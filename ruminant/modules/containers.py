@@ -402,6 +402,10 @@ class RIFFModule(module.RuminantModule):
             case "EXIF":
                 with self.buf.subunit():
                     chunk["data"]["exif"] = chew(self.buf)
+            case "XMP ":
+                with self.buf.subunit():
+                    chunk["data"]["xmp"] = utils.xml_to_dict(
+                        self.buf.readunit())
             case "ICMT" | "ISFT" | "INAM" | "IART" | "ICRD":
                 chunk["data"]["comment"] = self.buf.readunit().decode(
                     "utf-8").rstrip("\x00")
