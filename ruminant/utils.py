@@ -550,6 +550,29 @@ def _read_pgp(buf, fake=None):
     packet["tag"] = None
     packet["data"] = data
     match tag:
+        case 0x01:
+            packet["tag"] = "Public Key Encrypted Session Key"
+            data["version"] = buf.ru8()
+
+            algorithm = None
+            match data["version"]:
+                case 3:
+                    data["key-id"] = buf.rh(8)
+
+                    algorithm = buf.ru8()
+                    data["public-key-algorithm"] = unraw(
+                        algorithm, 1, PGP_PUBLIC_KEYS)
+                    
+                case _:
+                    packet["unknown"] = True
+
+            match algorithm:
+                case 0x01:
+                    data["session-key"] = {
+                        "c": read_pgp_mpi(buf)
+                    }
+                case _:
+                    data["session-key"] = {"unknown": True}
         case 0x02:
             packet["tag"] = "Signature"
             data["version"] = buf.ru8()
@@ -679,6 +702,16 @@ def _read_pgp(buf, fake=None):
         case 0x0d:
             packet["tag"] = "User ID"
             data["user-id"] = buf.rs(buf.unit)
+        case 0x12:
+            packet["tag"] = "Symetrically Encrypted and Integrity Protected Data"
+            data["version"] = buf.ru8()
+
+            match data["version"]:
+                case 0x01:
+                    data["encrypted-length"] = buf.unit
+                    buf.skipunit()
+                case _:
+                    packet["unknown"] = True
         case _:
             packet["tag"] = f"Unknown (0x{hex(tag)[2:].zfill(2)})"
             packet["unknown"] = True
