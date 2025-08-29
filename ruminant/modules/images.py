@@ -1557,7 +1557,10 @@ class TIFFModule(module.RuminantModule):
         thumbnail_length = None
         thumbnail_tag = None
         while True:
-            offset = self.buf.ru32l() if le else self.buf.ru32()
+            if self.buf.available() > 0:
+                offset = self.buf.ru32l() if le else self.buf.ru32()
+            else:
+                offset = 0
 
             if offset == 0:
                 if len(offset_queue):
@@ -1566,6 +1569,8 @@ class TIFFModule(module.RuminantModule):
                     break
 
             self.buf.seek(offset + base)
+            if self.buf.available() == 0:
+                continue
 
             entry_count = self.buf.ru16l() if le else self.buf.ru16()
             for i in range(0, entry_count):
