@@ -49,11 +49,10 @@ class PemModule(module.RuminantModule):
 class PgpModule(module.RuminantModule):
 
     def identify(buf, ctx):
-        with buf:
-            if buf.pu8() in (0x85, 0x89) and buf.peek(4)[3] in (0x03, 0x04):
-                return True
+        if buf.pu8() in (0x85, 0x89) and buf.peek(4)[3] in (0x03, 0x04):
+            return True
 
-            return buf.rl().startswith(b"-----BEGIN PGP ")
+        return buf.peek(15) == b"-----BEGIN PGP "
 
     def chew(self):
         meta = {}
