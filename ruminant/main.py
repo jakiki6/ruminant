@@ -104,6 +104,12 @@ def main():
 
         signal.signal(signal.SIGUSR1, print_stacktrace)
 
+        if len(sys.argv) == 2 and sys.argv[1] == "--dev":
+            with open(os.path.expanduser("~/.local/bin/ruminant"), "w") as f:
+                f.write("#!/usr/bin/env python3\nimport sys,os;sys.path.insert(0,os.path.expanduser(\"~/ruminant\"));from ruminant.main import main;sys.exit(main())")
+
+            exit(0)
+
     parser = argparse.ArgumentParser(description="Ruminant parser")
 
     parser.add_argument("file",
