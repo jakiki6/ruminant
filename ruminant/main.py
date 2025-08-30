@@ -106,7 +106,9 @@ def main():
 
         if len(sys.argv) == 2 and sys.argv[1] == "--dev":
             with open(os.path.expanduser("~/.local/bin/ruminant"), "w") as f:
-                f.write("#!/usr/bin/env python3\nimport sys,os;sys.path.insert(0,os.path.expanduser(\"~/ruminant\"));from ruminant.main import main;sys.exit(main())")
+                f.write(
+                    "#!/usr/bin/env python3\nimport sys,os;sys.path.insert(0,os.path.expanduser(\"~/ruminant\"));from ruminant.main import main;sys.exit(main())"  # noqa: E501
+                )
 
             exit(0)
 

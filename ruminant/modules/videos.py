@@ -1,7 +1,8 @@
 import uuid
 import struct
 import datetime
-from .. import module, utils, buf
+from .. import module, utils
+from ..buf import Buf
 from . import chew
 
 
@@ -1548,7 +1549,7 @@ class OggModule(module.RuminantModule):
                 slacks[stream_id] += self.buf.read(length)
 
                 if length != 255:
-                    self.process_packet(buf.Buf(slacks[stream_id]), stream_id,
+                    self.process_packet(Buf(slacks[stream_id]), stream_id,
                                         meta)
                     slacks[stream_id] = b""
 
@@ -1668,3 +1669,232 @@ class OggModule(module.RuminantModule):
             return
 
         meta["packets"].append(packet)
+
+
+@module.register
+class MpegTsModule(module.RuminantModule):
+
+    def identify(buf, ctx):
+        return buf.peek(1) == b"\x47"
+
+    def read_descriptors(self, buf):
+        descs = []
+
+        while buf.unit > 0:
+            desc = {}
+            desc["tag"] = buf.ru8()
+            desc["type"] = "unknown"
+            desc["length"] = buf.ru8()
+            desc["data"] = {}
+
+            match desc["tag"]:
+                case 0x48:
+                    desc["type"] = "Service Descriptor"
+                    desc["data"]["service-type"] = utils.unraw(
+                        buf.ru8(), 1, {
+                            1: "Digital TV",
+                            2: "Radio"
+                        })
+                    desc["data"]["provider"] = buf.rs(buf.ru8())
+                    desc["data"]["service"] = buf.rs(buf.ru8())
+                case 0x0a:
+                    desc["type"] = "Language"
+                    desc["data"]["language"] = buf.rs(3)
+                    desc["data"]["audio-type"] = utils.unraw(
+                        buf.ru8(), 1, {
+                            0: "Undefined",
+                            1: "Main audio",
+                            2: "Commentary",
+                            3: "Karaoke"
+                        })
+                case _:
+                    desc["unknown"] = True
+                    buf.skip(desc["length"])
+
+            descs.append(desc)
+
+        return descs
+
+    def process(self, pid, buf):
+        chunk = {}
+        chunk["pid"] = pid
+        chunk["length"] = buf.available()
+        chunk["type"] = "unknown"
+        chunk["data"] = {}
+
+        if pid in (0x0000, 0x0011) or pid in self.programs:
+            chunk["type"] = {0x0011: "sdt", 0x0000: "pat"}.get(pid, "pmt")
+
+            del chunk["data"]
+            chunk["psi"] = {}
+            chunk["data"] = {}
+            chunk["psi"]["table-id"] = buf.ru8()
+            temp = buf.ru16()
+            chunk["psi"]["fixed"] = temp >> 12
+
+            chunk["psi"]["section-length"] = temp & 0x0fff
+            buf.pushunit()
+            buf.setunit(chunk["psi"]["section-length"] - 4)
+
+            chunk["psi"]["transport-stream-id"] = buf.ru16()
+            temp = buf.ru8()
+            chunk["psi"]["reserved1"] = temp >> 6
+            chunk["psi"]["version"] = (temp >> 1) & 0x1f
+            chunk["psi"]["cni"] = bool(temp & 0x01)
+            chunk["psi"]["section-number"] = buf.ru8()
+            chunk["psi"]["last-section-number"] = buf.ru8()
+            chunk["psi"]["crc-32"] = None
+
+            match pid:
+                case 0x0011:
+                    chunk["data"]["original-network-id"] = buf.ru16()
+                    chunk["data"]["reserved2"] = buf.ru8()
+
+                    chunk["data"]["programs"] = []
+                    while buf.unit > 0:
+                        program = {}
+                        program["service-id"] = buf.ru16()
+                        eit = buf.ru8()
+                        program["eit"] = {
+                            "reserved": eit >> 2,
+                            "schedule": bool(eit & 0x02),
+                            "present-or-following": bool(eit & 0x01)
+                        }
+                        temp = buf.ru16()
+                        program["running-status"] = utils.unraw(
+                            (temp >> 13) & 0x07, 1, {
+                                0: "Undefined",
+                                1: "Not running",
+                                4: "Running"
+                            })
+                        program["scrambled"] = bool(temp & 0x1000)
+                        program["descriptor-length"] = temp & 0x0fff
+
+                        buf.pushunit()
+                        buf.setunit(temp & 0x0fff)
+
+                        program["descriptors"] = self.read_descriptors(buf)
+
+                        buf.skipunit()
+                        buf.popunit()
+
+                        chunk["data"]["programs"].append(program)
+                case 0x0000:
+                    chunk["data"]["programs"] = []
+                    while buf.unit > 0:
+                        program = {}
+                        program["program-number"] = buf.ru16()
+                        program["pid"] = buf.ru16() & 0x1fff
+
+                        self.programs[
+                            program["pid"]] = program["program-number"]
+
+                        chunk["data"]["programs"].append(program)
+                case _:
+                    chunk["data"]["program-id"] = self.programs[pid]
+                    temp = buf.ru16()
+                    chunk["data"]["reserved"] = temp >> 13
+                    chunk["data"]["pcr-id"] = temp & 0x1fff
+                    chunk["data"]["program-length"] = buf.ru16() & 0x0fff
+
+                    buf.pushunit()
+                    buf.setunit(chunk["data"]["program-length"])
+
+                    chunk["data"]["programs"] = self.read_descriptors(buf)
+
+                    buf.skipunit()
+                    buf.popunit()
+
+                    chunk["data"]["elementary-streams"] = []
+                    while buf.unit > 0:
+                        es = {}
+                        es["type"] = utils.unraw(
+                            buf.ru8(), 1, {
+                                2: "MPEG-2 video",
+                                3: "MPEG-1 audio",
+                                15: "AAC audio",
+                                27: "H.264 video"
+                            })
+                        es["pid"] = buf.ru16() & 0x1fff
+                        self.es.append(es["pid"])
+                        es["descriptor-length"] = buf.ru16() & 0x0fff
+
+                        buf.pushunit()
+                        buf.setunit(es["descriptor-length"])
+
+                        es["descriptors"] = self.read_descriptors(buf)
+
+                        buf.skipunit()
+                        buf.popunit()
+
+                        chunk["data"]["elementary-streams"].append(es)
+
+            buf.skipunit()
+            buf.popunit()
+
+            chunk["psi"]["crc-32"] = buf.rh(4)
+        else:
+            chunk["unknown"] = True
+
+        return chunk
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "mpeg-ts"
+        meta["chunks"] = []
+
+        self.programs = {}
+        self.es = []
+        slack = {}
+        starts = {}
+
+        index = 0
+        while self.buf.peek(1) == b"\x47":
+            self.buf.skip(1)
+            index += 1
+
+            temp = self.buf.ru16()
+            pusi = bool(temp & 0x4000)
+            pid = temp & 0x1fff
+
+            left = 184
+            if self.buf.ru8() & 0x20:
+                to_skip = self.buf.ru8()
+                self.buf.skip(to_skip)
+                left -= to_skip + 1
+
+            if pid not in slack:
+                slack[pid] = b""
+
+            if pusi:
+                offset = self.buf.ru8() + 1
+                self.buf.skip(offset - 1)
+
+                if len(slack[pid]):
+                    chunk = self.process(pid, Buf(slack[pid]))
+                    chunk["index"] = starts[pid]
+                    meta["chunks"].append(chunk)
+
+                slack[pid] = self.buf.read(left - offset)
+                starts[pid] = index
+            else:
+                slack[pid] += self.buf.read(left)
+
+            if self.buf.peek(1) != b"\x47" and self.buf.available(
+            ) > 16 and self.buf.peek(17)[-1] == b"\x47":
+                self.buf.skip(16)
+
+        for key, value in slack.items():
+            chunk = self.process(key, Buf(value))
+            chunk["index"] = starts[key]
+            meta["chunks"].append(chunk)
+
+        meta["chunks"].sort(key=lambda x: x["index"])
+        for chunk in meta["chunks"]:
+            del chunk["index"]
+
+            if chunk["pid"] in self.es:
+                del chunk["unknown"]
+                chunk["type"] = "es"
+
+        return meta
