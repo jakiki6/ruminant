@@ -119,12 +119,9 @@ class ID3v2Module(module.RuminantModule):
     def read_length(self):
         length = 0
 
-        if self.unsynchronized:
-            for i in range(0, 4):
-                length <<= 7
-                length |= self.buf.ru8() & 0x7f
-        else:
-            return self.buf.ru32()
+        for i in range(0, 4):
+            length <<= 7
+            length |= self.buf.ru8() & 0x7f
 
         return length
 
@@ -148,7 +145,6 @@ class ID3v2Module(module.RuminantModule):
 
         self.unsynchronized = True
         meta["header"]["length"] = self.read_length()
-        self.unsynchronized = bool(flags & 0x80)
         self.buf.pushunit()
         self.buf.setunit(meta["header"]["length"])
 
@@ -370,7 +366,7 @@ class ID3v2Module(module.RuminantModule):
                         frame["data"]["description"] = description.decode(
                             encoding)
                         frame["data"]["blob"] = chew(content)
-                    case "TALB" | "TIT1" | "TIT2" | "TIT3" | "TYER" | "TXXX" | "TPE1" | "TSSE" | "TCOM" | "TPUB" | "TOPE" | "TOAL" | "TCON" | "TPE2" | "TENC" | "TBPM":  # noqa: E501
+                    case "TALB" | "TIT1" | "TIT2" | "TIT3" | "TYER" | "TXXX" | "TPE1" | "TSSE" | "TCOM" | "TPUB" | "TOPE" | "TOAL" | "TCON" | "TPE2" | "TENC" | "TBPM" | "TRCK" | "TDEN" | "TDTG" | "TOFN":  # noqa: E501
                         frame["data"] = {}
                         frame["data"]["encoding"] = {
                             0: "latin-1",

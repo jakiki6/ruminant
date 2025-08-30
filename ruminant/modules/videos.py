@@ -1687,6 +1687,9 @@ class MpegTsModule(module.RuminantModule):
             desc["length"] = buf.ru8()
             desc["data"] = {}
 
+            buf.pushunit()
+            buf.setunit(desc["length"])
+
             match desc["tag"]:
                 case 0x48:
                     desc["type"] = "Service Descriptor"
@@ -1707,9 +1710,18 @@ class MpegTsModule(module.RuminantModule):
                             2: "Commentary",
                             3: "Karaoke"
                         })
+                case 0x25 | 0x26:
+                    if buf.peek(2) == b"\xff\xff":
+                        desc["type"] = "Twitch ID3"
+                    else:
+                        desc["payload"] = buf.rh(buf.unit)
+                        desc["unknown"] = True
                 case _:
+                    desc["payload"] = buf.rh(buf.unit)
                     desc["unknown"] = True
-                    buf.skip(desc["length"])
+
+            buf.skipunit()
+            buf.popunit()
 
             descs.append(desc)
 
@@ -1813,10 +1825,11 @@ class MpegTsModule(module.RuminantModule):
                                 2: "MPEG-2 video",
                                 3: "MPEG-1 audio",
                                 15: "AAC audio",
+                                21: "ID3 metadata",
                                 27: "H.264 video"
                             })
                         es["pid"] = buf.ru16() & 0x1fff
-                        self.es.append(es["pid"])
+                        self.es[es["pid"]] = es["type"]["raw"]
                         es["descriptor-length"] = buf.ru16() & 0x0fff
 
                         buf.pushunit()
@@ -1844,7 +1857,7 @@ class MpegTsModule(module.RuminantModule):
         meta["chunks"] = []
 
         self.programs = {}
-        self.es = []
+        self.es = {}
         slack = {}
         starts = {}
 
@@ -1873,6 +1886,7 @@ class MpegTsModule(module.RuminantModule):
                 if len(slack[pid]):
                     chunk = self.process(pid, Buf(slack[pid]))
                     chunk["index"] = starts[pid]
+                    chunk["blob"] = slack[pid]
                     meta["chunks"].append(chunk)
 
                 slack[pid] = self.buf.read(left - offset)
@@ -1887,14 +1901,27 @@ class MpegTsModule(module.RuminantModule):
         for key, value in slack.items():
             chunk = self.process(key, Buf(value))
             chunk["index"] = starts[key]
+            chunk["blob"] = value
             meta["chunks"].append(chunk)
 
         meta["chunks"].sort(key=lambda x: x["index"])
         for chunk in meta["chunks"]:
-            del chunk["index"]
-
             if chunk["pid"] in self.es:
                 del chunk["unknown"]
-                chunk["type"] = "es"
+
+                match self.es[chunk["pid"]]:
+                    case 21:
+                        chunk["type"] = "id3"
+
+                        blob = chunk["blob"]
+                        while blob[:3] != b"ID3":
+                            blob = blob[1:]
+
+                        chunk["data"] = chew(blob)
+                    case _:
+                        chunk["type"] = "es"
+
+            del chunk["index"]
+            del chunk["blob"]
 
         return meta
