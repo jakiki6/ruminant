@@ -643,6 +643,21 @@ def _read_pgp(buf, fake=None):
             data["version"] = buf.ru8()
 
             match data["version"]:
+                case 3:
+                    data["created-at"] = datetime.fromtimestamp(
+                        buf.ru32(), UTC).isoformat()
+                    data["expiry-days"] = buf.ru16()
+                    algorithm = buf.ru8()
+
+                    data["algorithm"] = unraw(algorithm, 1, PGP_PUBLIC_KEYS)
+                    match algorithm:
+                        case 0x01 | 0x02 | 0x03:
+                            data["key"] = {
+                                "n": read_pgp_mpi(buf),
+                                "e": read_pgp_mpi(buf)
+                            }
+                        case _:
+                            packet["unknown"] = True
                 case 4:
                     data["created-at"] = datetime.fromtimestamp(
                         buf.ru32(), UTC).isoformat()
