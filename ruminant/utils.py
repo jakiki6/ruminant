@@ -745,3 +745,50 @@ def read_pgp(buf):
     buf.popunit()
 
     return data
+
+
+def estimate_jpeg_quality(T_obs, wide=False, S_min=1, S_max=5000):
+    results = []
+    for S in range(S_min, S_max + 1):
+        Q = round((200 - S) / 2) if S <= 100 else round(5000.0 / S)
+
+        B_hat = []
+        for t in T_obs:
+            if S == 0:
+                b = 255
+            else:
+                b = int(round((100.0 * t - 50.0) / S))
+            if b < 1:
+                b = 1
+            if b > 255:
+                b = 255
+            B_hat.append(b)
+
+        T_pred = []
+        for b in B_hat:
+            v = int((b * S + 50) // 100)
+            if v < 1:
+                v = 1
+            if v > 255:
+                v = 255
+            T_pred.append(v)
+
+        err = sum(abs(a - b) for a, b in zip(T_obs, T_pred))
+        mism = sum(1 for a, b in zip(T_obs, T_pred) if a != b)
+
+        result = {
+            "quality": Q,
+            "s-value": S,
+            "error": err,
+            "mismatches": mism,
+            "recovered-b": "".join([hex(x)[2:].zfill(4 if wide else 2) for x in B_hat]),
+        }
+
+        if err == 0 and mism == 0:
+            return [result]
+
+        results.append(result)
+
+    results.sort(
+        key=lambda r: (r["error"], r["mismatches"], abs(r["s-value"] - 100)))
+    return results[0]
