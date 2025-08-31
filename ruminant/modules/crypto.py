@@ -21,18 +21,20 @@ class DerModule(module.RuminantModule):
 class PemModule(module.RuminantModule):
 
     def identify(buf, ctx):
-        return buf.peek(27) == b"-----BEGIN CERTIFICATE-----"
+        return buf.peek(27) == b"-----BEGIN CERTIFICATE-----" or buf.peek(
+            15) == b"-----BEGIN RSA " or buf.peek(
+                26) == b"-----BEGIN PUBLIC KEY-----"
 
     def chew(self):
         meta = {}
         meta["type"] = "pem"
 
-        self.buf.skip(27)
+        self.buf.rl()
 
         content = b""
         while True:
             line = self.buf.rl()
-            if line == b"-----END CERTIFICATE-----":
+            if len(line) == 0 or line.startswith(b"-----END"):
                 break
 
             content += line
@@ -69,7 +71,8 @@ class PgpModule(module.RuminantModule):
                 while True:
                     line = self.buf.rl()
 
-                    if line == b"-----BEGIN PGP SIGNATURE-----":
+                    if len(line
+                           ) == 0 or line == b"-----BEGIN PGP SIGNATURE-----":
                         break
 
                     message += line + b"\n"
@@ -79,10 +82,10 @@ class PgpModule(module.RuminantModule):
             content = b""
             while True:
                 line = self.buf.rl()
-                if line.startswith(b"-----END PGP "):
+                if len(line) == 0 or line.startswith(b"-----END PGP "):
                     break
 
-                if line.startswith(b"Comment: "):
+                if b":" in line:
                     continue
 
                 content += line
