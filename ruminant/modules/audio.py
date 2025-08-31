@@ -1,6 +1,7 @@
 from .. import module, utils
 from . import chew
 import zlib
+import json
 
 
 @module.register
@@ -382,6 +383,11 @@ class ID3v2Module(module.RuminantModule):
                                 "string"].split("\x00")[0]
                             frame["data"]["string"] = frame["data"][
                                 "string"].split("\x00")[1]
+
+                            match frame["data"]["namespace"]:
+                                case "segmentmetadata":
+                                    frame["data"]["string"] = json.loads(
+                                        frame["data"]["string"])
                     case _:
                         frame["data"] = content.hex()
                         frame["unknown"] = True

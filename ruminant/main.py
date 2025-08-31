@@ -110,6 +110,7 @@ def main():
                     "#!/usr/bin/env python3\nimport sys,os;sys.path.insert(0,os.path.expanduser(\"~/ruminant\"));from ruminant.main import main;sys.exit(main())"  # noqa: E501
                 )
 
+            print("Installed dev version of ruminant, make sure you have a cloned repo at ~/ruminant.")
             exit(0)
 
     parser = argparse.ArgumentParser(description="Ruminant parser")
