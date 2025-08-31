@@ -34,7 +34,7 @@ class PemModule(module.RuminantModule):
         content = b""
         while True:
             line = self.buf.rl()
-            if len(line) == 0 or line.startswith(b"-----END"):
+            if self.buf.available() == 0 or line.startswith(b"-----END"):
                 break
 
             content += line
@@ -71,8 +71,7 @@ class PgpModule(module.RuminantModule):
                 while True:
                     line = self.buf.rl()
 
-                    if len(line
-                           ) == 0 or line == b"-----BEGIN PGP SIGNATURE-----":
+                    if self.buf.available() == 0 or line == b"-----BEGIN PGP SIGNATURE-----":
                         break
 
                     message += line + b"\n"
@@ -82,7 +81,7 @@ class PgpModule(module.RuminantModule):
             content = b""
             while True:
                 line = self.buf.rl()
-                if len(line) == 0 or line.startswith(b"-----END PGP "):
+                if self.buf.available() == 0 or line.startswith(b"-----END PGP "):
                     break
 
                 if b":" in line:
