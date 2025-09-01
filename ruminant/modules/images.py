@@ -963,14 +963,7 @@ class JPEGModule(module.RuminantModule):
 
                     table["precision"] = 8 << (temp >> 4)
                     table["id"] = temp & 0x0f
-                    table["data"] = self.buf.ph(64 << (temp >> 4))
-
-                    T = [
-                        self.buf.ru16() if (temp >> 4) else self.buf.ru8()
-                        for i in range(0, 64)
-                    ]
-                    table["quality-estimation"] = utils.estimate_jpeg_quality(
-                        T, bool((temp >> 4)))
+                    table["data"] = self.buf.rh(64 << (temp >> 4))
 
                     chunk["tables"].append(table)
 

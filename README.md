@@ -20,12 +20,10 @@ Ruminant is still in early alpha but it can already process the following file t
   * IPTC metadata (I hate you for that one Adobe)
   * Adobe-specific metadata in APP14
   * MPF APP2 segments
-  * JPEG quality estimation
 * PNG files
   * EXIF metadata
 * TIFF files
   * EXIF metadata (EXIF metadata is literally stored in a TIFF file)
-    * Fuji Makernote
 * ISO files
   * MP4 files
   * AVIF files
