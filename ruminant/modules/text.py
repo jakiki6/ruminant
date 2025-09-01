@@ -6,10 +6,11 @@ import json
 
 @module.register
 class Utf8Module(module.RuminantModule):
-    priority = -1
+    priority = 1
 
     def identify(buf, ctx):
         try:
+            assert buf.available() < 1000000
             buf.peek(buf.available()).decode("utf-8")
 
             return True
