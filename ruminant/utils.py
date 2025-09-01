@@ -26,11 +26,13 @@ def _xml_to_dict(elem):
     return res
 
 
-def xml_to_dict(string):
+def xml_to_dict(string, fail=False):
     while len(string):
         try:
             return _xml_to_dict(ET.fromstring(string))
         except ET.ParseError:
+            if fail:
+                raise ValueError()
             string = string[:-1]
 
     return {}
