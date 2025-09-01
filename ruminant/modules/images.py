@@ -353,6 +353,8 @@ class IPTCIIMModule(module.RuminantModule):
                             data_length, "latin-1")
                     case 1061:
                         block["data"]["digest"] = self.buf.rh(16)
+                    case 1035:
+                        block["data"]["url"] = self.buf.rs(self.buf.unit)
                     case _:
                         block["data"]["unknown"] = True
             except Exception:
