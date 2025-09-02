@@ -6,13 +6,17 @@ import base64
 class DerModule(module.RuminantModule):
 
     def identify(buf, ctx):
-        return buf.pu8() == 0x30 and (buf.pu16() & 0xf0) in (0x80, 0x30)
+        return (buf.pu8() == 0x30 and (buf.pu16() & 0xf0) in (0x80, 0x30)) or buf.peek(3) == b"MII"
 
     def chew(self):
         meta = {}
         meta["type"] = "der"
 
-        meta["data"] = utils.read_der(self.buf)
+        content = self.buf.read(self.buf.available())
+        if content[:3] == b"MII":
+            content = base64.b64decode(content)
+
+        meta["data"] = utils.read_der(buf.Buf(content))
 
         return meta
 

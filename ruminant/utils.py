@@ -462,6 +462,9 @@ def read_pgp_subpacket(buf):
                 "can-authenticate": bool(flags & (1 << 5)),
                 "key-is-shared": bool(flags & (1 << 4)),
             }
+        case 0x1c:
+            packet["type"] = "Signer's User ID"
+            data["fingerprint"] = buf.rs(buf.unit)
         case 0x1d:
             packet["type"] = "Reason for Revocation"
             packet["reason"] = unraw(
