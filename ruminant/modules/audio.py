@@ -117,16 +117,30 @@ class ID3v2Module(module.RuminantModule):
     def identify(buf, ctx):
         return buf.peek(3) == b"ID3"
 
-    def read_length(self):
-        length = 0
+    def read_length(self, unsynchronized):
+        if unsynchronized or self.force:
+            length = 0
 
-        for i in range(0, 4):
-            length <<= 7
-            length |= self.buf.ru8() & 0x7f
+            for i in range(0, 4):
+                length <<= 7
+                length |= self.buf.ru8() & 0x7f
 
-        return length
+            return length
+        else:
+            return self.buf.ru32()
 
     def chew(self):
+        self.force = False
+
+        bak = self.buf.backup()
+        try:
+            return self._chew()
+        except AssertionError:
+            self.force = True
+            self.buf.restore(bak)
+            return self._chew()
+
+    def _chew(self):
         meta = {}
         meta["type"] = "id3v2"
 
@@ -144,15 +158,14 @@ class ID3v2Module(module.RuminantModule):
             "has-footer": bool(flags & 0x10),
         }
 
-        self.unsynchronized = True
-        meta["header"]["length"] = self.read_length()
+        meta["header"]["length"] = self.read_length(bool(flags & 0x80))
         self.buf.pushunit()
         self.buf.setunit(meta["header"]["length"])
 
         if meta["header"]["flags"]["has-extended-header"]:
             meta["extended-header"] = {}
 
-            extended_header_length = self.read_length()
+            extended_header_length = self.read_length(bool(flags & 0x80))
             meta["extended-header"]["length"] = extended_header_length
 
             self.buf.pushunit()
@@ -175,7 +188,7 @@ class ID3v2Module(module.RuminantModule):
             if frame["type"] == "\x00\x00\x00\x00":
                 break
 
-            frame["length"] = self.read_length()
+            frame["length"] = self.read_length(bool(flags & 0x80))
 
             status_flags = self.buf.ru8()
             frame["status-flags"] = {
@@ -199,12 +212,12 @@ class ID3v2Module(module.RuminantModule):
                 frame["format-flags"]["group-id"] = self.buf.ru8()
 
             if frame["format-flags"]["has-data-length-indictator"]:
-                frame["format-flags"]["data-length"] = self.read_length()
+                frame["format-flags"]["data-length"] = self.read_length(
+                    bool(format_flags & 0b00000010))
 
             content = self.buf.read(frame["length"])
 
-            if frame["format-flags"][
-                    "is-unsynchronized"] or self.unsynchronized:
+            if frame["format-flags"]["is-unsynchronized"]:
                 content = content.replace(b"\xff\x00", b"\xff")
 
             if frame["format-flags"]["is-encrypted"]:

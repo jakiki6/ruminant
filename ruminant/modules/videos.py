@@ -1649,8 +1649,9 @@ class OggModule(module.RuminantModule):
             packet["data"]["pixel-fmt-flags"] = buf.ru8()
             packet["data"]["target-bitrate"] = buf.ru24l()
             packet["data"]["quality"] = buf.ru8()
-            packet["data"]["keyframe-granule-shift"] = buf.ru8()
-            packet["data"]["pixel-fmt-flags2"] = buf.ru8()
+            if buf.available() > 0:
+                packet["data"]["keyframe-granule-shift"] = buf.ru8()
+                packet["data"]["pixel-fmt-flags2"] = buf.ru8()
         elif buf.peek(7) == b"\x81theora":
             buf.skip(7)
             packet["codec"] = "theora"
@@ -1675,7 +1676,15 @@ class OggModule(module.RuminantModule):
 class MpegTsModule(module.RuminantModule):
 
     def identify(buf, ctx):
-        return buf.peek(1) == b"\x47"
+        if buf.available() < 188:
+            return False
+        if buf.available() == 188:
+            return buf.peek(1) == b"\x47"
+        elif buf.available() == 204:
+            return buf.peek(1) == b"\x47" and buf.peek(189)[-1] != b"\x47"
+        else:
+            return buf.peek(1) == b"\x47" and (buf.peek(189)[-1] == 0x47
+                                               or buf.peek(205)[-1] == 0x47)
 
     def read_descriptors(self, buf):
         descs = []

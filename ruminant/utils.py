@@ -30,9 +30,9 @@ def xml_to_dict(string, fail=False):
     while len(string):
         try:
             return _xml_to_dict(ET.fromstring(string))
-        except ET.ParseError:
+        except ET.ParseError as e:
             if fail:
-                raise ValueError()
+                raise e
             string = string[:-1]
 
     return {}
