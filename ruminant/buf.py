@@ -47,11 +47,10 @@ class Buf(object):
         return data
 
     def skip(self, length):
-        if self.unit is not None:
-            self.unit = max(self.unit - length, 0)
-            assert (
-                self.unit >= 0
-            ), f"unit overread by {-self.unit} byte{'s' if self.unit != -1 else ''}"  # noqa: E501
+        if self.unit is None:
+            self.unit = self.available()
+        self.unit -= length
+        self._checkunit()
         self.seek(length, 1)
 
     def _checkunit(self):
@@ -79,9 +78,10 @@ class Buf(object):
             self.unit = None
             return self._file.read(self.available())
         else:
-            if self.unit is not None:
-                self.unit -= count
-                self._checkunit()
+            if self.unit is None:
+                self.unit = self.available()
+            self.unit -= count
+            self._checkunit()
 
             return self._file.read(min(count, self.available()))
 
@@ -102,8 +102,10 @@ class Buf(object):
         self.seek(offset)
 
     def rl(self):
+        if self.unit is None:
+            self.unit = self.available()
         line = b""
-        while self.unit is None or (self.unit > 0):
+        while self.unit > 0:
             c = self.read(1)
             if len(c) == 0:
                 break

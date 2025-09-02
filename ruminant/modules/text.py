@@ -1,7 +1,7 @@
 from .. import module, utils
 from . import chew
-import zlib
 import json
+import base64
 
 
 @module.register
@@ -14,7 +14,7 @@ class Utf8Module(module.RuminantModule):
             buf.peek(buf.available()).decode("utf-8")
 
             return True
-        except:
+        except Exception:
             return False
 
     def chew(self):
@@ -26,14 +26,18 @@ class Utf8Module(module.RuminantModule):
         try:
             content = utils.xml_to_dict(content, fail=True)
             meta["decoder"] = "xml"
-        except:
+        except Exception:
             try:
                 assert content[0] == "{"
                 content = json.loads(content)
                 meta["decoder"] = "json"
-            except:
-                content = content.split("\n")
-                meta["decoder"] = "lines"
+            except Exception:
+                try:
+                    content = chew(base64.b64decode(content))
+                    meta["decoder"] = "base64"
+                except Exception:
+                    content = content.split("\n")
+                    meta["decoder"] = "lines"
 
         meta["data"] = content
 
