@@ -2,58 +2,8 @@ from .. import module, utils
 from . import chew
 from ..buf import Buf
 
-import zipfile
-import xml.etree.ElementTree as ET
 import re
 import math
-
-
-@module.register
-class DocxModule(module.RuminantModule):
-
-    def identify(buf, ctx):
-        return False  # TODO
-
-    def chew(self):
-        zf = zipfile.ZipFile(self.buf, "r")
-        meta = {}
-        meta["type"] = "docx"
-
-        try:
-            with zf.open("docProps/core.xml", "r") as f:
-                root = ET.fromstring(f.read())
-
-            for child in root:
-                match child.tag:
-                    case "{http://purl.org/dc/elements/1.1/}creator":
-                        meta["creator"] = child.text
-                    case "{http://schemas.openxmlformats.org/package/2006/metadata/core-properties}lastModifiedBy":  # noqa: E501
-                        meta["last-modified-by"] = child.text
-                    case "{http://purl.org/dc/terms/}created":
-                        meta["created"] = child.text
-                    case "{http://purl.org/dc/terms/}modified":
-                        meta["modified"] = child.text
-                    case "{http://schemas.openxmlformats.org/package/2006/metadata/core-properties}lastPrinted":  # noqa: E501
-                        meta["last-printed"] = child.text
-                    case "{http://schemas.openxmlformats.org/package/2006/metadata/core-properties}revision":  # noqa: E501
-                        meta["revision"] = int(child.text)
-        except ET.ParseError:
-            pass
-
-        try:
-            with zf.open("docProps/app.xml", "r") as f:
-                root = ET.fromstring(f.read())
-
-            for child in root:
-                match child.tag:
-                    case "{http://schemas.openxmlformats.org/officeDocument/2006/extended-properties}Application":  # noqa: E501
-                        meta["application"] = child.text
-                    case "{http://schemas.openxmlformats.org/officeDocument/2006/extended-properties}Pages":  # noqa: E501
-                        meta["pages"] = int(child.text)
-        except ET.ParseError:
-            pass
-
-        return meta
 
 
 def png_decode(data, columns, rowlength):
@@ -521,7 +471,21 @@ class PdfModule(module.RuminantModule):
         elif token.isdigit():
             return int(token)
         elif token.startswith("("):
-            token = token[1:-1]
+            _token = token[1:-1]
+            token = ""
+            while len(_token):
+                if _token[0] == "\\":
+                    n = ""
+                    _token = _token[1:]
+                    while _token[0] in "0123456789":
+                        n += _token[0]
+                        _token = _token[1:]
+
+                    token += chr(int(n, 8))
+                else:
+                    token += _token[0]
+                    _token = _token[1:]
+
             if len(token) >= 2 and token[0] == "\xfe" and token[1] == "\xff":
                 if len(token) >= 3 and token[2] == "\\":
                     # what the fuck apple
@@ -535,6 +499,9 @@ class PdfModule(module.RuminantModule):
                     token = token.decode("latin-1")
                 elif len(token) % 2 == 0:
                     token = token.encode("latin-1").decode("utf-16")
+            elif len(token) >= 2 and token[0] == "\xff" and token[
+                    1] == "\xfe" and len(token) % 2 == 0:
+                token = token.encode("latin-1").decode("utf-16le")
 
             return token.replace("\\(", "(").replace("\\)", ")")
         elif token.startswith("<"):

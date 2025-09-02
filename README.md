@@ -11,7 +11,6 @@ This tool behaves similarly as extracted blobs themselves can be "chewed over ag
 # What can it process?
 Ruminant is still in early alpha but it can already process the following file types:
 * ZIP files
-* DOCX files (needs to be updated)
 * PDF files
 * JPEG files
   * EXIF metadata
