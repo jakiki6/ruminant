@@ -8,6 +8,52 @@ class TrueTypeModule(module.RuminantModule):
     def identify(buf, ctx):
         return buf.peek(5) in (b"\x00\x01\x00\x00\x00", b"OTTO\x00")
 
+    def read_dsig(self):
+        dsig = {}
+
+        base = self.buf.tell()
+
+        dsig["version"] = self.buf.ru32()
+        dsig["signature-count"] = self.buf.ru16()
+        flags = self.buf.ru16()
+        dsig["flags"] = {"raw": flags, "no-resigning": bool(flags & 0x01)}
+
+        most_offset = self.buf.tell()
+
+        dsig["signatures"] = []
+        for i in range(0, dsig["signature-count"]):
+            sig = {}
+            sig["format"] = self.buf.ru32()
+            sig["length"] = self.buf.ru32()
+            sig["offset"] = self.buf.ru32()
+
+            most_offset = max(most_offset,
+                              sig["offset"] + sig["length"] + base)
+
+            with self.buf:
+                self.buf.seek(sig["offset"] + base)
+                self.buf.pushunit()
+                self.buf.setunit(sig["length"])
+
+                match sig["format"]:
+                    case 1:
+                        sig["reserved"] = self.buf.rh(4)
+                        sig["length"] = self.buf.ru32()
+                        sig["data"] = utils.read_der(self.buf)
+                    case _:
+                        sig["unknown"] = True
+                        with self.subunit():
+                            sig["data"] = chew(self.buf)
+
+                self.buf.skipunit()
+                self.buf.popunit()
+
+            dsig["signatures"].append(sig)
+
+        self.buf.seek(((most_offset + 3) // 4) * 4)
+
+        return dsig
+
     def chew(self):
         meta = {}
         meta["type"] = "truetype"
@@ -503,7 +549,27 @@ class TrueTypeModule(module.RuminantModule):
                                     self.buf.read(tag["length"]))
 
                             table["data"]["tags"].append(tag)
-                    case "glyf" | "hmtx" | "loca" | "GDEF" | "GPOS" | "GSUB":
+                    case "PCLT":
+                        table["data"]["major-version"] = self.buf.ru16()
+                        table["data"]["minor-version"] = self.buf.ru16()
+                        table["data"]["font-vendor"] = self.buf.rs(1)
+                        table["data"]["font-number"] = self.buf.ru24()
+                        table["data"]["pitch"] = self.buf.ru16()
+                        table["data"]["x-height"] = self.buf.ru16()
+                        table["data"]["style"] = self.buf.ru16()
+                        table["data"]["type-family"] = self.buf.ru16()
+                        table["data"]["cap-height"] = self.buf.ru16()
+                        table["data"]["symbol-set"] = self.buf.ru16()
+                        table["data"]["typeface"] = self.buf.rs(16)
+                        table["data"]["character-complement"] = self.buf.rh(8)
+                        table["data"]["file-name"] = self.buf.rs(6)
+                        table["data"]["stroke-weight"] = self.buf.ru8()
+                        table["data"]["width-type"] = self.buf.ru8()
+                        table["data"]["serif-style"] = self.buf.ru8()
+                        table["data"]["reserved"] = self.buf.ru8()
+                    case "DSIG":
+                        table["data"] = self.read_dsig()
+                    case "glyf" | "hmtx" | "loca" | "GDEF" | "GPOS" | "GSUB" | "hdmx" | "VDMX" | "JSTF" | "LTSH":  # noqa: E501
                         # not really parsable as it's the raw glyph data
                         pass
                     case _:
@@ -518,49 +584,6 @@ class TrueTypeModule(module.RuminantModule):
 
         if self.buf.available(
         ) > 4 and self.buf.pu64() & 0xffffffffff00fffe == 0x0000000100000000:
-            dsig = {}
-            meta["dsig"] = dsig
-
-            base = self.buf.tell()
-
-            dsig["version"] = self.buf.ru32()
-            dsig["signature-count"] = self.buf.ru16()
-            flags = self.buf.ru16()
-            dsig["flags"] = {"raw": flags, "no-resigning": bool(flags & 0x01)}
-
-            most_offset = self.buf.tell()
-
-            dsig["signatures"] = []
-            for i in range(0, dsig["signature-count"]):
-                sig = {}
-                sig["format"] = self.buf.ru32()
-                sig["length"] = self.buf.ru32()
-                sig["offset"] = self.buf.ru32()
-
-                most_offset = max(most_offset,
-                                  sig["offset"] + sig["length"] + base)
-
-                with self.buf:
-                    self.buf.seek(sig["offset"] + base)
-                    self.buf.pushunit()
-                    self.buf.setunit(sig["length"])
-
-                    match sig["format"]:
-                        case 1:
-                            sig["reserved"] = self.buf.rh(4)
-                            sig["length"] = self.buf.ru32()
-                            sig["data"] = utils.read_der(self.buf)
-                        case _:
-                            sig["unknown"] = True
-                            with self.subunit():
-                                sig["data"] = chew(self.buf)
-
-                    self.buf.skipunit()
-                    self.buf.popunit()
-
-                dsig["signatures"].append(sig)
-
-            # there are 2 random zero bytes at the end for no fucking reason
-            self.buf.seek(most_offset + 2)
+            meta["table"].append({"tag": "DSIG", "data": self.read_dsig()})
 
         return meta
