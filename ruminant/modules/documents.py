@@ -264,8 +264,9 @@ class PdfModule(module.RuminantModule):
                                 buf = Buf(content)
                             case "/ASCIIHexDecode":
                                 buf = Buf(
-                                    bytes.fromhex(buf.read().rstrip(
-                                        b"\n").rstrip(b">").decode("latin-1")))
+                                    bytes.fromhex(
+                                        buf.read().rstrip(b"\n").split(
+                                            b">")[0].decode("latin-1")))
 
                     if "DecodeParms" in obj["value"]:
                         params = self.resolve(obj["value"]["DecodeParms"])
@@ -477,7 +478,7 @@ class PdfModule(module.RuminantModule):
                 if _token[0] == "\\":
                     n = ""
                     _token = _token[1:]
-                    while _token[0] in "0123456789":
+                    while len(_token) and _token[0] in "0123456789":
                         n += _token[0]
                         _token = _token[1:]
 
