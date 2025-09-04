@@ -1128,6 +1128,10 @@ class PNGModule(module.RuminantModule):
                     chunk["data"]["keyword"] = self.buf.rzs()
                     chunk["data"]["text"] = self.buf.readunit().decode(
                         "latin-1")
+
+                    if chunk["data"]["keyword"] == "XML:com.adobe.xmp":
+                        chunk["data"]["text"] = utils.xml_to_dict(
+                            chunk["data"]["text"].encode("latin-1"))
                 case "bKGD":
                     match self.buf.unit:
                         case 1:
