@@ -353,14 +353,11 @@ class RIFFModule(module.RuminantModule):
                 chunk["data"]["cue-id"] = self.buf.ru32l()
                 chunk["data"]["label"] = self.buf.rzs()
             case "bext":
-                chunk["data"]["description"] = self.buf.rs(256).rstrip("\x00")
-                chunk["data"]["originator"] = self.buf.rs(32).rstrip("\x00")
-                chunk["data"]["originator-ref"] = self.buf.rs(32).rstrip(
-                    "\x00")
-                chunk["data"]["originator-date"] = self.buf.rs(10).rstrip(
-                    "\x00")
-                chunk["data"]["originator-time"] = self.buf.rs(8).rstrip(
-                    "\x00")
+                chunk["data"]["description"] = self.buf.rs(256)
+                chunk["data"]["originator"] = self.buf.rs(32)
+                chunk["data"]["originator-ref"] = self.buf.rs(32)
+                chunk["data"]["originator-date"] = self.buf.rs(10)
+                chunk["data"]["originator-time"] = self.buf.rs(8)
                 chunk["data"]["time-reference"] = self.buf.ru64l()
                 chunk["data"]["version"] = self.buf.ru16l()
 

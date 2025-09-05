@@ -374,11 +374,17 @@ class Buf(object):
     def ph(self, length):
         return self.peek(length).hex()
 
-    def rs(self, length, encoding="utf-8"):
-        return utils.decode(self.read(length), encoding)
+    def rs(self, length, encoding="utf-8", strip=True):
+        s = utils.decode(self.read(length), encoding)
+        if strip:
+            s = s.rstrip("\x00")
+        return s
 
-    def ps(self, length, encoding="utf-8"):
-        return utils.decode(self.peek(length), encoding)
+    def ps(self, length, encoding="utf-8", strip=True):
+        s = utils.decode(self.peek(length), encoding)
+        if strip:
+            s = s.rstrip("\x00")
+        return s
 
     def rzs(self, encoding="utf-8"):
         s = b""
