@@ -1070,44 +1070,6 @@ class PNGModule(module.RuminantModule):
                 case "iTXt":
                     chunk["data"]["keyword"] = self.buf.rzs()
 
-                    compressed = bool(self.buf.ru8())
-                    chunk["data"]["compressed"] = compressed
-                    compression_method = self.buf.ru8()
-                    chunk["data"]["language-tag"] = self.buf.rzs()
-                    chunk["data"]["translated-keyword"] = self.buf.rzs()
-
-                    match compression_method:
-                        case 0:
-                            if compressed:
-                                chunk["data"]["compression-method"] = {
-                                    "raw": 0,
-                                    "name": "DEFLATE"
-                                }
-                                chunk["data"]["text"] = zlib.decompress(
-                                    self.buf.readunit())
-                            else:
-                                chunk["data"]["compression-method"] = {
-                                    "raw": 0,
-                                    "name": "Uncompressed"
-                                }
-                                chunk["data"]["text"] = self.buf.readunit()
-                        case _:
-                            chunk["data"]["compression-method"] = {
-                                "raw": compression_method,
-                                "name": "Unknown"
-                            }
-
-                    try:
-                        chunk["data"]["text"] = chunk["data"]["text"].decode(
-                            "utf-8")
-                    except UnicodeDecodeError:
-                        try:
-                            chunk["data"]["text"] = chunk["data"][
-                                "text"].decode("utf-16")
-                        except UnicodeDecodeError:
-                            chunk["data"]["text"] = chunk["data"][
-                                "text"].decode("latin-1")
-
                     if chunk["data"]["keyword"] == "XML:com.adobe.xmp":
                         chunk["data"]["text"] = utils.xml_to_dict(
                             chunk["data"]["text"])
@@ -1124,14 +1086,82 @@ class PNGModule(module.RuminantModule):
                     chunk["data"]["blue"] = [
                         self.buf.ru32() / 100000 for _ in range(0, 2)
                     ]
-                case "tEXt":
+                case "tEXt" | "zTXt":
                     chunk["data"]["keyword"] = self.buf.rzs()
-                    chunk["data"]["text"] = self.buf.readunit().decode(
-                        "latin-1")
 
-                    if chunk["data"]["keyword"] == "XML:com.adobe.xmp":
-                        chunk["data"]["text"] = utils.xml_to_dict(
-                            chunk["data"]["text"].encode("latin-1"))
+                    chunk["data"]["text"] = ""
+                    match chunk_type.decode("latin-1"):
+                        case "tEXt":
+                            chunk["data"]["text"] = self.buf.readunit()
+                        case "zTXt":
+                            compression_method = self.buf.ru8()
+
+                            match compression_method:
+                                case 0:
+                                    chunk["data"]["compression-method"] = {
+                                        "raw": 0,
+                                        "name": "DEFLATE"
+                                    }
+                                    chunk["data"]["text"] = zlib.decompress(
+                                        self.buf.readunit())
+                                case _:
+                                    chunk["data"]["compression-method"] = {
+                                        "raw": compression_method,
+                                        "name": "Unknown"
+                                    }
+
+                        case "iTXt":
+                            compressed = bool(self.buf.ru8())
+                            chunk["data"]["compressed"] = compressed
+                            compression_method = self.buf.ru8()
+                            chunk["data"]["language-tag"] = self.buf.rzs()
+                            chunk["data"]["translated-keyword"] = self.buf.rzs(
+                            )
+
+                            match compression_method:
+                                case 0:
+                                    if compressed:
+                                        chunk["data"]["compression-method"] = {
+                                            "raw": 0,
+                                            "name": "DEFLATE"
+                                        }
+                                        chunk["data"][
+                                            "text"] = zlib.decompress(
+                                                self.buf.readunit())
+                                    else:
+                                        chunk["data"]["compression-method"] = {
+                                            "raw": 0,
+                                            "name": "Uncompressed"
+                                        }
+                                        chunk["data"][
+                                            "text"] = self.buf.readunit()
+                                case _:
+                                    chunk["data"]["compression-method"] = {
+                                        "raw": compression_method,
+                                        "name": "Unknown"
+                                    }
+
+                    try:
+                        chunk["data"]["text"] = chunk["data"]["text"].decode(
+                            "utf-8")
+                    except UnicodeDecodeError:
+                        try:
+                            chunk["data"]["text"] = chunk["data"][
+                                "text"].decode("utf-16")
+                        except UnicodeDecodeError:
+                            chunk["data"]["text"] = chunk["data"][
+                                "text"].decode("latin-1")
+
+                    match chunk["data"]["keyword"]:
+                        case "XML:com.adobe.xmp":
+                            chunk["data"]["text"] = utils.xml_to_dict(
+                                chunk["data"]["text"])
+                        case "Raw profile type APP1":
+                            chunk["data"]["profile-type"] = chunk["data"][
+                                "text"].split("\n")[1]
+                            chunk["data"]["text"] = chew(
+                                bytes.fromhex(
+                                    chunk["data"]["text"].split("\n")[3]))
                 case "bKGD":
                     match self.buf.unit:
                         case 1:

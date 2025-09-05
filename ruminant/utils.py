@@ -2,7 +2,7 @@ from .oids import OIDS
 from .constants import PGP_HASHES, PGP_PUBLIC_KEYS, PGP_CIPHERS, PGP_AEADS, PGP_SIGNATURE_TYPES  # noqa: E501
 import uuid
 import xml.etree.ElementTree as ET
-from datetime import datetime, timezone, timedelta, UTC
+from datetime import datetime, timezone, timedelta
 import zlib
 import bz2
 
@@ -376,7 +376,8 @@ def read_pgp_subpacket(buf):
     match typ & 0x7f:
         case 0x02:
             packet["type"] = "Signature Creation Time"
-            data["time"] = datetime.fromtimestamp(buf.ru32(), UTC).isoformat()
+            data["time"] = datetime.fromtimestamp(buf.ru32(),
+                                                  timezone.utc).isoformat()
         case 0x03:
             packet["type"] = "Signature Expiration Time"
             data["expiration-offset"] = buf.ru32()
@@ -586,7 +587,7 @@ def _read_pgp(buf, fake=None):
                     buf.skip(1)
                     data["type"] = unraw(buf.ru8(), 1, PGP_SIGNATURE_TYPES)
                     data["created-at"] = datetime.fromtimestamp(
-                        buf.ru32(), UTC).isoformat()
+                        buf.ru32(), timezone.utc).isoformat()
 
                     data["key-id"] = buf.rh(8)
 
@@ -650,7 +651,7 @@ def _read_pgp(buf, fake=None):
             match data["version"]:
                 case 3:
                     data["created-at"] = datetime.fromtimestamp(
-                        buf.ru32(), UTC).isoformat()
+                        buf.ru32(), timezone.utc).isoformat()
                     data["expiry-days"] = buf.ru16()
                     algorithm = buf.ru8()
 
@@ -665,7 +666,7 @@ def _read_pgp(buf, fake=None):
                             packet["unknown"] = True
                 case 4:
                     data["created-at"] = datetime.fromtimestamp(
-                        buf.ru32(), UTC).isoformat()
+                        buf.ru32(), timezone.utc).isoformat()
                     algorithm = buf.ru8()
 
                     data["algorithm"] = unraw(algorithm, 1, PGP_PUBLIC_KEYS)
