@@ -33,7 +33,9 @@ class Utf8Module(module.RuminantModule):
                 meta["decoder"] = "json"
             except Exception:
                 try:
-                    content = chew(base64.b64decode(content))
+                    blob = chew(base64.b64decode(content))
+                    assert blob["type"] != "unknown"
+                    content = blob
                     meta["decoder"] = "base64"
                 except Exception:
                     content = content.split("\n")
