@@ -203,7 +203,7 @@ def main():
         with file:
             print(process(file, args.walk))
     else:
-        if not os.path.isfile(args.file):
+        if os.path.isdir(args.file):
             print("{\n  \"type\": \"directory\",\n  \"files\": [")
 
             filename_regex = re.compile(args.filename_regex)
@@ -250,6 +250,9 @@ def main():
 
             print("\n  ]\n}")
 
-        else:
+        elif os.path.isfile(args.file):
             with open(args.file, "rb") as file:
                 print(process(file, args.walk))
+        else:
+            print("File not found", file=sys.stderr)
+            exit(1)
