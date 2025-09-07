@@ -11,7 +11,8 @@ class Utf8Module(module.RuminantModule):
     def identify(buf, ctx):
         try:
             assert buf.available() > 0 and buf.available() < 1000000
-            buf.peek(buf.available()).decode("utf-8")
+            for i in buf.peek(buf.available()).decode("utf-8"):
+                assert ord(i) > 0
 
             return True
         except Exception:

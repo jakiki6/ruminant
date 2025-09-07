@@ -168,13 +168,17 @@ class PdfModule(module.RuminantModule):
                     try:
                         offset, buf = self.queue[0]
 
-                        with buf:
-                            buf.seek(offset)
-                            self.parse_object(self.buf)
+                        try:
+                            with buf:
+                                buf.seek(offset)
+                                self.parse_object(self.buf)
 
-                        self.queue.pop(0)
-                        stuck = False
-                        break
+                            self.queue.pop(0)
+                            stuck = False
+                            break
+                        except Exception:
+                            pass
+
                     except ReparsePoint:
                         self.queue.append(self.queue.pop(0))
 
