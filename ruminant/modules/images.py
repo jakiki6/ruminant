@@ -1447,6 +1447,7 @@ class TIFFModule(module.RuminantModule):
             42240: "Gamma",
             50341: "PrintImageMatching",
             59932: "Padding",
+            59933: "OffsetSchema",
         },
         # see lib/Image/ExifTool/FujiFilm.pm in exiftool
         "fuji": {
@@ -1541,6 +1542,91 @@ class TIFFModule(module.RuminantModule):
             32770: 'OrderNumber',
             32771: 'FrameNumber',
             45585: 'Parallax'
+        },
+        "sony": {
+            258: "Quality",
+            260: "FlashExposureComp",
+            261: "Teleconverter",
+            274: "WhiteBalanceFineTune",
+            277: "WhiteBalance",
+            4096: "MultiBurstMode",
+            4097: "MultiBurstImageWidth",
+            4098: "MultiBurstImageHeight",
+            8193: "PreviewImage",
+            8194: "Rating",
+            8196: "Contrast",
+            8197: "Saturation",
+            8198: "Sharpness",
+            8199: "Brightness",
+            8200: "LongExposureNoiseReduction",
+            8201: "HighISONoiseReduction",
+            8202: "AutoHDR",
+            8203: "MultiFrameNoiseReduction",
+            8206: "PictureEffect",
+            8207: "SoftSkinEffect",
+            8209: "VignettingCorrection",
+            8210: "LateralChromaticAberration",
+            8211: "DistortionCorrectionSetting",
+            8212: "WBShiftABGM",
+            8214: "AutoPortraitFramed",
+            8215: "FlashAction",
+            8218: "ElectronicFrontCurtainShutter",
+            8219: "FocusMode2",
+            8220: "AFAreaModeSetting",
+            8221: "FlexibleSpotPosition",
+            8222: "AFPointSelected",
+            8224: "AFPointsUsed",
+            8225: "AFTracking",
+            8226: "FocalPlaneAFPointsUsed",
+            8227: "MultiFrameNREffect",
+            8230: "WBShiftABGMPrecise",
+            8231: "FocusLocation",
+            8232: "VariableLowPassFilter",
+            8233: "RAWFileType",
+            8234: "Tag202a",
+            8235: "PrioritySetInAWB",
+            8236: "MeteringMode2",
+            8237: "ExposureStandardAdjustment",
+            8238: "Quality2",
+            8239: "PixelShiftInfo",
+            8241: "SerialNumber",
+            8242: "Shadows",
+            8243: "Highlights",
+            8244: "Fade",
+            8245: "SharpnessRange",
+            8246: "Clarity",
+            8247: "FocusFrameSize",
+            8249: "JPEGHEIFSwitch",
+            37888: "Tag9400",
+            45056: "FileFormat",
+            45057: "SonyModelID",
+            45088: "CreativeStyle",
+            45089: "ColorTemperature",
+            45090: "ColorCompensationFilter",
+            45091: "SceneMode",
+            45092: "ZoneMatching",
+            45093: "DynamicRangeOptimizer",
+            45094: "ImageStabilization",
+            45095: "LensID",
+            45097: "ColorMode",
+            45098: "LensSpec",
+            45099: "FullImageSize",
+            45100: "PreviewImageSize",
+            45120: "Macro",
+            45121: "ExposureMode",
+            45122: "FocusMode",
+            45123: "AFMode",
+            45124: "AFIlluminator",
+            45127: "JPEGQuality",
+            45128: "FlashLevel",
+            45129: "ReleaseMode",
+            45130: "SequenceNumber",
+            45131: "AntiBlur",
+            45134: "FocusMode3",
+            45135: "DynamicRangeOptimizer2",
+            45136: "HighISONoiseReduction2",
+            45138: "IntelligentAuto",
+            45140: "WhiteBalance2"
         }
     }
 
@@ -1561,7 +1647,8 @@ class TIFFModule(module.RuminantModule):
 
     def identify(buf, ctx):
         return buf.peek(4) in (b"II*\x00", b"MM\x00*",
-                               b"Exif") or buf.peek(8) == b"FUJIFILM"
+                               b"Exif") or buf.peek(8) in (b"FUJIFILM",
+                                                           b"SONY DSC")
 
     def chew(self):
         meta = {}
@@ -1570,18 +1657,23 @@ class TIFFModule(module.RuminantModule):
         le = None
         base = 0
         mode = "tiff"
+        shallow = 0
 
         if self.buf.peek(4) == b"Exif":
             self.buf.skip(6)
-            base = 6
+            base += 6
         elif self.buf.peek(8) == b"FUJIFILM":
-            self.buf.skip(4)
+            self.buf.skip(8)
             le = True
             mode = "fuji"
-
-        header = self.buf.read(4)
+        elif self.buf.peek(8) == b"SONY DSC":
+            self.buf.skip(12)
+            le = True
+            shallow = 1
+            mode = "sony"
 
         if le is None:
+            header = self.buf.read(4)
             le = header[0] == 0x49
 
         meta["endian"] = "little" if le else "big"
@@ -1594,185 +1686,230 @@ class TIFFModule(module.RuminantModule):
         thumbnail_length = None
         thumbnail_tag = None
         while True:
-            if self.buf.available() > 0:
-                offset = self.buf.ru32l() if le else self.buf.ru32()
-            else:
-                offset = 0
-
-            if offset == 0:
-                if len(offset_queue):
-                    offset = offset_queue.pop()
+            if not shallow:
+                if self.buf.available() > 0:
+                    offset = self.buf.ru32l() if le else self.buf.ru32()
                 else:
+                    offset = 0
+
+                if offset == 0:
+                    if len(offset_queue):
+                        offset = offset_queue.pop()
+                    else:
+                        break
+
+                self.buf.seek(offset + base)
+                if self.buf.available() == 0:
+                    continue
+            else:
+                if shallow == 2:
                     break
 
-            self.buf.seek(offset + base)
-            if self.buf.available() == 0:
-                continue
+                shallow += 1
 
             entry_count = self.buf.ru16l() if le else self.buf.ru16()
-            for i in range(0, entry_count):
-                tag = {}
 
-                tag_id = self.buf.ru16l() if le else self.buf.ru16()
-                tag["id"] = (self.TAG_IDS[mode].get(tag_id, "Unknown") +
-                             f" (0x{hex(tag_id)[2:].zfill(4)})")
-                field_type = self.buf.ru16l() if le else self.buf.ru16()
-                tag["type"] = (self.FIELD_TYPES.get(field_type, "Unknown") +
-                               f" (0x{hex(field_type)[2:].zfill(4)})")
-                count = self.buf.ru32l() if le else self.buf.ru32()
-                tag["count"] = count
-                offset_field_offset = self.buf.tell() - base
-                tag_offset = self.buf.ru32l() if le else self.buf.ru32()
-                tag["offset-or-value"] = tag_offset
+            try:
+                for i in range(0, entry_count):
+                    tag = {}
 
-                tag["values"] = []
-                with self.buf:
-                    if ((field_type in (1, 2, 7) and count <= 4)
-                            or (field_type in (3, 8, 11) and count <= 2)
-                            or (field_type in (4, 9, 12) and count <= 1)):
-                        self.buf.seek(offset_field_offset + base)
-                    else:
-                        self.buf.seek(tag_offset + base)
+                    tag_id = self.buf.ru16l() if le else self.buf.ru16()
+                    tag["id"] = (self.TAG_IDS[mode].get(tag_id, "Unknown") +
+                                 f" (0x{hex(tag_id)[2:].zfill(4)})")
+                    field_type = self.buf.ru16l() if le else self.buf.ru16()
+                    tag["type"] = (
+                        self.FIELD_TYPES.get(field_type, "Unknown") +
+                        f" (0x{hex(field_type)[2:].zfill(4)})")
+                    count = self.buf.ru32l() if le else self.buf.ru32()
+                    tag["count"] = count
+                    offset_field_offset = self.buf.tell() - base
+                    tag_offset = self.buf.ru32l() if le else self.buf.ru32()
+                    tag["offset-or-value"] = tag_offset
 
-                    for i in range(0, count):
-                        match field_type:
-                            case 1:
-                                tag["values"].append(
-                                    self.buf.ru8l() if le else self.buf.ru8())
-                            case 2:
-                                string = b""
-                                while self.buf.peek(1)[0]:
-                                    string += self.buf.read(1)
-
-                                self.buf.skip(1)
-                                tag["values"].append(string.decode("latin-1"))
-                                count -= len(string) + 1
-                                if count <= 0:
-                                    break
-                            case 3:
-                                tag["values"].append(self.buf.ru16l(
-                                ) if le else self.buf.ru16())
-                            case 4:
-                                value = (self.buf.ru32l()
-                                         if le else self.buf.ru32())
-                                tag["values"].append(value)
-
-                                if "IFD" in tag["id"]:
-                                    offset_queue.append(value)
-                            case 5:
-                                value = {}
-                                value["numerator"] = (self.buf.ru32l() if le
-                                                      else self.buf.ru32())
-                                value["denominator"] = (self.buf.ru32l() if le
-                                                        else self.buf.ru32())
-                                value["rational-approx"] = (
-                                    value["numerator"] / value["denominator"]
-                                    if value["denominator"] else "NaN")
-                                tag["values"].append(value)
-                            case 6:
-                                tag["values"].append(
-                                    self.buf.ri8l() if le else self.buf.ri8())
-                            case 7:
-                                tag["values"].append(self.buf.rh(count))
-                                break
-                            case 8:
-                                tag["values"].append(self.buf.ri16l(
-                                ) if le else self.buf.ri16())
-                            case 9:
-                                tag["values"].append(self.buf.ri32l(
-                                ) if le else self.buf.ri32())
-                            case 10:
-                                value = {}
-                                value["numerator"] = (self.buf.ri32l() if le
-                                                      else self.buf.ri32())
-                                value["denominator"] = (self.buf.ri32l() if le
-                                                        else self.buf.ri32())
-                                value["rational-approx"] = (
-                                    value["numerator"] / value["denominator"]
-                                    if value["denominator"] else "NaN")
-                                tag["values"].append(value)
-                            case 11:
-                                tag["values"].append(self.buf.rf32l(
-                                ) if le else self.buf.rf32())
-                            case 12:
-                                tag["values"].append(self.buf.rf64l(
-                                ) if le else self.buf.rf64())
-                            case _:
-                                tag["unknown"] = True
-
-                match mode:
-                    case "tiff":
-                        match tag_id:
-                            case 513:
-                                thumbnail_offset = tag["values"][0]
-                                thumbnail_tag = tag
-                            case 514:
-                                thumbnail_length = tag["values"][0]
-                            case 37500:
-                                if tag["values"][0].startswith(
-                                        "46554a4946494c4d"):
-                                    tag["parsed"] = chew(
-                                        bytes.fromhex(tag["values"][0]))
-                            case 45056:
-                                temp = bytes.fromhex(
-                                    tag["values"][0]).decode("latin-1")
-                                tag["parsed"] = temp[:2].lstrip("0") + "." + (
-                                    temp[2:].rstrip("0")
-                                    if temp[2:] != "00" else "0")
-                            case 45058:
-                                tag["parsed"] = {}
-                                buf = Buf(bytes.fromhex(tag["values"][0]))
-
-                                temp = buf.ru32l()
-                                flags = (temp >> 27) & 0x1f
-                                tag["parsed"]["flags"] = {
-                                    "raw": flags,
-                                    "representative": bool(flags & 0x02),
-                                    "dependent-child": bool(flags & 0x04),
-                                    "dependend-parent": bool(flags & 0x08)
-                                }
-                                tag["parsed"]["format"] = utils.unraw(
-                                    (temp >> 24) & 0x07, 1, {0: "JPEG"})
-                                tag["parsed"]["type"] = utils.unraw(
-                                    temp & 0xffffff, 3, {
-                                        0x000000: "Undefined",
-                                        0x010001:
-                                        "Large Thumbnail (VGA equivalent)",
-                                        0x010002:
-                                        "Large Thumbnail (full HD equivalent)",
-                                        0x010003:
-                                        "Large Thumbnail (4K equivalent)",
-                                        0x010004:
-                                        "Large Thumbnail (8K equivalent)",
-                                        0x010005:
-                                        "Large Thumbnail (16K equivalent)",
-                                        0x020001: "Multi-frame Panorama",
-                                        0x020002: "Multi-frame Disparity",
-                                        0x020003: "Multi-angle",
-                                        0x030000: "Baseline MP Primary Image",
-                                        0x040000:
-                                        "Original Preservation Image",
-                                        0x050000: "Gain Map Image"
-                                    })
-                                tag["parsed"]["image-start"] = buf.ru32l()
-                                tag["parsed"]["image-end"] = buf.ru32l()
-                                tag["parsed"]["dependent-image-entries"] = [
-                                    buf.ru16l() for i in range(0, 2)
-                                ]
-
-                if (thumbnail_tag is not None and thumbnail_offset is not None
-                        and thumbnail_length is not None):
+                    tag["values"] = []
                     with self.buf:
-                        self.buf.seek(thumbnail_offset + base)
+                        if ((field_type in (1, 2, 7) and count <= 4)
+                                or (field_type in (3, 8, 11) and count <= 2)
+                                or (field_type in (4, 9, 12) and count <= 1)):
+                            self.buf.seek(offset_field_offset + base)
+                        else:
+                            self.buf.seek(tag_offset + base)
 
-                        with self.buf.sub(thumbnail_length):
-                            thumbnail_tag["parsed"] = chew(self.buf)
+                        for i in range(0, count):
+                            match field_type:
+                                case 1:
+                                    tag["values"].append(self.buf.ru8l(
+                                    ) if le else self.buf.ru8())
+                                case 2:
+                                    string = b""
+                                    while self.buf.peek(1)[0]:
+                                        string += self.buf.read(1)
 
-                    thumbnail_tag = None
-                    thumbnail_offset = None
-                    thumbnail_length = None
+                                    self.buf.skip(1)
+                                    tag["values"].append(
+                                        string.decode("latin-1"))
+                                    count -= len(string) + 1
+                                    if count <= 0:
+                                        break
+                                case 3:
+                                    tag["values"].append(self.buf.ru16l(
+                                    ) if le else self.buf.ru16())
+                                case 4:
+                                    value = (self.buf.ru32l()
+                                             if le else self.buf.ru32())
+                                    tag["values"].append(value)
 
-                meta["data"]["tags"].append(tag)
+                                    if "IFD" in tag["id"]:
+                                        offset_queue.append(value)
+                                case 5:
+                                    value = {}
+                                    value["numerator"] = (self.buf.ru32l()
+                                                          if le else
+                                                          self.buf.ru32())
+                                    value["denominator"] = (self.buf.ru32l()
+                                                            if le else
+                                                            self.buf.ru32())
+                                    value["rational-approx"] = (
+                                        value["numerator"] /
+                                        value["denominator"]
+                                        if value["denominator"] else "NaN")
+                                    tag["values"].append(value)
+                                case 6:
+                                    tag["values"].append(self.buf.ri8l(
+                                    ) if le else self.buf.ri8())
+                                case 7:
+                                    tag["values"].append(self.buf.rh(count))
+                                    break
+                                case 8:
+                                    tag["values"].append(self.buf.ri16l(
+                                    ) if le else self.buf.ri16())
+                                case 9:
+                                    tag["values"].append(self.buf.ri32l(
+                                    ) if le else self.buf.ri32())
+                                case 10:
+                                    value = {}
+                                    value["numerator"] = (self.buf.ri32l()
+                                                          if le else
+                                                          self.buf.ri32())
+                                    value["denominator"] = (self.buf.ri32l()
+                                                            if le else
+                                                            self.buf.ri32())
+                                    value["rational-approx"] = (
+                                        value["numerator"] /
+                                        value["denominator"]
+                                        if value["denominator"] else "NaN")
+                                    tag["values"].append(value)
+                                case 11:
+                                    tag["values"].append(self.buf.rf32l(
+                                    ) if le else self.buf.rf32())
+                                case 12:
+                                    tag["values"].append(self.buf.rf64l(
+                                    ) if le else self.buf.rf64())
+                                case _:
+                                    tag["unknown"] = True
+
+                    match mode:
+                        case "tiff":
+                            match tag_id:
+                                case 513:
+                                    thumbnail_offset = tag["values"][0]
+                                    thumbnail_tag = tag
+                                case 514:
+                                    thumbnail_length = tag["values"][0]
+                                case 37500:
+                                    if tag["values"][0].startswith(
+                                            "46554a4946494c4d"
+                                    ) or tag["values"][0].startswith(
+                                            "534f4e592044534320"):
+                                        tag["parsed"] = chew(
+                                            bytes.fromhex(tag["values"][0]))
+                                case 2 | 36864 | 40960 | 45056:
+                                    if len(tag["values"]) == 1 and type(
+                                            tag["values"][0]) is str:
+                                        temp = bytes.fromhex(
+                                            tag["values"][0]).decode("latin-1")
+                                        tag["parsed"] = temp[:2].lstrip(
+                                            "0") + "." + (temp[2:].rstrip("0")
+                                                          if temp[2:] != "00"
+                                                          else "0")
+
+                                        if tag_id == 2:
+                                            tag["id"] = "Version (0x0002)"
+
+                                case 45058:
+                                    tag["parsed"] = {}
+                                    buf = Buf(bytes.fromhex(tag["values"][0]))
+
+                                    temp = buf.ru32l()
+                                    flags = (temp >> 27) & 0x1f
+                                    tag["parsed"]["flags"] = {
+                                        "raw": flags,
+                                        "representative": bool(flags & 0x02),
+                                        "dependent-child": bool(flags & 0x04),
+                                        "dependend-parent": bool(flags & 0x08)
+                                    }
+                                    tag["parsed"]["format"] = utils.unraw(
+                                        (temp >> 24) & 0x07, 1, {0: "JPEG"})
+                                    tag["parsed"]["type"] = utils.unraw(
+                                        temp & 0xffffff,
+                                        3,
+                                        {
+                                            0x000000: "Undefined",
+                                            0x010001:
+                                            "Large Thumbnail (VGA equivalent)",
+                                            0x010002:
+                                            "Large Thumbnail (full HD equivalent)",  # noqa: E501
+                                            0x010003:
+                                            "Large Thumbnail (4K equivalent)",
+                                            0x010004:
+                                            "Large Thumbnail (8K equivalent)",
+                                            0x010005:
+                                            "Large Thumbnail (16K equivalent)",
+                                            0x020001: "Multi-frame Panorama",
+                                            0x020002: "Multi-frame Disparity",
+                                            0x020003: "Multi-angle",
+                                            0x030000:
+                                            "Baseline MP Primary Image",
+                                            0x040000:
+                                            "Original Preservation Image",
+                                            0x050000: "Gain Map Image"
+                                        })
+                                    tag["parsed"]["image-start"] = buf.ru32l()
+                                    tag["parsed"]["image-end"] = buf.ru32l()
+                                    tag["parsed"][
+                                        "dependent-image-entries"] = [
+                                            buf.ru16l() for i in range(0, 2)
+                                        ]
+                        case "sony":
+                            match tag_id:
+                                case 8234:
+                                    tag["parsed"] = {}
+                                    buf = Buf(bytes.fromhex(tag["values"][0]))
+
+                                    tag["parsed"]["used"] = buf.ru8()
+                                    tag["parsed"]["area"] = [
+                                        buf.ru16() for i in range(0, 2)
+                                    ]
+                                    tag["parsed"]["points"] = [[
+                                        buf.ru16() for i in range(0, 2)
+                                    ] for j in range(0, 15)]
+
+                    if (thumbnail_tag is not None
+                            and thumbnail_offset is not None
+                            and thumbnail_length is not None):
+                        with self.buf:
+                            self.buf.seek(thumbnail_offset + base)
+
+                            with self.buf.sub(thumbnail_length):
+                                thumbnail_tag["parsed"] = chew(self.buf)
+
+                        thumbnail_tag = None
+                        thumbnail_offset = None
+                        thumbnail_length = None
+
+                    meta["data"]["tags"].append(tag)
+            except Exception:
+                pass
 
         self.buf.skip(self.buf.available())
 

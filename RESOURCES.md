@@ -35,3 +35,7 @@ This is a list of useful resources.
 
 # Files in the exiftool tree
 * lib/Image/ExifTool/FujiFilm.pm
+
+# Camera tags
+* https://exiv2.org/tags-sony.html
+* https://exiftool.org/TagNames/Sony.html
