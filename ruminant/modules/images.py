@@ -2,6 +2,7 @@ import zlib
 import datetime
 from . import chew
 from .. import module, utils
+from ..buf import Buf
 
 
 @module.register
@@ -1712,6 +1713,52 @@ class TIFFModule(module.RuminantModule):
                                         "46554a4946494c4d"):
                                     tag["parsed"] = chew(
                                         bytes.fromhex(tag["values"][0]))
+                            case 45056:
+                                temp = bytes.fromhex(
+                                    tag["values"][0]).decode("latin-1")
+                                tag["parsed"] = temp[:2].lstrip("0") + "." + (
+                                    temp[2:].rstrip("0")
+                                    if temp[2:] != "00" else "0")
+                            case 45058:
+                                tag["parsed"] = {}
+                                buf = Buf(bytes.fromhex(tag["values"][0]))
+
+                                temp = buf.ru32l()
+                                flags = (temp >> 27) & 0x1f
+                                tag["parsed"]["flags"] = {
+                                    "raw": flags,
+                                    "representative": bool(flags & 0x02),
+                                    "dependent-child": bool(flags & 0x04),
+                                    "dependend-parent": bool(flags & 0x08)
+                                }
+                                tag["parsed"]["format"] = utils.unraw(
+                                    (temp >> 24) & 0x07, 1, {0: "JPEG"})
+                                tag["parsed"]["type"] = utils.unraw(
+                                    temp & 0xffffff, 3, {
+                                        0x000000: "Undefined",
+                                        0x010001:
+                                        "Large Thumbnail (VGA equivalent)",
+                                        0x010002:
+                                        "Large Thumbnail (full HD equivalent)",
+                                        0x010003:
+                                        "Large Thumbnail (4K equivalent)",
+                                        0x010004:
+                                        "Large Thumbnail (8K equivalent)",
+                                        0x010005:
+                                        "Large Thumbnail (16K equivalent)",
+                                        0x020001: "Multi-frame Panorama",
+                                        0x020002: "Multi-frame Disparity",
+                                        0x020003: "Multi-angle",
+                                        0x030000: "Baseline MP Primary Image",
+                                        0x040000:
+                                        "Original Preservation Image",
+                                        0x050000: "Gain Map Image"
+                                    })
+                                tag["parsed"]["image-start"] = buf.ru32l()
+                                tag["parsed"]["image-end"] = buf.ru32l()
+                                tag["parsed"]["dependent-image-entries"] = [
+                                    buf.ru16l() for i in range(0, 2)
+                                ]
 
                 if (thumbnail_tag is not None and thumbnail_offset is not None
                         and thumbnail_length is not None):
