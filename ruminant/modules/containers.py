@@ -2,7 +2,6 @@ from . import chew
 from .. import module, utils, constants
 
 import tempfile
-import re
 
 
 @module.register
@@ -403,22 +402,18 @@ class RIFFModule(module.RuminantModule):
                 with self.buf.subunit():
                     chunk["data"]["xmp"] = utils.xml_to_dict(
                         self.buf.readunit())
-            case "ICMT" | "ISFT" | "INAM" | "IART" | "ICRD" | "strn":
+            case "ICMT" | "ISFT" | "INAM" | "IART" | "ICRD" | "IARL" | "ILNG" | "IMED" | "ISRC" | "ISRF" | "ITCH" | "strn":  # noqa: E501
                 chunk["data"]["text"] = utils.decode(
                     self.buf.readunit()).rstrip("\x00")
             case "RIFF" | "LIST" | "FORM":
                 chunk["data"]["type"] = self.buf.rs(4)
-                chunk["data"]["chunks"] = []
-                while self.buf.unit:
-                    list_chunk = self.read_chunk()
 
-                    if not re.match("\\d{2}(dc|db|wb|tx)", list_chunk["type"]):
+                if chunk["data"]["type"] != "movi":
+                    chunk["data"]["chunks"] = []
+
+                    while self.buf.unit:
+                        list_chunk = self.read_chunk()
                         chunk["data"]["chunks"].append(list_chunk)
-                    else:
-                        if "skipped" not in chunk:
-                            chunk["skipped"] = 0
-
-                        chunk["skipped"] += 1
             case "data" | "JUNK" | "idx1":
                 pass
             case _:
