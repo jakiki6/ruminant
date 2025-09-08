@@ -414,7 +414,7 @@ class RIFFModule(module.RuminantModule):
                     while self.buf.unit:
                         list_chunk = self.read_chunk()
                         chunk["data"]["chunks"].append(list_chunk)
-            case "data" | "JUNK" | "idx1":
+            case "data" | "JUNK" | "idx1" | "indx" | "ix00" | "ix01":
                 pass
             case _:
                 chunk["data"]["unknown"] = True
