@@ -656,10 +656,18 @@ def _read_pgp(buf, fake=None):
                     data["nested"] = buf.ru8() == 0
                 case _:
                     packet["unknown"] = True
-        case 0x06 | 0x0e:
-            packet["tag"] = "Public-key" if tag == 0x06 else "Public-Subkey"
+        case 0x05 | 0x06 | 0x07 | 0x0e:
+            packet["tag"] = {
+                0x05: "Secret Key",
+                0x06: "Public Key",
+                0x07: "Secret Subkey",
+                0x0e: "Public Subkey"
+            }[tag]
             data["version"] = buf.ru8()
 
+            secret = {0x05: True, 0x06: False, 0x07: True, 0x0e: False}[tag]
+
+            algorithm = None
             match data["version"]:
                 case 3:
                     data["created-at"] = datetime.fromtimestamp(
@@ -668,68 +676,61 @@ def _read_pgp(buf, fake=None):
                     algorithm = buf.ru8()
 
                     data["algorithm"] = unraw(algorithm, 1, PGP_PUBLIC_KEYS)
-                    match algorithm:
-                        case 0x01 | 0x02 | 0x03:
-                            data["key"] = {
-                                "n": read_pgp_mpi(buf),
-                                "e": read_pgp_mpi(buf)
-                            }
-                        case _:
-                            packet["unknown"] = True
                 case 4:
                     data["created-at"] = datetime.fromtimestamp(
                         buf.ru32(), timezone.utc).isoformat()
                     algorithm = buf.ru8()
 
                     data["algorithm"] = unraw(algorithm, 1, PGP_PUBLIC_KEYS)
-                    match algorithm:
-                        case 0x01 | 0x02 | 0x03:
-                            data["key"] = {
-                                "n": read_pgp_mpi(buf),
-                                "e": read_pgp_mpi(buf)
-                            }
-                        case 0x10:
-                            data["key"] = {
-                                "p": read_pgp_mpi(buf),
-                                "g": read_pgp_mpi(buf),
-                                "y": read_pgp_mpi(buf)
-                            }
-                        case 0x11:
-                            data["key"] = {
-                                "p": read_pgp_mpi(buf),
-                                "q": read_pgp_mpi(buf),
-                                "g": read_pgp_mpi(buf),
-                                "y": read_pgp_mpi(buf)
-                            }
-                        case 0x12:
-                            data["key"] = {
-                                "oid": read_oid(buf,
-                                                buf.ru8() - 1),
-                                "point": read_pgp_mpi(buf)
-                            }
-
-                            length = buf.ru8()
-                            buf.skip(1)
-                            data["key"]["kdf-hash-function"] = unraw(
-                                buf.ru8(), 1, PGP_HASHES)
-                            data["key"]["kdf-cipher"] = unraw(
-                                buf.ru8(), 1, PGP_CIPHERS)
-
-                            if length > 3:
-                                data["key"]["sender"] = buf.rs(32)
-                                data["key"]["fingerprint"] = buf.rh(length -
-                                                                    35)
-                        case 0x13 | 0x16:
-                            data["key"] = {
-                                "oid": read_oid(buf,
-                                                buf.ru8() - 1),
-                                "point": read_pgp_mpi(buf)
-                            }
-                        case _:
-                            packet["unknown"] = True
-
                 case _:
                     packet["unknown"] = True
+
+            match algorithm:
+                case 0x01 | 0x02 | 0x03:
+                    data["key"] = {
+                        "n": read_pgp_mpi(buf),
+                        "e": read_pgp_mpi(buf)
+                    }
+                case 0x10:
+                    data["key"] = {
+                        "p": read_pgp_mpi(buf),
+                        "g": read_pgp_mpi(buf),
+                        "y": read_pgp_mpi(buf)
+                    }
+                case 0x11:
+                    data["key"] = {
+                        "p": read_pgp_mpi(buf),
+                        "q": read_pgp_mpi(buf),
+                        "g": read_pgp_mpi(buf),
+                        "y": read_pgp_mpi(buf)
+                    }
+                case 0x12:
+                    data["key"] = {
+                        "oid": read_oid(buf,
+                                        buf.ru8() - 1),
+                        "point": read_pgp_mpi(buf)
+                    }
+
+                    length = buf.ru8()
+                    buf.skip(1)
+                    data["key"]["kdf-hash-function"] = unraw(
+                        buf.ru8(), 1, PGP_HASHES)
+                    data["key"]["kdf-cipher"] = unraw(
+                        buf.ru8(), 1, PGP_CIPHERS)
+
+                    if length > 3:
+                        data["key"]["sender"] = buf.rs(32)
+                        data["key"]["fingerprint"] = buf.rh(length -
+                                                            35)
+                case 0x13 | 0x16:
+                    data["key"] = {
+                        "oid": read_oid(buf,
+                                        buf.ru8() - 1),
+                        "point": read_pgp_mpi(buf)
+                    }
+                case _:
+                    packet["unknown"] = True
+
         case 0x08:
             packet["tag"] = "Compressed Data"
 
