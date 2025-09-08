@@ -634,7 +634,7 @@ def _read_pgp(buf, fake=None):
                     packet["unknown"] = True
             match algorithm:
                 case 0x01 | 0x02 | 0x03:
-                    data["signature"] = {"d": read_pgp_mpi(buf)}
+                    data["signature"] = {"c": read_pgp_mpi(buf)}
                 case 0x11 | 0x13 | 0x16:
                     data["signature"] = {
                         "r": read_pgp_mpi(buf),
@@ -642,6 +642,20 @@ def _read_pgp(buf, fake=None):
                     }
                 case _:
                     data["signature"] = {"unknown": True}
+        case 0x04:
+            packet["tag"] = "One-pass Signature"
+            data["version"] = buf.ru8()
+
+            match data["version"]:
+                case 3:
+                    data["type"] = unraw(buf.ru8(), 1, PGP_SIGNATURE_TYPES)
+                    data["hash-algorithm"] = unraw(buf.ru8(), 1, PGP_HASHES)
+                    data["public-key-algorithm"] = unraw(
+                        buf.ru8(), 1, PGP_PUBLIC_KEYS)
+                    data["key-id"] = buf.rh(8)
+                    data["nested"] = buf.ru8() == 0
+                case _:
+                    packet["unknown"] = True
         case 0x06 | 0x0e:
             packet["tag"] = "Public-key" if tag == 0x06 else "Public-Subkey"
             data["version"] = buf.ru8()
@@ -750,6 +764,18 @@ def _read_pgp(buf, fake=None):
                     data["content"].append(read_pgp(cbuf))
             else:
                 data["unknown"] = True
+        case 0x0b:
+            packet["tag"] = "Literal Data"
+            data["format"] = buf.rs(1)
+            data["filename"] = buf.rs(buf.ru8())
+            data["date"] = datetime.fromtimestamp(buf.ru32(),
+                                                  timezone.utc).isoformat()
+
+            match data["format"]:
+                case "t" | "b":
+                    data["content"] = buf.rs(buf.unit)
+                case _:
+                    packet["unknown"] = True
         case 0x0d:
             packet["tag"] = "User ID"
             data["user-id"] = buf.rs(buf.unit)
