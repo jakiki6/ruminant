@@ -1,7 +1,13 @@
 import io
 import struct
 import uuid
-from . import utils
+
+
+def _decode(content, encoding="utf-8"):
+    try:
+        return content.decode(encoding)
+    except Exception:
+        return content.decode("latin-1")
 
 
 class Buf(object):
@@ -375,13 +381,13 @@ class Buf(object):
         return self.peek(length).hex()
 
     def rs(self, length, encoding="utf-8", strip=True):
-        s = utils.decode(self.read(length), encoding)
+        s = _decode(self.read(length), encoding)
         if strip:
             s = s.rstrip("\x00")
         return s
 
     def ps(self, length, encoding="utf-8", strip=True):
-        s = utils.decode(self.peek(length), encoding)
+        s = _decode(self.peek(length), encoding)
         if strip:
             s = s.rstrip("\x00")
         return s
@@ -393,7 +399,7 @@ class Buf(object):
 
         self.skip(1)
 
-        return utils.decode(s, encoding)
+        return _decode(s, encoding)
 
     def pzs(self, encoding="utf-8"):
         pos = self.tell()
@@ -404,7 +410,7 @@ class Buf(object):
 
         self.seek(pos)
 
-        return utils.decode(s, encoding)
+        return _decode(s, encoding)
 
     def ruuid(self):
         return str(uuid.UUID(bytes=self.read(16)))

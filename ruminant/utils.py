@@ -1,5 +1,6 @@
 from .oids import OIDS
 from .constants import PGP_HASHES, PGP_PUBLIC_KEYS, PGP_CIPHERS, PGP_AEADS, PGP_SIGNATURE_TYPES  # noqa: E501
+from .buf import Buf, _decode
 import uuid
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
@@ -336,11 +337,8 @@ def zlib_decompress(content):
             return data
 
 
-def decode(content, encoding="utf-8"):
-    try:
-        return content.decode(encoding)
-    except Exception:
-        return content.decode("latin-1")
+def decode(*args, **kwargs):
+    return _decode(*args, **kwargs)
 
 
 def unraw(i, width, choices):
@@ -718,6 +716,40 @@ def _read_pgp(buf, fake=None):
 
                 case _:
                     packet["unknown"] = True
+        case 0x08:
+            packet["tag"] = "Compressed Data"
+
+            method = buf.ru8()
+            data["method"] = unraw(method, 1, {
+                0: "Uncompressed",
+                1: "ZIP",
+                2: "ZLIB",
+                3: "BZip2"
+            })
+
+            content = buf.readunit()
+            match method:
+                case 0:
+                    pass
+                case 1:
+                    decompressor = zlib.decompressobj(-zlib.MAX_WBITS)
+                    content = decompressor.decompress(
+                        content) + decompressor.flush()
+                case 2:
+                    content = zlib.decompress(content)
+                case 3:
+                    content = bz2.decompress(content)
+                case _:
+                    content = None
+
+            if content is not None:
+                cbuf = Buf(content)
+
+                data["content"] = []
+                while cbuf.available() > 0:
+                    data["content"].append(read_pgp(cbuf))
+            else:
+                data["unknown"] = True
         case 0x0d:
             packet["tag"] = "User ID"
             data["user-id"] = buf.rs(buf.unit)
