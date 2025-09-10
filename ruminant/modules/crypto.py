@@ -31,7 +31,8 @@ class PemModule(module.RuminantModule):
     def identify(buf, ctx):
         return buf.peek(27) == b"-----BEGIN CERTIFICATE-----" or buf.peek(
             15) == b"-----BEGIN RSA " or buf.peek(
-                26) == b"-----BEGIN PUBLIC KEY-----"
+                26) == b"-----BEGIN PUBLIC KEY-----" or buf.peek(
+                    27) == b"-----BEGIN PRIVATE KEY-----"
 
     def chew(self):
         meta = {}

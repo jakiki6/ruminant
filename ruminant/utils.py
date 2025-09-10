@@ -715,13 +715,12 @@ def _read_pgp(buf, fake=None):
                     buf.skip(1)
                     data["key"]["kdf-hash-function"] = unraw(
                         buf.ru8(), 1, PGP_HASHES)
-                    data["key"]["kdf-cipher"] = unraw(
-                        buf.ru8(), 1, PGP_CIPHERS)
+                    data["key"]["kdf-cipher"] = unraw(buf.ru8(), 1,
+                                                      PGP_CIPHERS)
 
                     if length > 3:
                         data["key"]["sender"] = buf.rs(32)
-                        data["key"]["fingerprint"] = buf.rh(length -
-                                                            35)
+                        data["key"]["fingerprint"] = buf.rh(length - 35)
                 case 0x13 | 0x16:
                     data["key"] = {
                         "oid": read_oid(buf,
@@ -731,6 +730,14 @@ def _read_pgp(buf, fake=None):
                 case _:
                     packet["unknown"] = True
 
+            if secret:
+                s2k_usage = buf.ru8()
+                data["s2k-usage"] = unraw(s2k_usage, 1, {
+                    0: "Unencrypted",
+                    253: "AEAD",
+                    254: "CFB",
+                    255: "MalleableCFB"
+                })
         case 0x08:
             packet["tag"] = "Compressed Data"
 

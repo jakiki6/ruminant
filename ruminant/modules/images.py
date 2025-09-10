@@ -1068,12 +1068,6 @@ class PNGModule(module.RuminantModule):
                                 "raw": compression_method,
                                 "name": "Unknown"
                             }
-                case "iTXt":
-                    chunk["data"]["keyword"] = self.buf.rzs()
-
-                    if chunk["data"]["keyword"] == "XML:com.adobe.xmp":
-                        chunk["data"]["text"] = utils.xml_to_dict(
-                            chunk["data"]["text"])
                 case "cHRM":
                     chunk["data"]["white"] = [
                         self.buf.ru32() / 100000 for _ in range(0, 2)
@@ -1087,7 +1081,7 @@ class PNGModule(module.RuminantModule):
                     chunk["data"]["blue"] = [
                         self.buf.ru32() / 100000 for _ in range(0, 2)
                     ]
-                case "tEXt" | "zTXt":
+                case "tEXt" | "zTXt" | "iTXt":
                     chunk["data"]["keyword"] = self.buf.rzs()
 
                     chunk["data"]["text"] = ""

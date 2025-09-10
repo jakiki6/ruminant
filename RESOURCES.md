@@ -33,9 +33,9 @@ This is a list of useful resources.
 * https://id3.org/id3v2.4.0-structure
 * https://id3.org/id3v2.4.0-frames
 
-# Files in the exiftool tree
-* lib/Image/ExifTool/FujiFilm.pm
-
 # Camera tags
 * https://exiv2.org/tags-sony.html
 * https://exiftool.org/TagNames/Sony.html
+
+## Files in the exiftool tree
+* lib/Image/ExifTool/FujiFilm.pm

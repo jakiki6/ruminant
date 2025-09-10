@@ -25,22 +25,39 @@ class Utf8Module(module.RuminantModule):
         content = self.buf.rs(self.buf.available())
 
         try:
-            content = utils.xml_to_dict(content, fail=True)
-            meta["decoder"] = "xml"
+            assert content.startswith("data:image/")
+            data = ";".join(content.split(";")[1:]).split(",")
+            encoding, data = data[0], ",".join(data[1:])
+
+            match encoding:
+                case "utf8":
+                    data = data.encode("utf-8")
+                case "base64":
+                    data = base64.b64decode(data)
+                case _:
+                    raise ValueError()
+
+            content = chew(data)
+            meta["decoder"] = "data-uri"
+            meta["encoding"] = encoding
         except Exception:
             try:
-                assert content[0] == "{"
-                content = json.loads(content)
-                meta["decoder"] = "json"
+                content = utils.xml_to_dict(content, fail=True)
+                meta["decoder"] = "xml"
             except Exception:
                 try:
-                    blob = chew(base64.b64decode(content))
-                    assert blob["type"] != "unknown"
-                    content = blob
-                    meta["decoder"] = "base64"
+                    assert content[0] == "{"
+                    content = json.loads(content)
+                    meta["decoder"] = "json"
                 except Exception:
-                    content = content.split("\n")
-                    meta["decoder"] = "lines"
+                    try:
+                        blob = chew(base64.b64decode(content))
+                        assert blob["type"] != "unknown"
+                        content = blob
+                        meta["decoder"] = "base64"
+                    except Exception:
+                        content = content.split("\n")
+                        meta["decoder"] = "lines"
 
         meta["data"] = content
 
