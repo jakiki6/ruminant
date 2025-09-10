@@ -383,7 +383,7 @@ class IsoModule(module.RuminantModule):
             atom["data"]["payload"] = utils.decode(
                 self.buf.readunit(),
                 "utf-16" if atom["data"]["type"] == 1 else "utf-8")
-        elif typ == "free":
+        elif typ in ("free", "skip"):
             atom["data"]["non-zero"] = sum(self.buf.peek(self.buf.unit)) > 0
             if atom["data"]["non-zero"]:
                 if self.buf.peek(3) == b"Iso":
