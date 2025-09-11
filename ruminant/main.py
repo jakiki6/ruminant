@@ -90,7 +90,7 @@ def process(file, walk):
                       ensure_ascii=False)
 
 
-def main():
+def main(dev=False):
     global has_tqdm, args
 
     if sys.platform == "linux":
@@ -105,14 +105,24 @@ def main():
         signal.signal(signal.SIGUSR1, print_stacktrace)
 
         if len(sys.argv) == 2 and sys.argv[1] == "--dev":
+            if sys.platform != "linux":
+                print("This only works on Linux.")
+                exit(1)
+
+            if not os.path.isdir(os.path.expanduser("~/ruminant")):
+                print("Please clone the repo to ~/ruminant first.")
+                exit(1)
+
+            if dev:
+                print("Installed already.")
+                exit(1)
+
             with open(os.path.expanduser("~/.local/bin/ruminant"), "w") as f:
                 f.write(
-                    "#!/usr/bin/env python3\nimport sys,os;sys.path.insert(0,os.path.expanduser(\"~/ruminant\"));from ruminant.main import main;sys.exit(main())"
+                    "#!/usr/bin/env python3\nimport sys,os;sys.path.insert(0,os.path.expanduser(\"~/ruminant\"));from ruminant.main import main;sys.exit(main(True))"
                 )
 
-            print(
-                "Installed dev version of ruminant, make sure you have a cloned repo at ~/ruminant."
-            )
+            print("Installed dev version of ruminant.")
             exit(0)
 
     parser = argparse.ArgumentParser(description="Ruminant parser")
@@ -254,5 +264,5 @@ def main():
             with open(args.file, "rb") as file:
                 print(process(file, args.walk))
         else:
-            print("File not found", file=sys.stderr)
+            print("File not found.", file=sys.stderr)
             exit(1)
