@@ -232,6 +232,10 @@ class IPTCIIMModule(module.RuminantModule):
         else:
             return self.buf.rs(4)
 
+    def read_unicode(self):
+        return self.buf.read(self.buf.ru32() *
+                             2).decode("utf-16be").rstrip("\x00")
+
     def read_item(self, typ):
         match typ:
             case "bool":
@@ -245,8 +249,23 @@ class IPTCIIMModule(module.RuminantModule):
             case "enum":
                 return {"type": self.read_key(), "enum": self.read_key()}, True
             case "TEXT":
-                return self.buf.read(self.buf.ru32() *
-                                     2).decode("utf-16be").rstrip("\x00"), True
+                return self.read_unicode(), True
+            case "long":
+                return self.buf.ru32(), True
+            case "VlLs":
+                count = self.buf.ru32()
+                typ = self.buf.rs(4)
+
+                lis = []
+                for i in range(0, count):
+                    value, success = self.read_item(typ)
+
+                    if not success:
+                        return lis, False
+
+                    lis.append(value)
+
+                return lis, True
             case _:
                 return {"unknown": typ}, False
 
@@ -255,8 +274,7 @@ class IPTCIIMModule(module.RuminantModule):
 
         if top:
             desc["version"] = self.buf.ru32()
-        desc["name"] = self.buf.read(self.buf.ru32() *
-                                     2).decode("utf16").rstrip("\x00")
+        desc["name"] = self.read_unicode()
         desc["class-id"] = self.read_key()
         desc["item-count"] = self.buf.ru32()
 
@@ -434,6 +452,57 @@ class IPTCIIMModule(module.RuminantModule):
                             self.buf.ru32() *
                             2).decode("utf-16be").rstrip("\x00")
                         block["data"]["file-version"] = self.buf.ru32()
+                    case 1064:
+                        block["data"]["version"] = self.buf.ru32()
+                        block["data"]["x-over-y"] = self.buf.rf64()
+                    case 1050:
+                        block["data"]["version"] = self.buf.ru32()
+                        match block["data"]["version"]:
+                            case 6:
+                                block["data"]["bounding-rect"] = [
+                                    self.buf.ru32() for i in range(0, 4)
+                                ]
+                                block["data"]["name"] = self.read_unicode()
+                                block["data"]["slice-count"] = self.buf.ru32()
+
+                                block["data"]["slices"] = []
+                                for i in range(0,
+                                               block["data"]["slice-count"]):
+                                    slic = {}
+                                    slic["id"] = self.buf.ru32()
+                                    slic["group-id"] = self.buf.ru32()
+                                    slic["origin"] = self.buf.ru32()
+                                    if slic["origin"]:
+                                        slic[
+                                            "associated-layer-id"] = self.buf.ru32(
+                                            )
+                                    slic["name"] = self.read_unicode()
+                                    slic["type"] = self.buf.rs(4)
+                                    slic["rect"] = [
+                                        self.buf.ru32() for i in range(0, 4)
+                                    ]
+                                    slic["url"] = self.read_unicode()
+                                    slic["target"] = self.read_unicode()
+                                    slic["message"] = self.read_unicode()
+                                    slic["alt-text"] = self.read_unicode()
+                                    slic["cell-text-is-html"] = bool(
+                                        self.buf.ru8())
+                                    slic["cell-text"] = self.read_unicode()
+                                    slic[
+                                        "horizontal-alignment"] = self.buf.ru32(
+                                        )
+                                    slic["vertical-alignment"] = self.buf.ru32(
+                                    )
+                                    slic["color"] = self.buf.rh(4)
+                                    slic[
+                                        "descriptor"], success = self.read_descriptor(
+                                            True)
+                                    if not success:
+                                        slic["unknown"] = True
+
+                                    block["data"]["slices"].append(slic)
+                            case _:
+                                block["data"]["unknown"] = True
                     case 1013 | 1016 | 1026:
                         block["data"]["blob"] = self.buf.rh(self.buf.unit)
                     case 1082 | 1083:
@@ -442,6 +511,7 @@ class IPTCIIMModule(module.RuminantModule):
                         if not success:
                             block["data"]["unknown"] = True
                     case _:
+                        block["data"]["blob"] = self.buf.rh(self.buf.unit)
                         block["data"]["unknown"] = True
             except Exception as e:
                 raise e
@@ -1940,9 +2010,7 @@ class TIFFModule(module.RuminantModule):
                                     tag["parsed"]["format"] = utils.unraw(
                                         (temp >> 24) & 0x07, 1, {0: "JPEG"})
                                     tag["parsed"]["type"] = utils.unraw(
-                                        temp & 0xffffff,
-                                        3,
-                                        {
+                                        temp & 0xffffff, 3, {
                                             0x000000: "Undefined",
                                             0x010001:
                                             "Large Thumbnail (VGA equivalent)",
