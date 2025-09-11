@@ -107,11 +107,11 @@ def main():
         if len(sys.argv) == 2 and sys.argv[1] == "--dev":
             with open(os.path.expanduser("~/.local/bin/ruminant"), "w") as f:
                 f.write(
-                    "#!/usr/bin/env python3\nimport sys,os;sys.path.insert(0,os.path.expanduser(\"~/ruminant\"));from ruminant.main import main;sys.exit(main())"  # noqa: E501
+                    "#!/usr/bin/env python3\nimport sys,os;sys.path.insert(0,os.path.expanduser(\"~/ruminant\"));from ruminant.main import main;sys.exit(main())"
                 )
 
             print(
-                "Installed dev version of ruminant, make sure you have a cloned repo at ~/ruminant."  # noqa: E501
+                "Installed dev version of ruminant, make sure you have a cloned repo at ~/ruminant."
             )
             exit(0)
 
@@ -236,7 +236,7 @@ def main():
                             print(",")
 
                         print(
-                            f"    {{\n      \"path\": {json.dumps(file)},\n      \"data\": {{"  # noqa: E501
+                            f"    {{\n      \"path\": {json.dumps(file)},\n      \"data\": {{"
                         )
 
                         print("\n".join([

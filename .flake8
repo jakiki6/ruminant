@@ -1,4 +1,4 @@
 [flake8]
 
 indent-size = 4
-max-line-length = 81
+max-line-length = 1000000

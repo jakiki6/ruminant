@@ -934,7 +934,7 @@ class IsoModule(module.RuminantModule):
         elif typ == "mdln":
             atom["data"]["model-name"] = self.buf.rs(self.buf.unit)
         elif typ == "sefd":
-            # algorithm is from https://github.com/eilam-ashbell/seft-parser/blob/4083f85aad99e01af014d089bf0b0d42acf27ad4/lib/esm/classes/Seft.js  # noqa: E501
+            # algorithm is from https://github.com/eilam-ashbell/seft-parser/blob/4083f85aad99e01af014d089bf0b0d42acf27ad4/lib/esm/classes/Seft.js
             with self.buf.sub(self.buf.unit):
                 length = self.buf.available()
 
@@ -1250,7 +1250,7 @@ class IsoModule(module.RuminantModule):
                     for atom in atoms:
                         if atom["type"] == "mdat":
                             atom["data"][
-                                "type"] = stream_type if stream_type is not None else "unknown"  # noqa: E501
+                                "type"] = stream_type if stream_type is not None else "unknown"
                             atom["data"]["unknown"] = True
 
                             self.buf.seek(atom["offset"])

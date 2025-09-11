@@ -380,7 +380,7 @@ class ID3v2Module(module.RuminantModule):
                         frame["data"]["description"] = description.decode(
                             encoding)
                         frame["data"]["blob"] = chew(content)
-                    case "TALB" | "TIT1" | "TIT2" | "TIT3" | "TYER" | "TXXX" | "TPE1" | "TSSE" | "TCOM" | "TPUB" | "TOPE" | "TOAL" | "TCON" | "TPE2" | "TENC" | "TBPM" | "TRCK" | "TDEN" | "TDTG" | "TOFN":  # noqa: E501
+                    case "TALB" | "TIT1" | "TIT2" | "TIT3" | "TYER" | "TXXX" | "TPE1" | "TSSE" | "TCOM" | "TPUB" | "TOPE" | "TOAL" | "TCON" | "TPE2" | "TENC" | "TBPM" | "TRCK" | "TDEN" | "TDTG" | "TOFN":
                         frame["data"] = {}
                         frame["data"]["encoding"] = {
                             0: "latin-1",

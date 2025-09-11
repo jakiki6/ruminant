@@ -283,7 +283,7 @@ class TrueTypeModule(module.RuminantModule):
                                     3:
                                     "Unicode 2.0 or later semantics (BMP only)",
                                     4:
-                                    "Unicode 2.0 or later semantics (non-BMP characters allowed)"  # noqa: E501
+                                    "Unicode 2.0 or later semantics (non-BMP characters allowed)"
                                 },
                                 1: {
                                     0: "Roman",
@@ -569,7 +569,7 @@ class TrueTypeModule(module.RuminantModule):
                         table["data"]["reserved"] = self.buf.ru8()
                     case "DSIG":
                         table["data"] = self.read_dsig()
-                    case "glyf" | "hmtx" | "loca" | "GDEF" | "GPOS" | "GSUB" | "hdmx" | "VDMX" | "JSTF" | "LTSH":  # noqa: E501
+                    case "glyf" | "hmtx" | "loca" | "GDEF" | "GPOS" | "GSUB" | "hdmx" | "VDMX" | "JSTF" | "LTSH":
                         # not really parsable as it's the raw glyph data
                         pass
                     case _:

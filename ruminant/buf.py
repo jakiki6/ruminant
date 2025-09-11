@@ -57,13 +57,13 @@ class Buf(object):
             self.unit = max(self.unit - length, 0)
             assert (
                 self.unit >= 0
-            ), f"unit overread by {-self.unit} byte{'s' if self.unit != -1 else ''}"  # noqa: E501
+            ), f"unit overread by {-self.unit} byte{'s' if self.unit != -1 else ''}"
         self.seek(length, 1)
 
     def _checkunit(self):
         assert (
             self.unit >= 0
-        ), f"unit overread by {-self.unit} byte{'s' if self.unit != -1 else ''}"  # noqa: E501
+        ), f"unit overread by {-self.unit} byte{'s' if self.unit != -1 else ''}"
 
     def setunit(self, length):
         self.unit = length
@@ -243,16 +243,16 @@ class Buf(object):
         return int.from_bytes(self.read(8), "little", signed=True)
 
     def rf32(self):
-        return struct.unpack(">f", self.read(4))
+        return struct.unpack(">f", self.read(4))[0]
 
     def rf64(self):
-        return struct.unpack(">d", self.read(8))
+        return struct.unpack(">d", self.read(8))[0]
 
     def rf32l(self):
-        return struct.unpack("<f", self.read(4))
+        return struct.unpack("<f", self.read(4))[0]
 
     def rf64l(self):
-        return struct.unpack("<d", self.read(8))
+        return struct.unpack("<d", self.read(8))[0]
 
     def rfp16(self):
         return self.ru16() / 256

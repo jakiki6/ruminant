@@ -7,9 +7,9 @@ import math
 
 
 def png_decode(data, columns, rowlength):
-    # based on https://github.com/py-pdf/pypdf/blob/47a7f8fae02aa06585f8c8338dcab647e2547917/pypdf/filters.py#L204  # noqa: E501
+    # based on https://github.com/py-pdf/pypdf/blob/47a7f8fae02aa06585f8c8338dcab647e2547917/pypdf/filters.py#L204
     # licensed under BSD-3
-    # see https://github.com/py-pdf/pypdf/blob/47a7f8fae02aa06585f8c8338dcab647e2547917/LICENSE for attribution  # noqa: E501
+    # see https://github.com/py-pdf/pypdf/blob/47a7f8fae02aa06585f8c8338dcab647e2547917/LICENSE for attribution
 
     output = b""
     prev_rowdata = bytes(rowlength)
@@ -71,7 +71,7 @@ class ReparsePoint(Exception):
 @module.register
 class PdfModule(module.RuminantModule):
     TOKEN_PATTERN = re.compile(
-        r"( << | >> | \[ | \] | /[^\s<>/\[\]()]+ | \d+\s+\d+\s+R | \d+\.\d+ | \d+ | \( (?: [^\\\)] | \\ . )* \) | <[0-9A-Fa-f\s]*> | true | false | null )",  # noqa: E501
+        r"( << | >> | \[ | \] | /[^\s<>/\[\]()]+ | \d+\s+\d+\s+R | \d+\.\d+ | \d+ | \( (?: [^\\\)] | \\ . )* \) | <[0-9A-Fa-f\s]*> | true | false | null )",
         re.VERBOSE | re.DOTALL,
     )
     INDIRECT_OBJECT_PATTERN = re.compile(r"^(\d+) (\d+) R$")
@@ -147,7 +147,7 @@ class PdfModule(module.RuminantModule):
         while len(self.queue) + len(self.compressed):
             stuck = True
             if len(self.compressed):
-                for compressed_id, compressed_index, compressed_buf in self.compressed[:]:  # noqa: E501
+                for compressed_id, compressed_index, compressed_buf in self.compressed[:]:
                     if compressed_id in self.objects:
                         try:
                             with compressed_buf:
@@ -168,16 +168,13 @@ class PdfModule(module.RuminantModule):
                     try:
                         offset, buf = self.queue[0]
 
-                        try:
-                            with buf:
-                                buf.seek(offset)
-                                self.parse_object(self.buf)
+                        with buf:
+                            buf.seek(offset)
+                            self.parse_object(self.buf)
 
-                            self.queue.pop(0)
-                            stuck = False
-                            break
-                        except Exception:
-                            pass
+                        self.queue.pop(0)
+                        stuck = False
+                        break
 
                     except ReparsePoint:
                         self.queue.append(self.queue.pop(0))
@@ -305,7 +302,7 @@ class PdfModule(module.RuminantModule):
                                             + 1))
                                 case _:
                                     raise ValueError(
-                                        f"Unknown predictor: {params['Predictor']}"  # noqa: E501
+                                        f"Unknown predictor: {params['Predictor']}"
                                     )
 
                     if packed is not None:
@@ -366,7 +363,27 @@ class PdfModule(module.RuminantModule):
             if buf.peek(6) == b"endobj":
                 break
 
-            if buf.peek(2) == b"<<":
+            if buf.peek(1) == b"(":
+                d += buf.read(1)
+
+                ilevel = 1
+                while ilevel > 0 and buf.available() > 0:
+                    chunk = buf.peek(4096)
+                    if not (b"\\" in chunk or b"(" in chunk or b")" in chunk):
+                        d += buf.read(4096)
+                    else:
+                        if buf.peek(1) == b"\\":
+                            d += buf.read(2)
+                        elif buf.peek(1) == b"(":
+                            ilevel += 1
+                            d += buf.read(1)
+                        elif buf.peek(1) == b")":
+                            ilevel -= 1
+                            d += buf.read(1)
+                        else:
+                            d += buf.read(1)
+
+            elif buf.peek(2) == b"<<":
                 level += 1
                 d += buf.read(1)
             elif buf.peek(2) == b">>":
@@ -431,6 +448,7 @@ class PdfModule(module.RuminantModule):
     def parse_dict(cls, tokens):
         result = {}
         key = None
+
         while len(tokens):
             if tokens[0] == ">>":
                 tokens.pop(0)

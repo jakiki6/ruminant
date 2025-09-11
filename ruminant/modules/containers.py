@@ -402,7 +402,7 @@ class RIFFModule(module.RuminantModule):
                 with self.buf.subunit():
                     chunk["data"]["xmp"] = utils.xml_to_dict(
                         self.buf.readunit())
-            case "ICMT" | "ISFT" | "INAM" | "IART" | "ICRD" | "IARL" | "ILNG" | "IMED" | "ISRC" | "ISRF" | "ITCH" | "strn":  # noqa: E501
+            case "ICMT" | "ISFT" | "INAM" | "IART" | "ICRD" | "IARL" | "ILNG" | "IMED" | "ISRC" | "ISRF" | "ITCH" | "strn":
                 chunk["data"]["text"] = utils.decode(
                     self.buf.readunit()).rstrip("\x00")
             case "RIFF" | "LIST" | "FORM":

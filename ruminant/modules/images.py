@@ -1,7 +1,7 @@
 import zlib
 import datetime
 from . import chew
-from .. import module, utils
+from .. import module, utils, constants
 from ..buf import Buf
 
 
@@ -137,6 +137,7 @@ class IPTCIIMModule(module.RuminantModule):
             122: "ARM Version"
         },
         2: {
+            0: "Version Number",
             3: "Object Type Reference",
             5: "Object Name",
             7: "Edit Status",
@@ -223,6 +224,54 @@ class IPTCIIMModule(module.RuminantModule):
             145: "Gamma Compensated Value"
         }
     }
+
+    def read_key(self):
+        length = self.buf.ru32()
+        if length > 0:
+            return self.buf.rs(length)
+        else:
+            return self.buf.rs(4)
+
+    def read_item(self, typ):
+        match typ:
+            case "bool":
+                return bool(self.buf.ru8()), True
+            case "Objc":
+                return self.read_descriptor()
+            case "doub":
+                return self.buf.rf64(), True
+            case "UntF":
+                return {"type": self.buf.rs(4), "value": self.buf.rf64()}, True
+            case "enum":
+                return {"type": self.read_key(), "enum": self.read_key()}, True
+            case "TEXT":
+                return self.buf.read(self.buf.ru32() *
+                                     2).decode("utf-16be").rstrip("\x00"), True
+            case _:
+                return {"unknown": typ}, False
+
+    def read_descriptor(self, top=False):
+        desc = {}
+
+        if top:
+            desc["version"] = self.buf.ru32()
+        desc["name"] = self.buf.read(self.buf.ru32() *
+                                     2).decode("utf16").rstrip("\x00")
+        desc["class-id"] = self.read_key()
+        desc["item-count"] = self.buf.ru32()
+
+        desc["items"] = []
+        for i in range(0, desc["item-count"]):
+            item = {}
+            item["key"] = self.read_key()
+            item["type"] = self.buf.rs(4)
+            desc["items"].append(item)
+
+            item["data"], success = self.read_item(item["type"])
+            if not success:
+                return desc, False
+
+        return desc, True
 
     def identify(buf, ctx):
         return buf.peek(18) == b"Photoshop 3.0\x008BIM"
@@ -320,45 +369,82 @@ class IPTCIIMModule(module.RuminantModule):
                     case 1049:
                         block["data"]["altitude"] = self.buf.ru32()
                     case 1028:
-                        self.buf.skip(1)
-                        record_number = self.buf.ru8()
-                        block["data"]["record-number"] = {
-                            "raw": record_number,
-                            "name": {
-                                1: "Envelope Record",
-                                2: "Application Record",
-                                3: "Pre‑ObjectData Descriptor Record",
-                                4: "ObjectData Descriptor Record",
-                                5: "Pre‑Data Descriptor Record",
-                                6: "Data Descriptor Record",
-                                7: "Pre‑ObjectData Descriptor Record",
-                                8: "Object Record",
-                                9: "Post‑Object Descriptor Record"
-                            }.get(record_number, "Unknown")
-                        }
+                        block["data"]["records"] = []
+                        while self.buf.unit > 2:
+                            self.buf.skip(1)
+                            record = {}
 
-                        dataset_number = self.buf.ru8()
-                        block["data"]["dataset-number"] = {
-                            "raw":
-                            dataset_number,
-                            "name":
-                            self.RECORD_DATASET_NAMES.get(record_number,
-                                                          {}).get(
-                                                              dataset_number,
-                                                              "Unknown")
-                        }
+                            record_number = self.buf.ru8()
+                            record["record-number"] = utils.unraw(
+                                record_number, 1, {
+                                    1: "Envelope Record",
+                                    2: "Application Record",
+                                    3: "Pre‑ObjectData Descriptor Record",
+                                    4: "ObjectData Descriptor Record",
+                                    5: "Pre‑Data Descriptor Record",
+                                    6: "Data Descriptor Record",
+                                    7: "Pre‑ObjectData Descriptor Record",
+                                    8: "Object Record",
+                                    9: "Post‑Object Descriptor Record"
+                                })
 
-                        data_length = self.buf.ru16()
-                        block["data"]["data-length"] = data_length
-                        block["data"]["data"] = self.buf.rs(
-                            data_length, "latin-1")
+                            dataset_number = self.buf.ru8()
+                            record["dataset-number"] = utils.unraw(
+                                dataset_number, 1,
+                                self.RECORD_DATASET_NAMES[record_number])
+
+                            data_length = self.buf.ru16()
+                            if data_length & 0x8000:
+                                data_length = int.from_bytes(
+                                    self.buf.read(data_length & 0x7fff), "big")
+                            record["data-length"] = data_length
+                            record["data"] = self.buf.rh(data_length)
+
+                            block["data"]["records"].append(record)
                     case 1061:
                         block["data"]["digest"] = self.buf.rh(16)
                     case 1035:
                         block["data"]["url"] = self.buf.rs(self.buf.unit)
+                    case 1062:
+                        block["data"]["style"] = utils.unraw(
+                            self.buf.ru16(), 2, {
+                                0: "centered",
+                                1: "size to fit",
+                                3: "user defined"
+                            })
+                        block["data"]["x"] = self.buf.rf32()
+                        block["data"]["y"] = self.buf.rf32()
+                        block["data"]["scale"] = self.buf.rf32()
+                    case 10000:
+                        block["data"]["version"] = self.buf.ru16()
+                        block["data"]["center-crop-marks"] = self.buf.ru8()
+                        block["data"]["reserved"] = self.buf.ru8()
+                        block["data"]["bleed-width"] = self.buf.ru32()
+                        block["data"]["bleed-width-scale"] = self.buf.ru16()
+                    case 1024:
+                        block["data"]["index"] = self.buf.ru16()
+                    case 1057:
+                        block["data"]["version"] = self.buf.ru32()
+                        block["data"]["has-real-merged-data"] = bool(
+                            self.buf.ru8())
+                        block["data"]["writer"] = self.buf.read(
+                            self.buf.ru32() *
+                            2).decode("utf-16be").rstrip("\x00")
+                        block["data"]["reader"] = self.buf.read(
+                            self.buf.ru32() *
+                            2).decode("utf-16be").rstrip("\x00")
+                        block["data"]["file-version"] = self.buf.ru32()
+                    case 1013 | 1016 | 1026:
+                        block["data"]["blob"] = self.buf.rh(self.buf.unit)
+                    case 1082 | 1083:
+                        block["data"][
+                            "descriptor"], success = self.read_descriptor(True)
+                        if not success:
+                            block["data"]["unknown"] = True
                     case _:
                         block["data"]["unknown"] = True
-            except Exception:
+            except Exception as e:
+                raise e
                 block["data"]["malformed"] = True
 
             meta["data"]["blocks"].append(block)
@@ -542,11 +628,11 @@ class ICCProfileModule(module.RuminantModule):
                 case "ucmI":
                     tag["data"]["parameter-length"] = self.buf.ru32()
                     tag["data"][
-                        "engine-version"] = f"{self.buf.ru8()}.{self.buf.ru8()}.{self.buf.ru16()}"  # noqa: E501
+                        "engine-version"] = f"{self.buf.ru8()}.{self.buf.ru8()}.{self.buf.ru16()}"
                     tag["data"][
-                        "profile-format-document-version"] = f"{self.buf.ru8()}.{self.buf.ru8()}.{self.buf.ru16()}"  # noqa: E501
+                        "profile-format-document-version"] = f"{self.buf.ru8()}.{self.buf.ru8()}.{self.buf.ru16()}"
                     tag["data"][
-                        "profile-version"] = f"{self.buf.ru8()}.{self.buf.ru8()}.{self.buf.ru16()}"  # noqa: E501
+                        "profile-version"] = f"{self.buf.ru8()}.{self.buf.ru8()}.{self.buf.ru16()}"
                     tag["data"]["profile-build-number"] = self.buf.ru32()
                     tag["data"]["interpolation-flag"] = self.buf.ru32()
                     tag["data"]["atob0-tag-override"] = self.buf.ru32()
@@ -786,6 +872,7 @@ class JPEGModule(module.RuminantModule):
 
         meta["chunks"] = []
         should_break = False
+        slack = {"xmp": b""}
         while self.buf.available() and not should_break:
             chunk = {}
 
@@ -848,10 +935,14 @@ class JPEGModule(module.RuminantModule):
                         if ns == "http://ns.adobe.com/xmp/extension/":
                             self.buf.skip(40)
 
-                        xmp = utils.xml_to_dict(
-                            self.buf.readunit().decode("utf-8"))
-                        chunk["data"]["namespace"] = ns
-                        chunk["data"]["xmp"] = xmp
+                        content = slack["xmp"] + self.buf.readunit()
+                        try:
+                            xmp = utils.xml_to_dict(content, True)
+                            slack["xmp"] = b""
+                            chunk["data"]["namespace"] = ns
+                            chunk["data"]["xmp"] = xmp
+                        except Exception:
+                            slack["xmp"] = content
                     except Exception:
                         raw = True
 
@@ -967,6 +1058,10 @@ class JPEGModule(module.RuminantModule):
                     table["precision"] = 8 << (temp >> 4)
                     table["id"] = temp & 0x0f
                     table["data"] = self.buf.rh(64 << (temp >> 4))
+
+                    if table["data"] in constants.JPEG_QUANTIZATION_TABLES:
+                        table["match"] = constants.JPEG_QUANTIZATION_TABLES[
+                            table["data"]]
 
                     chunk["tables"].append(table)
 
@@ -1852,7 +1947,7 @@ class TIFFModule(module.RuminantModule):
                                             0x010001:
                                             "Large Thumbnail (VGA equivalent)",
                                             0x010002:
-                                            "Large Thumbnail (full HD equivalent)",  # noqa: E501
+                                            "Large Thumbnail (full HD equivalent)",
                                             0x010003:
                                             "Large Thumbnail (4K equivalent)",
                                             0x010004:

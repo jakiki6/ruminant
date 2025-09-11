@@ -19,7 +19,7 @@ class GzipModule(module.RuminantModule):
         self.buf.skip(2)
 
         compression_method = self.buf.ru8()
-        assert compression_method == 8, f"Unknown gzip compression method {compression_method}"  # noqa: E501
+        assert compression_method == 8, f"Unknown gzip compression method {compression_method}"
         meta["compression-method"] = utils.unraw(compression_method, 2,
                                                  {8: "Deflate"})
 

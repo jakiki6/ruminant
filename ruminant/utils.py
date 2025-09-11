@@ -1,5 +1,5 @@
 from .oids import OIDS
-from .constants import PGP_HASHES, PGP_PUBLIC_KEYS, PGP_CIPHERS, PGP_AEADS, PGP_SIGNATURE_TYPES  # noqa: E501
+from .constants import PGP_HASHES, PGP_PUBLIC_KEYS, PGP_CIPHERS, PGP_AEADS, PGP_SIGNATURE_TYPES
 from .buf import Buf, _decode
 import uuid
 import xml.etree.ElementTree as ET
@@ -34,6 +34,7 @@ def xml_to_dict(string, fail=False):
         except ET.ParseError as e:
             if fail:
                 raise e
+
             string = string[:-1]
 
     return {}

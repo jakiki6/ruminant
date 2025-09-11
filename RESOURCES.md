@@ -39,3 +39,6 @@ This is a list of useful resources.
 
 ## Files in the exiftool tree
 * lib/Image/ExifTool/FujiFilm.pm
+
+# Adobe Photoshop
+* https://www.adobe.com/devnet-apps/photoshop/fileformatashtml/
