@@ -503,6 +503,8 @@ class IPTCIIMModule(module.RuminantModule):
                                     block["data"]["slices"].append(slic)
                             case _:
                                 block["data"]["unknown"] = True
+                    case 1034:
+                        block["data"]["is-copyrighted"] = bool(self.buf.ru8())
                     case 1013 | 1016 | 1026:
                         block["data"]["blob"] = self.buf.rh(self.buf.unit)
                     case 1082 | 1083:
