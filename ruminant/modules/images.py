@@ -417,11 +417,16 @@ class IPTCIIMModule(module.RuminantModule):
                                     self.buf.read(data_length & 0x7fff), "big")
                             record["data-length"] = data_length
 
+                            record["data"] = {}
                             match (record_number, dataset_number):
+                                case (2, 0):
+                                    record["data"]["version"] = self.buf.ru16()
                                 case (2, _):
-                                    record["data"] = self.buf.rs(data_length)
+                                    record["data"]["text"] = self.buf.rs(
+                                        data_length)
                                 case _:
-                                    record["data"] = self.buf.rh(data_length)
+                                    record["data"]["blob"] = self.buf.rh(
+                                        data_length)
 
                             block["data"]["records"].append(record)
                     case 1061:
