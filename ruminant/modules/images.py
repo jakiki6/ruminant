@@ -416,7 +416,12 @@ class IPTCIIMModule(module.RuminantModule):
                                 data_length = int.from_bytes(
                                     self.buf.read(data_length & 0x7fff), "big")
                             record["data-length"] = data_length
-                            record["data"] = self.buf.rh(data_length)
+
+                            match (record_number, dataset_number):
+                                case (2, _):
+                                    record["data"] = self.buf.rs(data_length)
+                                case _:
+                                    record["data"] = self.buf.rh(data_length)
 
                             block["data"]["records"].append(record)
                     case 1061:
