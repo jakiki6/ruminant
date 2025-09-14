@@ -42,3 +42,7 @@ This is a list of useful resources.
 
 # Adobe Photoshop
 * https://www.adobe.com/devnet-apps/photoshop/fileformatashtml/
+
+# EXIF
+* https://exiv2.org/tags.html
+* https://exiftool.org/makernote_types.html

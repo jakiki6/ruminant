@@ -6,7 +6,7 @@ from ..buf import Buf
 
 
 @module.register
-class IPTCIIMModule(module.RuminantModule):
+class IRBModule(module.RuminantModule):
     RESOURCE_IDS = {
         1000: "Number of channels, rows, columns, depth, and mode (obsolete)",
         1001: "Macintosh print manager print info record",
@@ -296,7 +296,7 @@ class IPTCIIMModule(module.RuminantModule):
 
     def chew(self):
         meta = {}
-        meta["type"] = "iptc-iim"
+        meta["type"] = "irb"
         meta["data"] = {}
 
         self.buf.skip(14)
@@ -1497,6 +1497,7 @@ class TIFFModule(module.RuminantModule):
             323: "TileLength",
             324: "TileOffset",
             325: "TileByteCounts",
+            330: "SubIFDPointer",
             332: "InkSet",
             333: "InkNames",
             334: "NumberOfInks",
@@ -1520,6 +1521,8 @@ class TIFFModule(module.RuminantModule):
             530: "YCbCrSubSampling",
             531: "YCbCrPositioning",
             532: "ReferenceBlackWhite",
+            33421: "CFARepeatPatternDim",
+            33422: "CFAPattern",
             33432: "Copyright",
             33434: "ExposureTime",
             33437: "FNumber",
@@ -1617,6 +1620,49 @@ class TIFFModule(module.RuminantModule):
             42080: "CompositeImage",
             42240: "Gamma",
             50341: "PrintImageMatching",
+            50706: "DNGVersion",
+            50707: "DNGBackwardVersion",
+            50708: "UniqueCameraModel",
+            50710: "CFAPlaneColor",
+            50711: "CFALayout",
+            50713: "BlackLevelRepeatDim",
+            50714: "BlackLevel",
+            50717: "WhiteLevel",
+            50718: "DefaultScale",
+            50719: "DefaultCropOrigin",
+            50720: "DefaultCropSize",
+            50721: "ColorMatrix1",
+            50722: "ColorMatrix2",
+            50727: "AnalogBalance",
+            50728: "AsShotNeutral",
+            50730: "BaselineExposure",
+            50731: "BaselineNoise",
+            50732: "BaselineSharpness",
+            50733: "BayerGreenSplit",
+            50734: "LinearResponseLimit",
+            50738: "AntiAliasStrength",
+            50739: "ShadowScale",
+            50741: "MakerNoteSafety",
+            50778: "CalibrationIlluminant1",
+            50779: "CalibrationIlluminant2",
+            50780: "BestQualityScale",
+            50781: "RawDataUniqueID",
+            50829: "ActiveArea",
+            50938: "ProfileHueSatMapData1",
+            50939: "ProfileHueSatMapData2",
+            50941: "ProfileEmbedPolicy",
+            50942: "ProfileCopyright",
+            50964: "ForwardMatrix1",
+            50965: "ForwardMatrix2",
+            50981: "ProfileLookTableDims",
+            50982: "ProfileLookTableData",
+            51009: "OpcodeList2",
+            51022: "OpcodeList3",
+            51041: "NoiseProfile",
+            51111: "NewRawImageDigest",
+            50932: "ProfileCalibrationSignature",
+            50936: "ProfileName",
+            50937: "ProfileHueSatMapDims",
             59932: "Padding",
             59933: "OffsetSchema",
         },
@@ -1988,12 +2034,8 @@ class TIFFModule(module.RuminantModule):
                                 case 514:
                                     thumbnail_length = tag["values"][0]
                                 case 37500:
-                                    if tag["values"][0].startswith(
-                                            "46554a4946494c4d"
-                                    ) or tag["values"][0].startswith(
-                                            "534f4e592044534320"):
-                                        tag["parsed"] = chew(
-                                            bytes.fromhex(tag["values"][0]))
+                                    tag["parsed"] = chew(
+                                        bytes.fromhex(tag["values"][0]))
                                 case 2 | 36864 | 40960 | 45056:
                                     if len(tag["values"]) == 1 and type(
                                             tag["values"][0]) is str:
