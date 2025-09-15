@@ -91,7 +91,9 @@ class GzipModule(module.RuminantModule):
             decompressor = zlib.decompressobj(-zlib.MAX_WBITS)
 
             while not decompressor.eof:
-                fd.write(decompressor.decompress(self.buf.read(1 << 24)))
+                fd.write(
+                    decompressor.decompress(
+                        self.buf.read(min(1 << 24, self.buf.available()))))
 
             self.buf.seek(-len(decompressor.unused_data), 1)
 

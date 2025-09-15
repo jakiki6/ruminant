@@ -1398,6 +1398,15 @@ class PNGModule(module.RuminantModule):
                             chunk["data"]["significant-bits"] = [
                                 self.buf.ru8() for i in range(0, 4)
                             ]
+                case "iDOT":
+                    # see https://www.hackerfactor.com/blog/index.php?/archives/895-Connecting-the-iDOTs.html
+                    chunk["data"]["height-divisor"] = self.buf.ru32()
+                    chunk["data"]["reserved"] = self.buf.ru32()
+                    chunk["data"]["divided-height"] = self.buf.ru32()
+                    chunk["data"]["predefined"] = self.buf.ru32()
+                    chunk["data"]["first-half-height"] = self.buf.ru32()
+                    chunk["data"]["second-half-height"] = self.buf.ru32()
+                    chunk["data"]["idat-restart-offset"] = self.buf.ru32()
                 case "IDAT" | "IEND" | "PLTE" | "tRNS" | "npOl" | "npTc":
                     pass
                 case _:

@@ -76,15 +76,22 @@ def read_protobuf(buf, length, escape=False):
         match entry_type:
             case 0:
                 value = read_varint(buf)
+                if escape:
+                    entry_type = "VARINT"
             case 1:
                 value = buf.ru64l()
+                if escape:
+                    entry_type = "I64"
             case 2:
                 value_length = read_varint(buf)
                 value = buf.read(value_length)
                 if escape:
                     value = value.hex()
+                    entry_type = "LEN"
             case 5:
                 value = buf.ru32l()
+                if escape:
+                    entry_type = "I32"
             case _:
                 break
 
