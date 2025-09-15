@@ -1,5 +1,6 @@
 import zlib
 import datetime
+import gzip
 from . import chew
 from .. import module, utils, constants
 from ..buf import Buf
@@ -2267,3 +2268,42 @@ class GifModule(module.RuminantModule):
                 return data
 
             data += self.buf.read(length)
+
+
+@module.register
+class HdrpMakernoteModule(module.RuminantModule):
+
+    def identify(buf, ctx):
+        return buf.peek(4) == b"HDRP"
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "hdrp-makernote"
+
+        self.buf.skip(4)
+        meta["version"] = self.buf.ru8()
+
+        content = bytearray(self.buf.read(self.buf.available()))
+        key = 0x2515606b4a7791cd
+
+        # really sneaky to use xorshift
+        # too bad you can just google the magic multiplier
+        for i in range(0, len(content)):
+            if i % 8 == 0:
+                key ^= (key >> 12) & 0xffffffffffffffff
+                key ^= (key << 25) & 0xffffffffffffffff
+                key ^= (key >> 27) & 0xffffffffffffffff
+                key = (key * 0x2545f4914f6cdd1d) & 0xffffffffffffffff
+
+            content[i] ^= (key >> (8 * (i % 8))) & 0xff
+
+        content = gzip.decompress(content)
+
+        buf = Buf(content)
+
+        if buf.peek(7) == b"Payload":
+            meta["data"] = buf.rs(buf.available()).split("\n")
+        else:
+            meta["data"] = utils.read_protobuf(buf, len(content), escape=True)
+
+        return meta

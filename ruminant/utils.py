@@ -1,11 +1,13 @@
 from .oids import OIDS
 from .constants import PGP_HASHES, PGP_PUBLIC_KEYS, PGP_CIPHERS, PGP_AEADS, PGP_SIGNATURE_TYPES
 from .buf import Buf, _decode
+from .modules import chew
 import uuid
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
 import zlib
 import bz2
+import base64
 
 
 def _xml_to_dict(elem):
@@ -16,6 +18,15 @@ def _xml_to_dict(elem):
 
     if elem.attrib:
         res["attributes"] = elem.attrib
+        res["parsed"] = {}
+
+        for k, v in elem.attrib.items():
+            match k:
+                case "{http://ns.google.com/photos/1.0/camera/}hdrp_makernote" | "{http://ns.google.com/photos/1.0/camera/}shot_log_data":
+                    res["parsed"][k] = chew(base64.b64decode(v))
+
+        if res["parsed"] == {}:
+            del res["parsed"]
 
     if elem.text and len(elem.text.strip()):
         res["text"] = elem.text
@@ -52,7 +63,7 @@ def read_varint(buf):
     return i
 
 
-def read_protobuf(buf, length):
+def read_protobuf(buf, length, escape=False):
     buf.pushunit()
     buf.setunit(length)
 
@@ -70,6 +81,8 @@ def read_protobuf(buf, length):
             case 2:
                 value_length = read_varint(buf)
                 value = buf.read(value_length)
+                if escape:
+                    value = value.hex()
             case 5:
                 value = buf.ru32l()
             case _:

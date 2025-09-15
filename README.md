@@ -60,6 +60,10 @@ Ruminant is still in early alpha but it can already process the following file t
 * PGP stuff
 * ID3v2 tags
 * MPEG-TS
+* MakerNotes
+  * Fuji
+  * Sony
+  * Google HDR+
 
 # How do I install it?
 Run `pip3 install ruminant`.
