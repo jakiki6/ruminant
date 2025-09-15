@@ -2301,7 +2301,7 @@ class HdrpMakernoteModule(module.RuminantModule):
 
         buf = Buf(content)
 
-        if buf.peek(7) == b"Payload":
+        if buf.peek(7) == b"Payload" or buf.peek(3) == b"dng":
             meta["data"] = buf.rs(buf.available()).split("\n")
         else:
             meta["data"] = utils.read_protobuf(buf, len(content), escape=True)
