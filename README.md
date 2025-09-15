@@ -64,6 +64,7 @@ Ruminant is still in early alpha but it can already process the following file t
   * Fuji
   * Sony
   * Google HDR+
+* PSD files
 
 # How do I install it?
 Run `pip3 install ruminant`.

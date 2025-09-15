@@ -293,19 +293,23 @@ class IRBModule(module.RuminantModule):
         return desc, True
 
     def identify(buf, ctx):
-        return buf.peek(18) == b"Photoshop 3.0\x008BIM"
+        return buf.peek(18) == b"Photoshop 3.0\x008BIM" or buf.peek(
+            4) == b"8BIM"
 
     def chew(self):
         meta = {}
         meta["type"] = "irb"
         meta["data"] = {}
 
-        self.buf.skip(14)
+        if self.buf.peek(1) == b"P":
+            self.buf.skip(14)
 
         meta["data"]["blocks"] = []
         while self.buf.available():
             header = self.buf.read(4)
-            assert header == b"8BIM", f"Invalid IRB block header: {header}"
+            if header != b"8BIM":
+                break
+
             block = {}
 
             resource_id = self.buf.ru16()
@@ -516,6 +520,11 @@ class IRBModule(module.RuminantModule):
                                 block["data"]["unknown"] = True
                     case 1034:
                         block["data"]["is-copyrighted"] = bool(self.buf.ru8())
+                    case 1058:
+                        with self.buf.subunit():
+                            block["data"]["exif"] = chew(self.buf)
+
+                        self.buf.skipunit()
                     case 1013 | 1016 | 1026:
                         block["data"]["blob"] = self.buf.rh(self.buf.unit)
                     case 1082 | 1083:
@@ -2314,5 +2323,49 @@ class HdrpMakernoteModule(module.RuminantModule):
             meta["data"] = buf.rs(buf.available()).split("\n")
         else:
             meta["data"] = utils.read_protobuf(buf, len(content), escape=True)
+
+        return meta
+
+
+@module.register
+class PsdModule(module.RuminantModule):
+
+    def identify(buf, ctx):
+        return buf.peek(4) == b"8BPS"
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "psd"
+
+        self.buf.skip(4)
+        meta["header"] = {}
+        meta["header"]["version"] = self.buf.ru16()
+        meta["header"]["reserved"] = self.buf.rh(6)
+        meta["header"]["channels"] = self.buf.ru16()
+        meta["header"]["width"] = self.buf.ru32()
+        meta["header"]["height"] = self.buf.ru32()
+        meta["header"]["depth"] = self.buf.ru16()
+        meta["header"]["color-mode"] = utils.unraw(
+            self.buf.ru16(), 2, {
+                0: "Bitmap",
+                1: "Grayscale",
+                2: "Indexed",
+                3: "RGB",
+                4: "CMYK",
+                7: "Multichannel",
+                8: "Duotone",
+                9: "Lab"
+            })
+
+        meta["color-mode-data-length"] = self.buf.ru32()
+        self.buf.skip(meta["color-mode-data-length"])
+
+        meta["image-resources-length"] = self.buf.ru32()
+        with self.buf.sub(meta["image-resources-length"]):
+            meta["image-resources"] = chew(self.buf)
+        self.buf.skip(meta["image-resources-length"])
+
+        # TODO
+        self.buf.skip(self.buf.available())
 
         return meta
