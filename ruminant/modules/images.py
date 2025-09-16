@@ -525,6 +525,14 @@ class IRBModule(module.RuminantModule):
                             block["data"]["exif"] = chew(self.buf)
 
                         self.buf.skipunit()
+                    case 1060:
+                        block["data"]["xmp"] = utils.xml_to_dict(
+                            self.buf.read(self.buf.unit))
+                    case 1039:
+                        with self.buf.subunit():
+                            block["data"]["profile"] = chew(self.buf)
+
+                        self.buf.skipunit()
                     case 1013 | 1016 | 1026:
                         block["data"]["blob"] = self.buf.rh(self.buf.unit)
                     case 1082 | 1083:
@@ -2055,6 +2063,19 @@ class TIFFModule(module.RuminantModule):
                                 case 37500:
                                     tag["parsed"] = chew(
                                         bytes.fromhex(tag["values"][0]))
+                                case 37510:
+                                    blob = bytes.fromhex(tag["values"][0])
+                                    encoding, blob = blob[:8].decode(
+                                        "latin-1").rstrip("\x00"), blob[8:]
+
+                                    tag["parsed"] = {"encoding": encoding}
+                                    match encoding:
+                                        case "ASCII":
+                                            tag["parsed"][
+                                                "text"] = blob.decode(
+                                                    "latin-1")
+                                        case _:
+                                            tag["parsed"]["unknown"] = True
                                 case 2 | 36864 | 40960 | 45056:
                                     if len(tag["values"]) == 1 and type(
                                             tag["values"][0]) is str:
