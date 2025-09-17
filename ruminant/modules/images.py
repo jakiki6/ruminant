@@ -972,7 +972,7 @@ class JPEGModule(module.RuminantModule):
 
         meta["chunks"] = []
         should_break = False
-        slack = {"xmp": b""}
+        slack = {"xmp": b"", "xmp-ns": b""}
         while self.buf.available() and not should_break:
             chunk = {}
 
@@ -1021,28 +1021,34 @@ class JPEGModule(module.RuminantModule):
                 self.buf.skip(6)
                 with self.buf.subunit():
                     chunk["data"]["tiff"] = chew(self.buf)
-            elif typ == 0xe1 and self.buf.peek(4) == b"http":
+            elif typ == 0xe1 and (self.buf.peek(4) == b"http" or len(slack["xmp"]) > 0):
                 raw = False
 
                 with self.buf:
                     try:
-                        ns = b""
-                        while self.buf.peek(1)[0]:
-                            ns += self.buf.read(1)
-                        self.buf.skip(1)
-                        ns = ns.decode("utf-8")
-
-                        if ns == "http://ns.adobe.com/xmp/extension/":
-                            self.buf.skip(40)
+                        if len(slack["xmp"]) == 0:
+                            ns = b""
+                            while self.buf.peek(1)[0]:
+                                ns += self.buf.read(1)
+                            self.buf.skip(1)
+                            ns = ns.decode("utf-8")
+                            slack["xmp-ns"] = ns
+                            if ns == "http://ns.adobe.com/xmp/extension/":
+                                self.buf.skip(40)
+                        else:
+                            ns = slack["xmp-ns"]
 
                         content = slack["xmp"] + self.buf.readunit()
+
                         try:
                             xmp = utils.xml_to_dict(content, True)
                             slack["xmp"] = b""
+                            slack["xmp-ns"] = b""
                             chunk["data"]["namespace"] = ns
                             chunk["data"]["xmp"] = xmp
                         except Exception:
                             slack["xmp"] = content
+                            slack["xmp-ns"] = ns
                     except Exception:
                         raw = True
 
