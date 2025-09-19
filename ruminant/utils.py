@@ -116,18 +116,22 @@ def read_protobuf(buf, length, escape=False, recursion={}, decode={}):
                     value = read_protobuf(Buf(value), len(value), escape,
                                           recursion[entry_id],
                                           decode.get(entry_id, {}))
-
                 elif escape:
                     if isinstance(decode, dict) and entry_id in decode:
                         match decode[entry_id]:
                             case "utf-8":
                                 value = value.decode(decode[entry_id])
+                            case _:
+                                value = value.hex()
                     else:
                         value = value.hex()
             case 5:
                 value = buf.ru32l()
             case _:
                 break
+
+        if entry_id in recursion.get("keys", {}):
+            entry_id = recursion["keys"][entry_id]
 
         if entry_id in entries:
             if not isinstance(entries[entry_id], list):

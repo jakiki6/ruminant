@@ -1193,6 +1193,9 @@ HDRP_V2_RECURSION = {
 }
 
 HDRP_V3_RECURSION = {
+    "keys": {
+        12: "StaticMetadata"
+    },
     4: {
         1: {
             4: {}
@@ -1220,6 +1223,18 @@ HDRP_V3_RECURSION = {
     },
     11: {},
     12: {
+        "keys": {
+            1: "Make",
+            2: "Model",
+            3: "Device",
+            4: "Revision",
+            5: "SensorId",
+            6: "Software",
+            7: "DeviceOsVersion",
+            8: "ShotTimestamp",
+            9: "App",
+            10: "Version"
+        },
         12: {},
         13: {},
         17: {},
