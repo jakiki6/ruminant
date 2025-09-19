@@ -1165,7 +1165,34 @@ insert(
     "030303050405070606070b0808080b0b0b0b0b0b0b0b0b0b0b0b0b0b0c0c0b0b0b0b0c0c0c0c0c0b0b0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c",
     "Google Camera secondary")
 
-HDRP_RECURSION = {
+HDRP_V2_RECURSION = {
+    1: {},
+    13: {},
+    23: {},
+    25: {},
+    26: {},
+    27: {},
+    31: {
+        3: {
+            1: {},
+            2: {}
+        },
+        4: {
+            1: {},
+            2: {}
+        },
+        5: {},
+        6: {
+            1: {},
+            2: {}
+        },
+        9: {}
+    },
+    36: {},
+    39: {}
+}
+
+HDRP_V3_RECURSION = {
     4: {
         1: {
             4: {}
@@ -1256,7 +1283,7 @@ HDRP_RECURSION = {
     }
 }
 
-HDRP_DECODE = {
+HDRP_V3_DECODE = {
     11: {
         11: "utf-8",
         30: "utf-8"

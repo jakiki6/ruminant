@@ -678,7 +678,8 @@ class IsoModule(module.RuminantModule):
                 case "edef8ba9-79d6-4ace-a3c8-27dcd51d21ed":
                     atom["data"]["blob"] = {}
 
-                    for i, v in utils.read_protobuf(self.buf, blob_length).items():
+                    for i, v in utils.read_protobuf(self.buf,
+                                                    blob_length).items():
                         match i:
                             case 1:
                                 atom["data"]["blob"]["algorithm"] = {

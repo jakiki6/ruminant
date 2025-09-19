@@ -1036,7 +1036,7 @@ class JPEGModule(module.RuminantModule):
                         self.buf.skip(1)
                 elif self.buf.peek(
                         34) == b"http://ns.adobe.com/xmp/extension/":
-                    self.buf.skip(34)
+                    self.buf.skip(35)
                     chunk["data"]["extended-xmp"] = [{}]
                     chunk["data"]["extended-xmp"][0]["conforming"] = True
                     chunk["data"]["extended-xmp"][0]["uuid"] = self.buf.rs(32)
@@ -1044,8 +1044,8 @@ class JPEGModule(module.RuminantModule):
                     )
                     chunk["data"]["extended-xmp"][0]["offset"] = self.buf.ru32(
                     )
-                    chunk["data"]["extended-xmp"][0]["data"] = self.buf.rs(
-                        self.buf.unit)
+                    chunk["data"]["extended-xmp"][0][
+                        "data"] = utils.xml_to_dict(self.buf.rs(self.buf.unit))
                     conforming = True
 
                 if not conforming:
@@ -2370,7 +2370,8 @@ class HdrpMakernoteModule(module.RuminantModule):
 
         buf = Buf(content)
 
-        if buf.peek(7) == b"Payload" or buf.peek(3) == b"dng":
+        if buf.peek(7) == b"Payload" or buf.peek(3) == b"dng" or buf.peek(
+                22) == b"shot_makernote_version":
             meta["data"] = buf.rs(buf.available()).split("\n")
         else:
             if meta["version"] == 3:
@@ -2378,12 +2379,14 @@ class HdrpMakernoteModule(module.RuminantModule):
                     buf,
                     len(content),
                     escape=True,
-                    recursion=constants.HDRP_RECURSION,
-                    decode=constants.HDRP_DECODE)
+                    recursion=constants.HDRP_V3_RECURSION,
+                    decode=constants.HDRP_V_3DECODE)
             else:
-                meta["data"] = utils.read_protobuf(buf,
-                                                   len(content),
-                                                   escape=True)
+                meta["data"] = utils.read_protobuf(
+                    buf,
+                    len(content),
+                    escape=True,
+                    recursion=constants.HDRP_V2_RECURSION)
 
         return meta
 

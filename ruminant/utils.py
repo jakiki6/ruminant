@@ -19,15 +19,11 @@ def _xml_to_dict(elem):
 
     if elem.attrib:
         res["attributes"] = elem.attrib
-        res["parsed"] = {}
 
         for k, v in elem.attrib.items():
             match k:
                 case "{http://ns.google.com/photos/1.0/camera/}hdrp_makernote" | "{http://ns.google.com/photos/1.0/camera/}shot_log_data":
-                    res["parsed"][k] = chew(base64.b64decode(v))
-
-        if res["parsed"] == {}:
-            del res["parsed"]
+                    res["attributes"][k] = chew(base64.b64decode(v))
 
     if elem.text and len(elem.text.strip()):
         res["text"] = elem.text
@@ -59,28 +55,29 @@ def read_xml(buf, chunk_size=4096):
     root = None
     bak = buf.backup()
 
-    while True:
-        chunk = buf.read(
-            min(buf.unit if buf.unit is not None else 2**64, buf.available(),
-                chunk_size))
-        if not chunk or len(chunk) == 0:
-            break
+    try:
+        while True:
+            chunk = buf.read(
+                min(buf.unit if buf.unit is not None else 2**64,
+                    buf.available(), chunk_size))
+            if not chunk or len(chunk) == 0:
+                break
 
-        for i in range(len(chunk)):
-            b = chunk[i:i + 1]
-            content += b
-            parser.feed(b)
+            for i in range(len(chunk)):
+                b = chunk[i:i + 1]
+                content += b
+                parser.feed(b)
 
-            for event, elem in parser.read_events():
-                if event == "start" and not root_seen:
-                    root_seen = True
-                    root = elem
-                elif event == "end" and elem is root:
-                    buf.restore(bak)
-                    buf.skip(len(content))
-                    return xml_to_dict(content)
-
-    buf.restore(bak)
+                for event, elem in parser.read_events():
+                    if event == "start" and not root_seen:
+                        root_seen = True
+                        root = elem
+                    elif event == "end" and elem is root:
+                        buf.restore(bak)
+                        buf.skip(len(content))
+                        return xml_to_dict(content)
+    finally:
+        buf.restore(bak)
     raise ValueError("No complete XML document found")
 
 
