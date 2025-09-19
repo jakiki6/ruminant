@@ -100,7 +100,7 @@ def read_protobuf(buf, length, escape=False, recursion={}, decode={}):
     buf.pushunit()
     buf.setunit(length)
 
-    entries = []
+    entries = {}
     while buf.unit > 0:
         entry_id = read_varint(buf)
         entry_type = entry_id & 0b111
@@ -132,10 +132,13 @@ def read_protobuf(buf, length, escape=False, recursion={}, decode={}):
             case _:
                 break
 
-        if escape:
-            entries.append(value)
+        if entry_id in entries:
+            if not isinstance(entries[entry_id], list):
+                entries[entry_id] = [entries[entry_id]]
+
+            entries[entry_id].append(value)
         else:
-            entries.append([entry_id, entry_type, value])
+            entries[entry_id] = value
 
     buf.skipunit()
     buf.popunit()

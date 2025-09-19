@@ -678,7 +678,7 @@ class IsoModule(module.RuminantModule):
                 case "edef8ba9-79d6-4ace-a3c8-27dcd51d21ed":
                     atom["data"]["blob"] = {}
 
-                    for i, t, v in utils.read_protobuf(self.buf, blob_length):
+                    for i, v in utils.read_protobuf(self.buf, blob_length).items():
                         match i:
                             case 1:
                                 atom["data"]["blob"]["algorithm"] = {
@@ -692,8 +692,12 @@ class IsoModule(module.RuminantModule):
                                 if "key-ids" not in atom["data"]["blob"]:
                                     atom["data"]["blob"]["key-ids"] = []
 
-                                atom["data"]["blob"]["key-ids"].append(
-                                    utils.to_uuid(v))
+                                if isinstance(v, list):
+                                    v = [utils.to_uuid(x) for x in v]
+                                else:
+                                    v = [utils.to_uuid(v)]
+
+                                atom["data"]["blob"]["key-ids"].extend(v)
                             case 3:
                                 atom["data"]["blob"]["provider"] = v.decode(
                                     "utf-8")
