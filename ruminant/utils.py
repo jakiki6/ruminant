@@ -4,6 +4,7 @@ from .buf import Buf, _decode
 from .modules import chew
 import uuid
 import xml.etree.ElementTree as ET
+from lxml import etree
 from datetime import datetime, timezone, timedelta
 import zlib
 import bz2
@@ -51,6 +52,38 @@ def xml_to_dict(string, fail=False):
     return {}
 
 
+def read_xml(buf, chunk_size=4096):
+    parser = etree.XMLPullParser(events=("start", "end"))
+    content = b""
+    root_seen = False
+    root = None
+    bak = buf.backup()
+
+    while True:
+        chunk = buf.read(
+            min(buf.unit if buf.unit is not None else 2**64, buf.available(),
+                chunk_size))
+        if not chunk or len(chunk) == 0:
+            break
+
+        for i in range(len(chunk)):
+            b = chunk[i:i + 1]
+            content += b
+            parser.feed(b)
+
+            for event, elem in parser.read_events():
+                if event == "start" and not root_seen:
+                    root_seen = True
+                    root = elem
+                elif event == "end" and elem is root:
+                    buf.restore(bak)
+                    buf.skip(len(content))
+                    return xml_to_dict(content)
+
+    buf.restore(bak)
+    raise ValueError("No complete XML document found")
+
+
 def read_varint(buf):
     i = 0
     o = 0
@@ -63,7 +96,7 @@ def read_varint(buf):
     return i
 
 
-def read_protobuf(buf, length, escape=False):
+def read_protobuf(buf, length, escape=False, recursion={}, decode={}):
     buf.pushunit()
     buf.setunit(length)
 
@@ -76,26 +109,33 @@ def read_protobuf(buf, length, escape=False):
         match entry_type:
             case 0:
                 value = read_varint(buf)
-                if escape:
-                    entry_type = "VARINT"
             case 1:
                 value = buf.ru64l()
-                if escape:
-                    entry_type = "I64"
             case 2:
                 value_length = read_varint(buf)
                 value = buf.read(value_length)
-                if escape:
-                    value = value.hex()
-                    entry_type = "LEN"
+
+                if entry_id in recursion:
+                    value = read_protobuf(Buf(value), len(value), escape,
+                                          recursion[entry_id],
+                                          decode.get(entry_id, {}))
+
+                elif escape:
+                    if isinstance(decode, dict) and entry_id in decode:
+                        match decode[entry_id]:
+                            case "utf-8":
+                                value = value.decode(decode[entry_id])
+                    else:
+                        value = value.hex()
             case 5:
                 value = buf.ru32l()
-                if escape:
-                    entry_type = "I32"
             case _:
                 break
 
-        entries.append([entry_id, entry_type, value])
+        if escape:
+            entries.append(value)
+        else:
+            entries.append([entry_id, entry_type, value])
 
     buf.skipunit()
     buf.popunit()

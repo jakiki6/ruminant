@@ -414,7 +414,8 @@ class IRBModule(module.RuminantModule):
                             dataset_number = self.buf.ru8()
                             record["dataset-number"] = utils.unraw(
                                 dataset_number, 1,
-                                self.RECORD_DATASET_NAMES[record_number])
+                                self.RECORD_DATASET_NAMES.get(
+                                    record_number, {}))
 
                             data_length = self.buf.ru16()
                             if data_length & 0x8000:
@@ -972,7 +973,7 @@ class JPEGModule(module.RuminantModule):
 
         meta["chunks"] = []
         should_break = False
-        slack = {"xmp": b"", "xmp-ns": b""}
+        slack = b""
         while self.buf.available() and not should_break:
             chunk = {}
 
@@ -1021,40 +1022,57 @@ class JPEGModule(module.RuminantModule):
                 self.buf.skip(6)
                 with self.buf.subunit():
                     chunk["data"]["tiff"] = chew(self.buf)
-            elif typ == 0xe1 and (self.buf.peek(4) == b"http" or len(slack["xmp"]) > 0):
-                raw = False
+            elif typ == 0xe1 and (self.buf.peek(4) == b"http"
+                                  or len(slack) > 0):
+                conforming = False
 
-                with self.buf:
-                    try:
-                        if len(slack["xmp"]) == 0:
-                            ns = b""
-                            while self.buf.peek(1)[0]:
-                                ns += self.buf.read(1)
-                            self.buf.skip(1)
-                            ns = ns.decode("utf-8")
-                            slack["xmp-ns"] = ns
-                            if ns == "http://ns.adobe.com/xmp/extension/":
-                                self.buf.skip(40)
-                        else:
-                            ns = slack["xmp-ns"]
+                if len(slack) == 0:
+                    self.buf.rzs()
+                    chunk["data"]["xmp"] = utils.read_xml(self.buf)
+                    while self.buf.peek(1) != b">":
+                        self.buf.skip(1)
 
-                        content = slack["xmp"] + self.buf.readunit()
+                    if self.buf.peek(1) == b">":
+                        self.buf.skip(1)
+                elif self.buf.peek(
+                        34) == b"http://ns.adobe.com/xmp/extension/":
+                    self.buf.skip(34)
+                    chunk["data"]["extended-xmp"] = [{}]
+                    chunk["data"]["extended-xmp"][0]["conforming"] = True
+                    chunk["data"]["extended-xmp"][0]["uuid"] = self.buf.rs(32)
+                    chunk["data"]["extended-xmp"][0]["length"] = self.buf.ru32(
+                    )
+                    chunk["data"]["extended-xmp"][0]["offset"] = self.buf.ru32(
+                    )
+                    chunk["data"]["extended-xmp"][0]["data"] = self.buf.rs(
+                        self.buf.unit)
+                    conforming = True
 
-                        try:
-                            xmp = utils.xml_to_dict(content, True)
-                            slack["xmp"] = b""
-                            slack["xmp-ns"] = b""
-                            chunk["data"]["namespace"] = ns
-                            chunk["data"]["xmp"] = xmp
-                        except Exception:
-                            slack["xmp"] = content
-                            slack["xmp-ns"] = ns
-                    except Exception:
-                        raw = True
+                if not conforming:
+                    slack += self.buf.read(self.buf.unit)
+                    buf = Buf(slack)
 
-                if raw:
-                    chunk["data"]["payload"] = self.buf.readunit().decode(
-                        "latin-1")
+                    chunk["data"]["extended-xmp"] = []
+                    while buf.available() > 0:
+                        with buf:
+                            buf.skip(32)
+                            if buf.ru32() > buf.available() + 4:
+                                break
+
+                        exmp = {}
+                        exmp["conforming"] = False
+                        exmp["uuid"] = buf.rs(32)
+                        exmp["length"] = buf.ru32()
+                        exmp["offset"] = buf.ru32()
+
+                        with open("e.xml", "wb") as f:
+                            f.write(buf.peek(exmp["length"] + 40))
+
+                        exmp["data"] = utils.xml_to_dict(
+                            buf.read(exmp["length"] + 40), True)
+                        chunk["data"]["extended-xmp"].append(exmp)
+
+                    slack = buf.read(buf.available())
             elif typ == 0xe2 and self.buf.peek(12) == b"ICC_PROFILE\x00":
                 with self.buf.subunit():
                     chunk["data"]["icc-profile"] = chew(self.buf)
@@ -2069,6 +2087,7 @@ class TIFFModule(module.RuminantModule):
                                 case 37500:
                                     tag["parsed"] = chew(
                                         bytes.fromhex(tag["values"][0]))
+                                    del tag["values"]
                                 case 37510:
                                     blob = bytes.fromhex(tag["values"][0])
                                     encoding, blob = blob[:8].decode(
@@ -2080,6 +2099,7 @@ class TIFFModule(module.RuminantModule):
                                             tag["parsed"][
                                                 "text"] = blob.decode(
                                                     "latin-1")
+                                            del tag["values"]
                                         case _:
                                             tag["parsed"]["unknown"] = True
                                 case 2 | 36864 | 40960 | 45056:
@@ -2095,6 +2115,7 @@ class TIFFModule(module.RuminantModule):
                                         if tag_id == 2:
                                             tag["id"] = "Version (0x0002)"
 
+                                        del tag["values"]
                                 case 45058:
                                     tag["parsed"] = {}
                                     buf = Buf(bytes.fromhex(tag["values"][0]))
@@ -2137,6 +2158,7 @@ class TIFFModule(module.RuminantModule):
                                         "dependent-image-entries"] = [
                                             buf.ru16l() for i in range(0, 2)
                                         ]
+                                    del tag["values"]
                         case "sony":
                             match tag_id:
                                 case 8234:
@@ -2150,6 +2172,8 @@ class TIFFModule(module.RuminantModule):
                                     tag["parsed"]["points"] = [[
                                         buf.ru16() for i in range(0, 2)
                                     ] for j in range(0, 15)]
+
+                                    del tag["values"]
 
                     if (thumbnail_tag is not None
                             and thumbnail_offset is not None
@@ -2349,7 +2373,17 @@ class HdrpMakernoteModule(module.RuminantModule):
         if buf.peek(7) == b"Payload" or buf.peek(3) == b"dng":
             meta["data"] = buf.rs(buf.available()).split("\n")
         else:
-            meta["data"] = utils.read_protobuf(buf, len(content), escape=True)
+            if meta["version"] == 3:
+                meta["data"] = utils.read_protobuf(
+                    buf,
+                    len(content),
+                    escape=True,
+                    recursion=constants.HDRP_RECURSION,
+                    decode=constants.HDRP_DECODE)
+            else:
+                meta["data"] = utils.read_protobuf(buf,
+                                                   len(content),
+                                                   escape=True)
 
         return meta
 
