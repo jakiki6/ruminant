@@ -9,6 +9,7 @@ from datetime import datetime, timezone, timedelta
 import zlib
 import bz2
 import base64
+import struct
 
 
 def _xml_to_dict(elem):
@@ -93,7 +94,7 @@ def read_varint(buf):
     return i
 
 
-def read_protobuf(buf, length, escape=False, recursion={}, decode={}):
+def read_protobuf(buf, length, escape=False, decode={}):
     buf.pushunit()
     buf.setunit(length)
 
@@ -111,27 +112,39 @@ def read_protobuf(buf, length, escape=False, recursion={}, decode={}):
             case 2:
                 value_length = read_varint(buf)
                 value = buf.read(value_length)
-
-                if entry_id in recursion:
-                    value = read_protobuf(Buf(value), len(value), escape,
-                                          recursion[entry_id],
-                                          decode.get(entry_id, {}))
-                elif escape:
-                    if isinstance(decode, dict) and entry_id in decode:
-                        match decode[entry_id]:
-                            case "utf-8":
-                                value = value.decode(decode[entry_id])
-                            case _:
-                                value = value.hex()
-                    else:
-                        value = value.hex()
             case 5:
                 value = buf.ru32l()
             case _:
                 break
 
-        if entry_id in recursion.get("keys", {}):
-            entry_id = recursion["keys"][entry_id]
+        if entry_id in decode:
+            if isinstance(decode[entry_id], dict):
+                value = read_protobuf(Buf(value), len(value), escape,
+                                      decode[entry_id])
+            else:
+                match decode[entry_id]:
+                    case "utf-8":
+                        value = value.decode(decode[entry_id])
+                    case "float":
+                        if isinstance(value, int):
+                            value = value.to_bytes(4, "little")
+
+                        value = struct.unpack("<" + "f" * (len(value) >> 2),
+                                              value)
+                        if len(value) == 1:
+                            value = value[0]
+                    case "s32":
+                        value = (2**32 - 1) - value - 1
+                    case "s64":
+                        value = (2**64 - 1) - value - 1
+                    case _:
+                        if escape:
+                            value = value.hex()
+        elif escape and isinstance(value, bytes):
+            value = value.hex()
+
+        if entry_id in decode.get("keys", {}):
+            entry_id = decode["keys"][entry_id]
 
         if entry_id in entries:
             if not isinstance(entries[entry_id], list):

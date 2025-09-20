@@ -1165,7 +1165,7 @@ insert(
     "030303050405070606070b0808080b0b0b0b0b0b0b0b0b0b0b0b0b0b0c0c0b0b0b0b0c0c0c0c0c0b0b0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c",
     "Google Camera secondary")
 
-HDRP_V2_RECURSION = {
+HDRP_V2_PROTO = {
     1: {},
     13: {},
     23: {},
@@ -1192,27 +1192,81 @@ HDRP_V2_RECURSION = {
     39: {}
 }
 
-HDRP_V3_RECURSION = {
+HDRP_V3_PROTO = {
     "keys": {
         12: "StaticMetadata"
     },
     4: {
         1: {
-            4: {}
+            4: {
+                1: "float",
+                2: "float",
+                3: "float",
+                4: "float",
+                6: "float",
+                7: "float"
+            }
         }
     },
     9: {
-        1: {},
-        13: {},
-        17: {},
-        21: {},
+        "keys": {
+            3: "FrameCount",
+            36: "CreationDate"
+        },
+        1: {
+            1: "float",
+            2: "float",
+            3: "float",
+            4: "float",
+            5: "float",
+            6: "float",
+            7: "float",
+            8: "float",
+            9: "float",
+            10: "float",
+            11: "float",
+            12: "float",
+            15: "float"
+        },
+        4: "float",
+        13: {
+            1: "float",
+            2: "float",
+            3: "float",
+            4: "float"
+        },
+        16: "float",
+        17: {
+            1: "float"
+        },
+        18: "float",
+        19: "float",
+        21: "float",
         22: {},
-        23: {},
+        23: {
+            2: "float",
+            3: "float"
+        },
         25: {},
-        26: {},
-        27: {},
-        36: {},
-        58: {},
+        26: {
+            4: "float",
+            5: "float"
+        },
+        27: {
+            1: "float"
+        },
+        29: "float",
+        30: "float",
+        36: {
+            "keys": {
+                1: "Seconds"
+            }
+        },
+        58: {
+            5: "float",
+            6: "float"
+        },
+        61: "float",
         66: {
             1: {},
             2: {},
@@ -1221,7 +1275,10 @@ HDRP_V3_RECURSION = {
             5: {}
         }
     },
-    11: {},
+    11: {
+        11: "utf-8",
+        30: "utf-8"
+    },
     12: {
         "keys": {
             1: "Make",
@@ -1231,79 +1288,10 @@ HDRP_V3_RECURSION = {
             5: "SensorId",
             6: "Software",
             7: "DeviceOsVersion",
-            8: "ShotTimestamp",
+            8: "SoftwareCompileTimestamp",
             9: "App",
             10: "Version"
         },
-        12: {},
-        13: {},
-        17: {},
-        23: {},
-        32: {
-            1: {}
-        }
-    },
-    13: {
-        1: {
-            1: {},
-            2: {},
-            3: {
-                2: {}
-            },
-        },
-        2: {},
-        3: {},
-        56: {
-            1: {},
-            3: {}
-        }
-    },
-    14: {
-        1: {
-            10: {},
-            11: {
-                1: {},
-                2: {}
-            },
-            20: {},
-            22: {},
-            23: {},
-            24: {
-                4: {
-                    2: {}
-                }
-            },
-            29: {},
-            35: {},
-            36: {
-                4: {}
-            },
-            37: {
-                5: {},
-                6: {}
-            },
-            39: {
-                2: {}
-            },
-            44: {
-                1: {}
-            },
-            48: {
-                1: {}
-            }
-        }
-    },
-    1007: {
-        3: {}
-    }
-}
-
-HDRP_V3_DECODE = {
-    11: {
-        11: "utf-8",
-        30: "utf-8"
-    },
-    12: {
         1: "utf-8",
         2: "utf-8",
         3: "utf-8",
@@ -1311,6 +1299,183 @@ HDRP_V3_DECODE = {
         6: "utf-8",
         7: "utf-8",
         9: "utf-8",
-        10: "utf-8"
+        10: "utf-8",
+        12: {
+            1: "float",
+            2: "float"
+        },
+        13: {
+            1: "float",
+            2: "float"
+        },
+        14: "float",
+        17: {},
+        21: "float",
+        22: "float",
+        23: {},
+        30: "float",
+        32: {
+            1: {}
+        }
+    },
+    13: {
+        1: {
+            1: {
+                2: "float",
+                4: "float"
+            },
+            2: {
+                2: "float",
+                4: "float"
+            },
+            3: {
+                1: "float",
+                2: {
+                    2: "float",
+                    4: "float"
+                }
+            },
+        },
+        2: {},
+        3: {
+            2: "float",
+            3: "float",
+            5: "float",
+            6: "float",
+            7: "float",
+            8: "float"
+        },
+        17: "float",
+        32: "float",
+        44: "float",
+        45: "float",
+        46: "float",
+        53: "s64",
+        56: {
+            1: {
+                1: "float",
+                2: "float",
+                3: "float"
+            },
+            3: {
+                1: "float",
+                2: "float",
+                3: "float"
+            },
+            4: "float"
+        },
+        86: "float"
+    },
+    14: {
+        1: {
+            1: "float",
+            2: "float",
+            3: "float",
+            4: "float",
+            8: "float",
+            10: {
+                2: "float",
+                3: "float"
+            },
+            11: {
+                1: {
+                    2: "float",
+                    3: "float"
+                },
+                2: {
+                    2: "float",
+                    3: "float"
+                }
+            },
+            18: "float",
+            20: {
+                2: "float"
+            },
+            22: {},
+            23: {},
+            24: {
+                4: {
+                    2: {}
+                }
+            },
+            26: "float",
+            27: "float",
+            28: "float",
+            32: "float",
+            29: {},
+            35: {
+                1: "float",
+                2: "float",
+                3: "float",
+                4: "float",
+                5: "float",
+                6: "float",
+                7: "float",
+                8: "float",
+                9: "float",
+                10: "float",
+                11: "float",
+                12: "float"
+            },
+            36: {
+                1: "float",
+                2: "float",
+                3: "float",
+                4: {
+                    1: "float"
+                }
+            },
+            37: {
+                1: "float",
+                2: "float",
+                3: "float",
+                4: "float",
+                5: {
+                    1: "float",
+                    2: "float",
+                    3: "float",
+                    4: "float",
+                    5: "float",
+                    6: "float",
+                    7: "s32",
+                    8: "float",
+                    9: "float",
+                },
+                6: {
+                    1: "float",
+                    2: "float",
+                    3: "float",
+                    4: "float",
+                    5: "float",
+                    6: "float",
+                    7: "s32",
+                    8: "float",
+                    9: "float",
+                }
+            },
+            39: {
+                2: {
+                    1: "float",
+                    2: "float"
+                }
+            },
+            43: "float",
+            44: {
+                1: {
+                    2: "float"
+                }
+            },
+            48: {
+                1: {}
+            },
+            58: "float"
+        }
+    },
+    1007: {
+        3: {
+            2: "float",
+            9: "float"
+        },
+        4: "float"
     }
 }

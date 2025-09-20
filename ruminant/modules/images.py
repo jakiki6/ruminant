@@ -2379,14 +2379,13 @@ class HdrpMakernoteModule(module.RuminantModule):
                     buf,
                     len(content),
                     escape=True,
-                    recursion=constants.HDRP_V3_RECURSION,
-                    decode=constants.HDRP_V3_DECODE)
+                    decode=constants.HDRP_V3_PROTO)
             else:
                 meta["data"] = utils.read_protobuf(
                     buf,
                     len(content),
                     escape=True,
-                    recursion=constants.HDRP_V2_RECURSION)
+                    decode=constants.HDRP_V2_PROTO)
 
         return meta
 
