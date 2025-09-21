@@ -88,7 +88,7 @@ class IsoModule(module.RuminantModule):
                     self.buf.rs(4, "utf-8"))
         elif typ == "uuid":
             atom["data"]["uuid"] = str(uuid.UUID(bytes=self.buf.read(16)))
-            atom["data"]["user-data"] = self.buf.readunit().decode("utf-8")
+            atom["data"]["user-data"] = self.buf.rs(self.buf.unit)
             try:
                 atom["data"]["user-data"] = utils.xml_to_dict(
                     atom["data"]["user-data"])
