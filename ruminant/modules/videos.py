@@ -20,7 +20,7 @@ def mp4_decode_language(lang_bytes):
 class IsoModule(module.RuminantModule):
 
     def identify(buf, ctx):
-        return buf.peek(8)[4:] == b"ftyp"
+        return buf.peek(8)[4:] in (b"ftyp", b"styp")
 
     def chew(self):
         file = {}
