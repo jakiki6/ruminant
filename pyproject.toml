@@ -11,9 +11,7 @@ description = "Recursive metadata extraction tool"
 version = "0.0.15"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = [
-    "lxml"
-]
+dependencies = []
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",

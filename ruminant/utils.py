@@ -4,7 +4,6 @@ from .buf import Buf, _decode
 from .modules import chew
 import uuid
 import xml.etree.ElementTree as ET
-from lxml import etree
 from datetime import datetime, timezone, timedelta
 import zlib
 import bz2
@@ -50,7 +49,7 @@ def xml_to_dict(string, fail=False):
 
 
 def read_xml(buf, chunk_size=4096):
-    parser = etree.XMLPullParser(events=("start", "end"))
+    parser = ET.XMLPullParser(events=("start", "end"))
     content = b""
     root_seen = False
     root = None
