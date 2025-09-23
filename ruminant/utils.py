@@ -132,6 +132,14 @@ def read_protobuf(buf, length, escape=False, decode={}):
                                               value)
                         if len(value) == 1:
                             value = value[0]
+                    case "double":
+                        if isinstance(value, int):
+                            value = value.to_bytes(8, "little")
+
+                        value = struct.unpack("<" + "d" * (len(value) >> 3),
+                                              value)
+                        if len(value) == 1:
+                            value = value[0]
                     case "s32":
                         value = (2**32 - 1) - value - 1
                     case "s64":
