@@ -1022,6 +1022,8 @@ class JPEGModule(module.RuminantModule):
                 self.buf.skip(6)
                 with self.buf.subunit():
                     chunk["data"]["tiff"] = chew(self.buf)
+            elif typ == 0xe1 and self.buf.peek(9) == b"<?xpacket":
+                chunk["data"]["xmp"] = utils.xml_to_dict(self.buf.readunit())
             elif typ == 0xe1 and (self.buf.peek(4) == b"http"
                                   or len(slack) > 0):
                 conforming = False
