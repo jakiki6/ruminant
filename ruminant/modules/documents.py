@@ -1,9 +1,11 @@
 from .. import module, utils
 from . import chew
 from ..buf import Buf
+from ..thirdparty import lzw
 
 import re
 import math
+import base64
 
 
 def png_decode(data, columns, rowlength):
@@ -263,12 +265,19 @@ class PdfModule(module.RuminantModule):
                                     obj["decompression-error"] = True
 
                                 buf = Buf(content)
+                            case "/LZWDecode":
+                                buf = Buf(lzw.decompress(buf.read()))
                             case "/ASCIIHexDecode":
                                 buf = Buf(
                                     bytes.fromhex(
                                         buf.read().rstrip(b"\n").split(
                                             b">")[0].decode("latin-1")))
-                            case "/DCTDecode":
+                            case "/ASCII85Decode":
+                                buf = Buf(
+                                    base64.a85decode(
+                                        buf.read().rstrip(b"\n").split(
+                                            b">")[0].decode("latin-1")))
+                            case "/DCTDecode" | "/CCITTFaxDecode":
                                 pass
                             case _:
                                 raise ValueError(f"Unknown filter '{filt}'")
