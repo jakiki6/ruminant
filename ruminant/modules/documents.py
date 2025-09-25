@@ -268,6 +268,10 @@ class PdfModule(module.RuminantModule):
                                     bytes.fromhex(
                                         buf.read().rstrip(b"\n").split(
                                             b">")[0].decode("latin-1")))
+                            case "/DCTDecode":
+                                pass
+                            case _:
+                                raise ValueError(f"Unknown filter '{filt}'")
 
                     if "DecodeParms" in obj["value"]:
                         params = self.resolve(obj["value"]["DecodeParms"])
@@ -353,6 +357,25 @@ class PdfModule(module.RuminantModule):
                                 values.append(self.parse_value(tokens))
 
                             obj["data"] = values
+                        case None, _:
+                            bak = buf.backup()
+
+                            obj["data"] = chew(buf)
+                            if obj["data"]["type"] in ("unknown", "text"):
+                                try:
+                                    with buf:
+                                        buf.restore(bak)
+                                        tokens = list(
+                                            self.tokenize(buf.rs(buf.unit)))
+
+                                        values = []
+                                        while len(tokens) > 0:
+                                            values.append(
+                                                self.parse_value(tokens))
+
+                                        obj["data"] = values
+                                except Exception:
+                                    pass
                         case _, _:
                             obj["data"] = chew(buf)
 
