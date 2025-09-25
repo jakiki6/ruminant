@@ -62,3 +62,13 @@ class Utf8Module(module.RuminantModule):
         meta["data"] = content
 
         return meta
+
+
+@module.register
+class EmptyModule(module.RuminantModule):
+
+    def identify(buf, ctx):
+        return buf.available() == 0
+
+    def chew(self):
+        return {"type": "empty"}

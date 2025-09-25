@@ -46,3 +46,6 @@ This is a list of useful resources.
 # EXIF
 * https://exiv2.org/tags.html
 * https://exiftool.org/makernote_types.html
+
+# KDBX
+* https://keepass.info/help/kb/kdbx.html

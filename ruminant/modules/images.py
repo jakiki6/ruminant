@@ -2397,7 +2397,7 @@ class HdrpMakernoteModule(module.RuminantModule):
 
 
 @module.register
-class PsdModule(module.RuminantModule):
+class PsdModule(IRBModule):
 
     def identify(buf, ctx):
         return buf.peek(4) == b"8BPS"
@@ -2409,6 +2409,7 @@ class PsdModule(module.RuminantModule):
         self.buf.skip(4)
         meta["header"] = {}
         meta["header"]["version"] = self.buf.ru16()
+        self.old = meta["header"]["version"] == 1
         meta["header"]["reserved"] = self.buf.rh(6)
         meta["header"]["channels"] = self.buf.ru16()
         meta["header"]["width"] = self.buf.ru32()
@@ -2434,7 +2435,140 @@ class PsdModule(module.RuminantModule):
             meta["image-resources"] = chew(self.buf)
         self.buf.skip(meta["image-resources-length"])
 
-        # TODO
+        meta["layers"] = {}
+        self.buf.pushunit()
+        self.buf.setunit(self.buf.ru32() if self.old else self.buf.ru64())
+
+        self.buf.pushunit()
+        self.buf.setunit(self.buf.ru32() if self.old else self.buf.ru64())
+        meta["layers"]["record-count"] = self.buf.ri16()
+        meta["layers"]["records"] = []
+
+        for i in range(0, abs(meta["layers"]["record-count"])):
+            record = {}
+            record["rect"] = [self.buf.ru32() for i in range(0, 4)]
+            record["channel-count"] = self.buf.ru16()
+            record["channels"] = [{
+                "id":
+                utils.unraw(
+                    self.buf.ri16(), 1, {
+                        0: "Red",
+                        1: "Green",
+                        2: "Blue",
+                        -1: "Transparency mask",
+                        -2: "User supplied layer mask",
+                        -3: "Real user supplied layer mask"
+                    }),
+                "length":
+                self.buf.ru32() if self.old else self.buf.ru64()
+            } for i in range(0, record["channel-count"])]
+            self.buf.skip(4)
+            record["key"] = self.buf.rs(4)
+            record["opacity"] = self.buf.ru8()
+            record["clipping"] = utils.unraw(self.buf.ru8(), 1, {
+                0: "Base",
+                1: "Non-base"
+            })
+            flags = self.buf.ru8()
+            record["flags"] = {
+                "raw": flags,
+                "transparency-protected": bool(flags & (1 << 0)),
+                "visible": bool(flags & (1 << 1)),
+                "obsolete": bool(flags & (1 << 2)),
+                "bit4-valid": bool(flags & (1 << 3)),
+                "pixel-data-irrelevant": bool(flags & (1 << 4))
+            }
+            record["filter"] = self.buf.ru8()
+
+            self.buf.pushunit()
+            self.buf.setunit(self.buf.ru32())
+
+            self.buf.skip(self.buf.ru32())
+            self.buf.skip(self.buf.ru32())
+            record["name"] = self.buf.rs(self.buf.ru8())
+
+            self.buf.skipunit()
+            self.buf.popunit()
+
+            meta["layers"]["records"].append(record)
+
+        self.buf.skipunit()
+        self.buf.popunit()
+
+        self.buf.skip(self.buf.ru32())
+
+        meta["layers"]["effects"] = []
+        while self.buf.unit > 4:
+            effect = {}
+            self.buf.skip(4)
+            effect["key"] = self.buf.rs(4)
+
+            self.buf.pushunit()
+            self.buf.setunit(self.buf.ru32() if (
+                self.old or effect["key"] not in [
+                    "LMsk", "Lr16", "Lr32", "Layr", "Mt16", "Mt32", "Mtrn",
+                    "Alph", "FMsk", "lnk2", "FEid", "FXid", "PxSD"
+                ]) else self.buf.ru64())
+
+            match effect["key"]:
+                case "Patt" | "Pat2" | "Pat3":
+                    effect["data"] = []
+                    while self.buf.unit > 0:
+                        self.buf.pushunit()
+                        self.buf.setunit(self.buf.ru32())
+
+                        pattern = {}
+                        pattern["version"] = self.buf.ru32()
+                        pattern["image-mode"] = utils.unraw(
+                            self.buf.ru32(), 4, {
+                                0: "Bitmap",
+                                1: "Grayscale",
+                                2: "Indexed",
+                                3: "RGB",
+                                4: "CMYK",
+                                7: "Multichannel",
+                                8: "Duotone",
+                                9: "Lab"
+                            })
+                        pattern["points"] = [
+                            self.buf.ru16() for i in range(0, 2)
+                        ]
+                        pattern["name"] = self.buf.rs(self.buf.ru32())
+                        pattern["id"] = self.buf.rs(self.buf.ru8())
+
+                        effect["data"].append(pattern)
+
+                        self.buf.skipunit()
+                        self.buf.popunit()
+                case "FMsk":
+                    effect["data"] = {
+                        "colorspace": self.buf.rh(10),
+                        "opacity": self.buf.ru16()
+                    }
+                case "cinf":
+                    effect["data"] = {
+                        "version": self.buf.ru32(),
+                        "descriptor": self.read_descriptor()
+                    }
+                case _:
+                    effect["unknown"] = True
+
+            self.buf.skipunit()
+            self.buf.popunit()
+
+            meta["layers"]["effects"].append(effect)
+
+        self.buf.skipunit()
+        self.buf.popunit()
+
+        meta["image-data-compression"] = utils.unraw(
+            self.buf.ru16(), 2, {
+                0: "Raw image data",
+                1: "RLE",
+                2: "ZIP without prediction",
+                3: "ZIP with prediction"
+            })
+
         self.buf.skip(self.buf.available())
 
         return meta
