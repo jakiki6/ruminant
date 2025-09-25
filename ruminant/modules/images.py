@@ -1378,6 +1378,10 @@ class PNGModule(module.RuminantModule):
                             chunk["data"]["text"] = chew(
                                 bytes.fromhex(
                                     chunk["data"]["text"].split("\n")[3]))
+                        case "Raw profile type exif":
+                            chunk["data"]["text"] = chew(
+                                bytes.fromhex("".join(
+                                    chunk["data"]["text"].split("\n")[3:])))
                 case "bKGD":
                     match self.buf.unit:
                         case 1:
@@ -2278,8 +2282,7 @@ class GifModule(module.RuminantModule):
                             }
                         case 0xfe:
                             block["extension"] = "comment"
-                            block["data"] = self.read_subblocks().decode(
-                                "utf-8")
+                            block["data"] = utils.decode(self.read_subblocks())
                             processed_subdata = True
                         case 0xff:
                             block["extension"] = "application"
@@ -2324,6 +2327,7 @@ class GifModule(module.RuminantModule):
                     block["type"] = "end"
                     running = False
                 case _:
+                    break
                     raise ValueError(f"Unknown GIF block type {typ}")
 
             meta["blocks"].append(block)

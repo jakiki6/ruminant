@@ -345,6 +345,14 @@ class PdfModule(module.RuminantModule):
                                 self.queue.append(
                                     (self.resolve(obj["value"]["Prev"]),
                                      old_buf))
+                        case "/ObjStm", _:
+                            tokens = list(self.tokenize(buf.rs(buf.unit)))
+
+                            values = []
+                            while len(tokens) > 0:
+                                values.append(self.parse_value(tokens))
+
+                            obj["data"] = values
                         case _, _:
                             obj["data"] = chew(buf)
 
