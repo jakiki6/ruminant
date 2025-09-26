@@ -22,7 +22,7 @@ def _xml_to_dict(elem):
 
         for k, v in elem.attrib.items():
             match k:
-                case "{http://ns.google.com/photos/1.0/camera/}hdrp_makernote" | "{http://ns.google.com/photos/1.0/camera/}shot_log_data":
+                case "{http://ns.google.com/photos/1.0/camera/}hdrp_makernote" | "{http://ns.google.com/photos/1.0/camera/}shot_log_data" | "{http://ns.adobe.com/xap/1.0/g/img/}image":
                     res["attributes"][k] = chew(base64.b64decode(v))
 
     if elem.text and len(elem.text.strip()):
