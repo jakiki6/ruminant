@@ -49,3 +49,6 @@ This is a list of useful resources.
 
 # KDBX
 * https://keepass.info/help/kb/kdbx.html
+
+# JPEG2000
+* https://www.itu.int/rec/dologin_pub.asp?lang=e&id=T-REC-T.813-201206-I!!PDF-E&type=items

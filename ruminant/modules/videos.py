@@ -20,10 +20,12 @@ def mp4_decode_language(lang_bytes):
 class IsoModule(module.RuminantModule):
 
     def identify(buf, ctx):
-        return buf.peek(8)[4:] in (b"ftyp", b"styp")
+        return buf.peek(8)[4:] in (b"ftyp", b"styp", b"jP  ")
 
     def chew(self):
         file = {}
+
+        self.mode = None
 
         file["type"] = "iso"
         file["atoms"] = []
@@ -75,7 +77,8 @@ class IsoModule(module.RuminantModule):
         if typ in ("moov", "trak", "mdia", "minf", "dinf", "stbl", "udta",
                    "mvex", "moof", "traf", "gsst", "gstd", "sinf", "schi",
                    "cprt", "trkn", "aART", "iprp", "ipco", "tapt", "tref",
-                   "gmhd") or (typ[0] == "©"
+                   "gmhd", "jp2h",
+                   "asoc") or (typ[0] == "©"
                                and self.buf.peek(8)[4:8] == b"data"):
             self.read_more(atom)
         elif typ in ("ftyp", "styp"):
@@ -86,6 +89,9 @@ class IsoModule(module.RuminantModule):
             while self.buf.unit > 0:
                 atom["data"]["compatible-brands"].append(
                     self.buf.rs(4, "utf-8"))
+
+            if atom["data"]["major-brand"] == "jp2 ":
+                self.mode = "jp2"
         elif typ == "uuid":
             atom["data"]["uuid"] = str(uuid.UUID(bytes=self.buf.read(16)))
             atom["data"]["user-data"] = self.buf.rs(self.buf.unit)
@@ -280,25 +286,33 @@ class IsoModule(module.RuminantModule):
                 atom["data"]["pictureParameterSets"].append(
                     self.buf.rh(length))
         elif typ == "colr":
-            atom["data"]["color-type"] = self.buf.rs(4)
+            if self.mode == "jp2":
+                atom["data"]["method"] = self.buf.ru8()
+                atom["data"]["precedence"] = self.buf.ru8()
+                atom["data"]["approx"] = self.buf.ru8()
+                atom["data"]["colour"] = self.buf.rh(self.buf.unit)
+            else:
+                atom["data"]["color-type"] = self.buf.rs(4)
 
-            match atom["data"]["color-type"]:
-                case "nclc":
-                    atom["data"]["color-primaries"] = self.buf.ru16()
-                    atom["data"]["transfer-characteristics"] = self.buf.ru16()
-                    atom["data"]["matrix-coefficients"] = self.buf.ru16()
-                case "rICC" | "prof":
-                    atom["data"]["icc_profile_data"] = chew(
-                        b"ICC_PROFILE\x00\x00\x00" + self.buf.readunit())
-                case "nclx":
-                    atom["data"]["color-primaries"] = self.buf.ru16()
-                    atom["data"]["transfer-characteristics"] = self.buf.ru16()
-                    atom["data"]["matrix-coefficients"] = self.buf.ru16()
-                    full_range_flag = self.buf.ru8()
-                    atom["data"]["full_range_flag"] = {
-                        "raw": full_range_flag,
-                        "full": bool(full_range_flag & 0x80),
-                    }
+                match atom["data"]["color-type"]:
+                    case "nclc":
+                        atom["data"]["color-primaries"] = self.buf.ru16()
+                        atom["data"][
+                            "transfer-characteristics"] = self.buf.ru16()
+                        atom["data"]["matrix-coefficients"] = self.buf.ru16()
+                    case "rICC" | "prof":
+                        atom["data"]["icc_profile_data"] = chew(
+                            b"ICC_PROFILE\x00\x00\x00" + self.buf.readunit())
+                    case "nclx":
+                        atom["data"]["color-primaries"] = self.buf.ru16()
+                        atom["data"][
+                            "transfer-characteristics"] = self.buf.ru16()
+                        atom["data"]["matrix-coefficients"] = self.buf.ru16()
+                        full_range_flag = self.buf.ru8()
+                        atom["data"]["full_range_flag"] = {
+                            "raw": full_range_flag,
+                            "full": bool(full_range_flag & 0x80),
+                        }
         elif typ == "pasp":
             atom["data"]["hSpacing"] = self.buf.ru32()
             atom["data"]["vSpacing"] = self.buf.ru32()
@@ -1067,6 +1081,20 @@ class IsoModule(module.RuminantModule):
             atom["data"]["content"] = chew(self.buf.readunit())
         elif typ == "nmhd":
             self.read_version(atom)
+        elif typ == "jP  ":
+            atom["data"]["signature"] = self.buf.rh(4)
+        elif typ == "ihdr":
+            atom["data"]["height"] = self.buf.ru32()
+            atom["data"]["width"] = self.buf.ru32()
+            atom["data"]["num-components"] = self.buf.ru16()
+            atom["data"]["depth"] = self.buf.ru8()
+            atom["data"]["compression"] = self.buf.ru8()
+            atom["data"]["colour-unknown"] = self.buf.ru8()
+            atom["data"]["ipr"] = self.buf.ru8()
+        elif typ == "lbl ":
+            atom["data"]["string"] = self.buf.rs(self.buf.unit)
+        elif typ == "xml ":
+            atom["data"]["xml"] = utils.xml_to_dict(self.buf.rs(self.buf.unit))
         elif typ in ("samr", "sawb", "mp4a", "drms", "alac", "owma", "ac-3",
                      "ec-3", "mlpa", "dtsl", "dtsh", "dtse", "enca", "fLaC"):
             # see https://github.com/sannies/mp4parser for reference
@@ -1107,7 +1135,7 @@ class IsoModule(module.RuminantModule):
         elif typ in ("lpcm", "beam"):
             # TODO
             pass
-        elif typ[0] == "\x00" or typ in ("mdat", "wide"):
+        elif typ[0] == "\x00" or typ in ("mdat", "wide", "jp2c"):
             pass
         else:
             atom["unknown"] = True
