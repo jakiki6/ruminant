@@ -1190,7 +1190,11 @@ class JPEGModule(module.RuminantModule):
                             table["data"]]
 
                     chunk["tables"].append(table)
-
+            elif typ == 0xc4:
+                temp = self.buf.ru8()
+                chunk["data"]["id"] = temp & 0x0f
+                chunk["data"]["type"] = "ac" if (temp & 0x10) else "dc"
+                chunk["data"]["symbol-count"] = list(self.buf.read(16))
             elif typ == 0xd9:
                 should_break = True
 
@@ -2569,6 +2573,22 @@ class PsdModule(IRBModule):
                 3: "ZIP with prediction"
             })
 
+        self.buf.skip(self.buf.available())
+
+        return meta
+
+
+@module.register
+class JpegXlModule(module.RuminantModule):
+
+    def identify(buf, ctx):
+        return buf.peek(2) == b"\xff\x0a"
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "jpeg-xl"
+
+        # TODO
         self.buf.skip(self.buf.available())
 
         return meta
