@@ -2595,3 +2595,17 @@ class JpegXlModule(module.RuminantModule):
         self.buf.skip(self.buf.available())
 
         return meta
+
+@module.register
+class DicomModule(module.RuminantModule):
+
+    def identify(buf, ctx):
+        return buf.peek(128 + 4)[128:] == b"DICM"
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "dicom"
+
+        meta["preamble"] = self.buf.rh(128)
+
+        return meta

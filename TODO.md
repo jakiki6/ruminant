@@ -1,8 +1,10 @@
 * new file formats
   * DJVU
-  * finish PSD
   * INDD
   * WOFF2
+* expand file formats
+  * Jpeg XL
+  * DICOM
 * more consistent naming convention
 * backends (process the json blob)
   * exiftool-like output

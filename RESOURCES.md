@@ -59,3 +59,7 @@ This is a list of useful resources.
 
 # C2PA
 * https://github.com/TrustNXT/c2pa-ts
+
+# DICOM
+* https://dicom.nema.org/medical/dicom/current/output/chtml/part10/chapter_7.html
+* https://manpages.ubuntu.com/manpages/plucky/man1/gdcmdump.1.html
