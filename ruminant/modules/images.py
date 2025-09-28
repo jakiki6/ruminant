@@ -1458,6 +1458,9 @@ class PNGModule(module.RuminantModule):
                     chunk["data"]["first-half-height"] = self.buf.ru32()
                     chunk["data"]["second-half-height"] = self.buf.ru32()
                     chunk["data"]["idat-restart-offset"] = self.buf.ru32()
+                case "caBX":
+                    with self.buf.subunit():
+                        chunk["data"]["jumbf"] = chew(self.buf)
                 case "IDAT" | "IEND" | "PLTE" | "tRNS" | "npOl" | "npTc":
                     pass
                 case _:

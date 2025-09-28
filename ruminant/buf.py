@@ -242,11 +242,17 @@ class Buf(object):
     def ri64l(self):
         return int.from_bytes(self.read(8), "little", signed=True)
 
+    def rf16(self):
+        return struct.unpack(">e", self.read(2))[0]
+
     def rf32(self):
         return struct.unpack(">f", self.read(4))[0]
 
     def rf64(self):
         return struct.unpack(">d", self.read(8))[0]
+
+    def rf16l(self):
+        return struct.unpack("<e", self.read(2))[0]
 
     def rf32l(self):
         return struct.unpack("<f", self.read(4))[0]

@@ -20,7 +20,7 @@ def mp4_decode_language(lang_bytes):
 class IsoModule(module.RuminantModule):
 
     def identify(buf, ctx):
-        return buf.peek(8)[4:] in (b"ftyp", b"styp", b"jP  ")
+        return buf.peek(8)[4:] in (b"ftyp", b"styp", b"jP  ", b"jumb")
 
     def chew(self):
         file = {}
@@ -77,8 +77,8 @@ class IsoModule(module.RuminantModule):
         if typ in ("moov", "trak", "mdia", "minf", "dinf", "stbl", "udta",
                    "mvex", "moof", "traf", "gsst", "gstd", "sinf", "schi",
                    "cprt", "trkn", "aART", "iprp", "ipco", "tapt", "tref",
-                   "gmhd", "jp2h",
-                   "asoc") or (typ[0] == "©"
+                   "gmhd", "jp2h", "asoc",
+                   "jumb") or (typ[0] == "©"
                                and self.buf.peek(8)[4:8] == b"data"):
             self.read_more(atom)
         elif typ in ("ftyp", "styp"):
@@ -1095,6 +1095,41 @@ class IsoModule(module.RuminantModule):
             atom["data"]["string"] = self.buf.rs(self.buf.unit)
         elif typ == "xml ":
             atom["data"]["xml"] = utils.xml_to_dict(self.buf.rs(self.buf.unit))
+        elif typ == "jumd":
+            atom["data"]["uuid"] = utils.to_uuid(self.buf.read(16))
+            toggles = self.buf.ru8()
+            atom["data"]["toggles"] = {
+                "raw": toggles,
+                "requestable": bool(toggles & (1 << 0)),
+                "label": bool(toggles & (1 << 1)),
+                "id": bool(toggles & (1 << 2)),
+                "signature": bool(toggles & (1 << 3))
+            }
+
+            if atom["data"]["toggles"]["label"]:
+                atom["data"]["label"] = self.buf.rzs()
+
+            if atom["data"]["toggles"]["id"]:
+                atom["data"]["id"] = self.buf.ru32()
+
+            if atom["data"]["toggles"]["signature"]:
+                atom["data"]["signature-hash"] = self.buf.rh(32)
+        elif typ == "cbor":
+            atom["data"]["blob"] = utils.read_cbor(self.buf)
+        elif typ == "bfdb":
+            flags = self.buf.ru8()
+            atom["data"]["flags"] = {
+                "raw": flags,
+                "has-filename": bool(flags & (1 << 0))
+            }
+
+            atom["data"]["media-type"] = self.buf.rzs()
+
+            if atom["data"]["flags"]["has-filename"]:
+                atom["data"]["filename"] = self.buf.rzs()
+        elif typ == "bidb":
+            with self.buf.subunit():
+                atom["data"]["file"] = chew(self.buf)
         elif typ in ("samr", "sawb", "mp4a", "drms", "alac", "owma", "ac-3",
                      "ec-3", "mlpa", "dtsl", "dtsh", "dtse", "enca", "fLaC"):
             # see https://github.com/sannies/mp4parser for reference

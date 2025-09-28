@@ -902,3 +902,115 @@ def read_pgp(buf):
     buf.popunit()
 
     return data
+
+
+def read_cbor(buf):
+    cmd = buf.ru8()
+    major, minor = cmd >> 5, cmd & 0x1f
+
+    if minor == 24:
+        minor = buf.ru8()
+    elif minor == 25:
+        if major == 7:
+            minor = buf.rf16()
+        else:
+            minor = buf.ru16()
+    elif minor == 26:
+        if major == 7:
+            minor = buf.rf32()
+        else:
+            minor = buf.ru32()
+    elif minor == 27:
+        if major == 7:
+            minor = buf.rf64()
+        else:
+            minor = buf.ru64()
+    elif minor == 31:
+        if major == 7:
+            raise ValueError(
+                "CBOR indefinite length end outside of indefinite length context"
+            )
+        else:
+            minor = None
+    elif minor > 27:
+        raise ValueError(f"Malformed CBOR: {(major, minor)}")
+
+    match major:
+        case 0:
+            value = minor
+        case 1:
+            value = -1 - minor
+        case 2:
+            if minor is None:
+                value = b""
+
+                while True:
+                    if buf.pu8() == 0xff:
+                        buf.skip(1)
+                        break
+
+                    value += read_cbor(buf)
+
+                value = value.hex()
+            else:
+                value = buf.rh(minor)
+
+            try:
+                buf2 = Buf(bytes.fromhex(value))
+                data = read_cbor(buf2)
+                assert buf2.available() == 0
+                value = data
+            except Exception:
+                data = chew(bytes.fromhex(value))
+                if data["type"] not in ("unknown", "empty", "error"):
+                    value = data
+        case 3:
+            if minor is None:
+                value = b""
+
+                while True:
+                    if buf.pu8() == 0xff:
+                        buf.skip(1)
+                        break
+
+                    value += read_cbor(buf)
+
+                value = decode(value)
+            else:
+                value = buf.rs(minor)
+        case 4:
+            value = []
+
+            if minor is None:
+                while True:
+                    if buf.pu8() == 0xff:
+                        buf.skip(1)
+                        break
+
+                    value.append(read_cbor(buf))
+            else:
+                for i in range(0, minor):
+                    value.append(read_cbor(buf))
+        case 5:
+            value = {}
+
+            if minor is None:
+                while True:
+                    if buf.pu8() == 0xff:
+                        buf.skip(1)
+                        break
+
+                    k, v = read_cbor(buf), read_cbor(buf)
+                    value[k] = v
+            else:
+                for i in range(0, minor):
+                    k, v = read_cbor(buf), read_cbor(buf)
+                    value[k] = v
+        case 6:
+            value = (minor, read_cbor(buf))
+        case 7:
+            value = minor
+        case _:
+            raise ValueError(f"Unknown CBOR major {major}")
+
+    return value

@@ -37,7 +37,7 @@ This is a list of useful resources.
 * https://exiv2.org/tags-sony.html
 * https://exiftool.org/TagNames/Sony.html
 
-## Files in the exiftool tree
+# Files in the exiftool tree
 * lib/Image/ExifTool/FujiFilm.pm
 
 # Adobe Photoshop
@@ -52,3 +52,10 @@ This is a list of useful resources.
 
 # JPEG2000
 * https://www.itu.int/rec/dologin_pub.asp?lang=e&id=T-REC-T.813-201206-I!!PDF-E&type=items
+
+# CBOR
+* https://www.rfc-editor.org/rfc/rfc8949.html
+* https://datatracker.ietf.org/doc/html/rfc8152
+
+# C2PA
+* https://github.com/TrustNXT/c2pa-ts
