@@ -2596,6 +2596,7 @@ class JpegXlModule(module.RuminantModule):
 
         return meta
 
+
 @module.register
 class DicomModule(module.RuminantModule):
 

@@ -73,12 +73,16 @@ def read_xml(buf, chunk_size=4096):
                         root_seen = True
                         root = elem
                     elif event == "end" and elem is root:
-                        buf.restore(bak)
-                        buf.skip(len(content))
-                        return xml_to_dict(content)
+                        break
     finally:
         buf.restore(bak)
-    raise ValueError("No complete XML document found")
+
+    try:
+        xml = xml_to_dict(content, True)
+        buf.skip(len(content))
+        return xml
+    except Exception:
+        raise ValueError("No complete XML document found")
 
 
 def read_varint(buf):
