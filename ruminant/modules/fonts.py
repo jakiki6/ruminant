@@ -586,4 +586,7 @@ class TrueTypeModule(module.RuminantModule):
         ) > 4 and self.buf.pu64() & 0xffffffffff00fffe == 0x0000000100000000:
             meta["tables"].append({"tag": "DSIG", "data": self.read_dsig()})
 
+        if self.buf.tell() % 4 != 0:
+            self.buf.skip(4 - (self.buf.tell() % 4))
+
         return meta
