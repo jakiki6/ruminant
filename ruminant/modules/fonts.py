@@ -569,6 +569,8 @@ class TrueTypeModule(module.RuminantModule):
                         table["data"]["reserved"] = self.buf.ru8()
                     case "DSIG":
                         table["data"] = self.read_dsig()
+                    case "Wasm":
+                        table["data"] = chew(self.buf.readunit())
                     case "glyf" | "hmtx" | "loca" | "GDEF" | "GPOS" | "GSUB" | "hdmx" | "VDMX" | "JSTF" | "LTSH":
                         # not really parsable as it's the raw glyph data
                         pass
