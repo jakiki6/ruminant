@@ -424,6 +424,22 @@ class Buf(object):
     def puuid(self):
         return str(uuid.UUID(bytes=self.peek(16)))
 
+    def ruleb(self):
+        c = self.ru8()
+        v = c & 0x7f
+        shift = 7
+
+        while c & 0x80:
+            c = self.ru8()
+            v |= (c & 0x7f) << shift
+            shift += 7
+
+        return v
+
+    def puleb(self):
+        with self.buf:
+            return self.ruleb()
+
     def __getattr__(self, name):
         # Delegate everything else to the underlying file
         return getattr(self._file, name)

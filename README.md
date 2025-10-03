@@ -68,6 +68,7 @@ Ruminant is still in early alpha but it can already process the following file t
 * KDBX files
 * JPEG2000 files
 * C2PA CAI JUMBF metadata
+* WASM files
 
 # How do I install it?
 Run `pip3 install ruminant`.

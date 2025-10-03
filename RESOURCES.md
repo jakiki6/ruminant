@@ -63,3 +63,6 @@ This is a list of useful resources.
 # DICOM
 * https://dicom.nema.org/medical/dicom/current/output/chtml/part10/chapter_7.html
 * https://manpages.ubuntu.com/manpages/plucky/man1/gdcmdump.1.html
+
+# WASM
+* https://webassembly.github.io/spec/core/binary/index.html
