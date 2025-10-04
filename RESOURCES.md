@@ -66,3 +66,5 @@ This is a list of useful resources.
 
 # WASM
 * https://webassembly.github.io/spec/core/binary/index.html
+* https://github.com/WebAssembly/tool-conventions/blob/main/ProducersSection.md
+* https://github.com/WebAssembly/tool-conventions/blob/main/Linking.md

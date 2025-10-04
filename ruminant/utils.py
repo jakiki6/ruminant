@@ -9,6 +9,7 @@ import zlib
 import bz2
 import base64
 import struct
+import json
 
 
 def _xml_to_dict(elem):
@@ -863,14 +864,29 @@ def _read_pgp(buf, fake=None):
                 data["unknown"] = True
         case 0x0b:
             packet["tag"] = "Literal Data"
-            data["format"] = buf.rs(1)
-            data["filename"] = buf.rs(buf.ru8())
+            data["format"] = buf.read(1).decode("latin-1")
             data["date"] = datetime.fromtimestamp(buf.ru32(),
                                                   timezone.utc).isoformat()
 
             match data["format"]:
                 case "t" | "b":
+                    data["filename"] = buf.rs(buf.ru8())
                     data["content"] = buf.rs(buf.unit)
+                case "\x00":
+                    content = buf.read(min(buf.unit, buf.available()))
+
+                    if content.startswith(b"{\"body\""):
+                        i = 0
+                        while content[i] != 0x0a:
+                            i += 1
+
+                        data["content"] = {}
+                        data["content"]["json"] = json.loads(
+                            content[:i].replace(b"\x1f", b"").decode("utf-8"))
+                        data["content"]["signature"] = read_pgp(
+                            Buf(content[i + 1:]))
+                    else:
+                        data["content"] = content.hex()
                 case _:
                     packet["unknown"] = True
         case 0x0d:
