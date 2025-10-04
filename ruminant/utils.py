@@ -29,6 +29,9 @@ def _xml_to_dict(elem):
     if elem.text and len(elem.text.strip()):
         res["text"] = elem.text
 
+        if elem.tag == "{http://ns.adobe.com/xap/1.0/g/img/}image":
+            res["text"] = chew(base64.b64decode(res["text"]))
+
     children = list(elem)
     if len(children):
         res["children"] = [_xml_to_dict(child) for child in children]
@@ -1034,3 +1037,46 @@ def read_cbor(buf):
             raise ValueError(f"Unknown CBOR major {major}")
 
     return value
+
+def demangle(name):
+    assert name[:2] == "_Z"
+    res = None
+
+    name = name[2:]
+    if name[0] == "N":
+        name = name[1:]
+        res = []
+
+        while True:
+            if name[0] == "E":
+                name = name[1:]
+                break
+
+            length = ""
+            while name[0] in "0123456789":
+                length += name[0]
+                name = name[1:]
+
+            length = int(length)
+            res.append(name[:length])
+            name = name[length:]
+
+            if res[-1].startswith("_$"):
+                res[-1] = res[-1][1:]
+
+        res = "::".join(res)
+
+
+    res = res.replace("$LT$", "<")
+    res = res.replace("$GT$", ">")
+    res = res.replace("$LP$", "(")
+    res = res.replace("$RP$", ")")
+    res = res.replace("$BP$", "*")
+    res = res.replace("$RF$", "&")
+    res = res.replace("$C$", ",")
+    res = res.replace("..", "::")
+
+    for i in range(0, 128):
+        res = res.replace(f"$u{hex(i)[2:].zfill(2)}$", chr(i))
+
+    return res

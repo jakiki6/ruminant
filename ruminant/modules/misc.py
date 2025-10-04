@@ -1,4 +1,4 @@
-from .. import module
+from .. import module, utils
 from . import chew
 
 
@@ -127,6 +127,13 @@ class WasmModule(module.RuminantModule):
                             while self.buf.unit > 0:
                                 section["data"]["strings"].append(
                                     self.buf.rzs())
+
+                            for i in range(0, len(section["data"]["strings"])):
+                                if section["data"]["strings"][i].startswith("_Z"):
+                                    section["data"]["strings"][i] = {
+                                        "raw": section["data"]["strings"][i],
+                                        "demangled": utils.demangle(section["data"]["strings"][i])
+                                    }
                         case _:
                             with self.buf.subunit():
                                 section["data"]["blob"] = chew(self.buf)
