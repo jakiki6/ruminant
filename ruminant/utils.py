@@ -1038,6 +1038,7 @@ def read_cbor(buf):
 
     return value
 
+
 def demangle(name):
     assert name[:2] == "_Z"
     res = None
@@ -1065,7 +1066,6 @@ def demangle(name):
                 res[-1] = res[-1][1:]
 
         res = "::".join(res)
-
 
     res = res.replace("$LT$", "<")
     res = res.replace("$GT$", ">")
