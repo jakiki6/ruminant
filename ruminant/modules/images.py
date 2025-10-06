@@ -1119,6 +1119,13 @@ class JPEGModule(module.RuminantModule):
                 chunk["data"]["flags0"] = self.buf.rh(2)
                 chunk["data"]["flags1"] = self.buf.rh(2)
                 chunk["data"]["transform"] = self.buf.ru8()
+            elif typ == 0xea and self.buf.peek(4) == b"AROT":
+                self.buf.skip(6)
+                chunk["data"]["entry-count"] = self.buf.ru32()
+                chunk["data"]["entries"] = [
+                    self.buf.ru32l()
+                    for i in range(0, chunk["data"]["entry-count"])
+                ]
             elif typ & 0xf0 == 0xe0:
                 chunk["data"]["payload"] = self.buf.readunit().hex()
             elif typ in (0xc0, 0xc2):

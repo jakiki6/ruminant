@@ -1080,3 +1080,51 @@ def demangle(name):
         res = res.replace(f"$u{hex(i)[2:].zfill(2)}$", chr(i))
 
     return res
+
+
+def read_bencode(buf, blob_mode=False):
+    c = buf.read(1)
+
+    if c == b"i":
+        n = b""
+        while buf.peek(1) != b"e":
+            n += buf.read(1)
+
+        buf.read(1)
+
+        return int(n)
+    elif c == b"l":
+        elems = []
+        while buf.peek(1) != b"e":
+            elems.append(read_bencode(buf))
+
+        buf.read(1)
+        return elems
+    elif c == b"d":
+        elems = {}
+        while buf.peek(1) != b"e":
+            key = read_bencode(buf)
+
+            match key:
+                case "pieces":
+                    elems[key] = read_bencode(buf, True)
+                case "creation date":
+                    elems[key] = datetime.fromtimestamp(
+                        read_bencode(buf), timezone.utc).isoformat()
+                case _:
+                    elems[key] = read_bencode(buf)
+
+        buf.read(1)
+        return elems
+    elif c in b"0123456789":
+        n = c
+        while buf.peek(1) != b":":
+            n += buf.read(1)
+
+        buf.read(1)
+
+        value = buf.read(int(n))
+        if blob_mode:
+            return chew(value, blob_mode=True)
+        else:
+            return value.decode("utf-8")

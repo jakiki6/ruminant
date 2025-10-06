@@ -11,10 +11,11 @@ blob_id = 0
 
 class EntryModule(module.RuminantModule):
 
-    def __init__(self, walk_mode, *args, **kwargs):
+    def __init__(self, walk_mode, blob_mode, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.walk_mode = walk_mode
+        self.blob_mode = blob_mode
 
     def chew(self):
         global blob_id
@@ -27,50 +28,57 @@ class EntryModule(module.RuminantModule):
         offset = self.buf.tell()
 
         matched = False
-        for m in module.modules:
-            if m.identify(self.buf, {"walk": self.walk_mode}):
-                try:
-                    rest = m(self.buf).chew()
-                except Exception as e:
-                    if self.walk_mode:
-                        raise e
 
-                    self.buf.skip(self.buf.available())
+        if self.blob_mode:
+            matched = True
+            meta["type"] = "blob"
+            meta["length"] = self.buf.size()
+            self.buf.skip(self.buf.size())
+        else:
+            for m in module.modules:
+                if m.identify(self.buf, {"walk": self.walk_mode}):
+                    try:
+                        rest = m(self.buf).chew()
+                    except Exception as e:
+                        if self.walk_mode:
+                            raise e
 
-                    stack_list = []
-                    for frame in traceback.extract_tb(e.__traceback__):
-                        stack_list.append({
-                            "filename": frame.filename,
-                            "lineno": frame.lineno,
-                            "name": frame.name,
-                            "line": frame.line
-                        })
+                        self.buf.skip(self.buf.available())
 
-                    rest = {
-                        "type": "error",
-                        "module": m.__name__,
-                        "error-type": type(e).__name__,
-                        "error-message": str(e),
-                        "stack": stack_list
-                    }
+                        stack_list = []
+                        for frame in traceback.extract_tb(e.__traceback__):
+                            stack_list.append({
+                                "filename": frame.filename,
+                                "lineno": frame.lineno,
+                                "name": frame.name,
+                                "line": frame.line
+                            })
 
-                meta["length"] = self.buf.tell()
-                meta |= rest
+                        rest = {
+                            "type": "error",
+                            "module": m.__name__,
+                            "error-type": type(e).__name__,
+                            "error-message": str(e),
+                            "stack": stack_list
+                        }
 
-                matched = True
+                    meta["length"] = self.buf.tell()
+                    meta |= rest
 
-                if self.buf.available() and not self.walk_mode:
-                    with self.buf.cut():
-                        meta = {"type": "nested", "segments": [meta]}
+                    matched = True
 
-                        trailer = self.chew()
-                        if trailer["type"] == "nested":
-                            meta["segments"] += trailer["segments"]
-                        else:
-                            meta["segments"].append(trailer)
+                    if self.buf.available() and not self.walk_mode:
+                        with self.buf.cut():
+                            meta = {"type": "nested", "segments": [meta]}
 
-                    self.buf.skip(self.buf.available())
-                break
+                            trailer = self.chew()
+                            if trailer["type"] == "nested":
+                                meta["segments"] += trailer["segments"]
+                            else:
+                                meta["segments"].append(trailer)
+
+                        self.buf.skip(self.buf.available())
+                    break
 
         if not matched:
             meta |= {"type": "unknown", "length": self.buf.size()}
@@ -106,8 +114,8 @@ class EntryModule(module.RuminantModule):
         return meta
 
 
-def chew(blob, walk_mode=False):
-    return EntryModule(walk_mode, Buf.of(blob)).chew()
+def chew(blob, walk_mode=False, blob_mode=False):
+    return EntryModule(walk_mode, blob_mode, Buf.of(blob)).chew()
 
 
 from . import containers, images, videos, documents, fonts, audio, crypto, compression, text, misc  # noqa: F401,E402
