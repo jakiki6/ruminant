@@ -1468,6 +1468,26 @@ class PNGModule(module.RuminantModule):
                 case "caBX":
                     with self.buf.subunit():
                         chunk["data"]["jumbf"] = chew(self.buf)
+                case "cICP":
+                    chunk["data"]["color-primaries"] = self.buf.ru8()
+                    chunk["data"]["transfer-function"] = self.buf.ru8()
+                    chunk["data"]["matrix-coefficients"] = self.buf.ru8()
+                    chunk["data"]["video-full-range-flag"] = self.buf.ru8()
+                case "acTL":
+                    chunk["data"]["frame-count"] = self.buf.ru32()
+                    chunk["data"]["loop-count"] = self.buf.ru32()
+                case "fcTL":
+                    chunk["data"]["sequence-number"] = self.buf.ru32()
+                    chunk["data"]["width"] = self.buf.ru32()
+                    chunk["data"]["height"] = self.buf.ru32()
+                    chunk["data"]["x-offset"] = self.buf.ru32()
+                    chunk["data"]["y-offset"] = self.buf.ru32()
+                    chunk["data"]["delay-num"] = self.buf.ru16()
+                    chunk["data"]["delay-den"] = self.buf.ru16()
+                    chunk["data"]["dispose-op"] = self.buf.ru8()
+                    chunk["data"]["blend-op"] = self.buf.ru8()
+                case "fdAT":
+                    chunk["data"]["sequence-number"] = self.buf.ru32()
                 case "IDAT" | "IEND" | "PLTE" | "tRNS" | "npOl" | "npTc":
                     pass
                 case _:

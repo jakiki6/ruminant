@@ -70,6 +70,7 @@ Ruminant is still in early alpha but it can already process the following file t
 * C2PA CAI JUMBF metadata
 * WASM files
 * Torrent files
+* Sqlite3 database files
 
 # How do I install it?
 Run `pip3 install ruminant`.

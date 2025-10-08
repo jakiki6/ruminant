@@ -1,5 +1,7 @@
 from .. import module, utils
 from . import chew
+import tempfile
+import sqlite3
 
 
 @module.register
@@ -181,5 +183,67 @@ class TorrentModule(module.RuminantModule):
         meta["type"] = "magnet"
 
         meta["data"] = utils.read_bencode(self.buf)
+
+        return meta
+
+
+@module.register
+class Sqlite3Module(module.RuminantModule):
+
+    def identify(buf, ctx):
+        return buf.peek(16) == b"SQLite format 3\x00"
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "sqlite3"
+
+        self.buf.skip(16)
+
+        meta["header"] = {}
+        meta["header"]["page-size"] = self.buf.ru16()
+        if meta["header"]["page-size"] == 1:
+            meta["header"]["page-size"] = 65536
+        meta["header"]["write-version"] = self.buf.ru8()
+        meta["header"]["read-version"] = self.buf.ru8()
+        meta["header"]["reserved-per-page"] = self.buf.ru8()
+        meta["header"]["max-embedded-payload-fraction"] = self.buf.ru8()
+        meta["header"]["min-embedded-payload-fraction"] = self.buf.ru8()
+        meta["header"]["leaf-payload-fraction"] = self.buf.ru8()
+        meta["header"]["file-change-count"] = self.buf.ru32()
+        meta["header"]["page-count"] = self.buf.ru32()
+        meta["header"]["first-freelist"] = self.buf.ru32()
+        meta["header"]["freelist-count"] = self.buf.ru32()
+        meta["header"]["schema-cookie"] = self.buf.ru32()
+        meta["header"]["schema-format"] = self.buf.ru32()
+        meta["header"]["default-page-cache-size"] = self.buf.ru32()
+        meta["header"]["largest-broot-page"] = self.buf.ru32()
+        meta["header"]["encoding"] = utils.unraw(self.buf.ru32(), 4, {
+            1: "UTF-8",
+            2: "UTF-16le",
+            3: "UTF-16be"
+        })
+        meta["header"]["user-version"] = self.buf.ru32()
+        meta["header"]["incremental-vaccum-mode"] = self.buf.ru32()
+        meta["header"]["application-id"] = self.buf.ru32()
+        meta["header"]["reserved"] = self.buf.rh(20)
+        meta["header"]["version-valid-for"] = self.buf.ru32()
+        meta["header"]["sqlite-version-number"] = self.buf.ru32()
+
+        fd = tempfile.NamedTemporaryFile()
+        self.buf.seek(0)
+        to_copy = meta["header"]["page-size"] * meta["header"]["page-count"]
+        while to_copy > 0:
+            fd.write(self.buf.read(min(to_copy, 1 << 24)))
+            to_copy = max(to_copy - (1 << 24), 0)
+
+        db = sqlite3.connect(fd.name)
+        cur = db.cursor()
+
+        meta["schema"] = [
+            x[0] for x in cur.execute("SELECT sql FROM sqlite_master")
+        ]
+
+        db.close()
+        fd.close()
 
         return meta
