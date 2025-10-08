@@ -1,9 +1,9 @@
-import zlib
-import datetime
-import gzip
 from . import chew
 from .. import module, utils, constants
 from ..buf import Buf
+import zlib
+import datetime
+import gzip
 
 
 @module.register
@@ -2630,10 +2630,155 @@ class DicomModule(module.RuminantModule):
     def identify(buf, ctx):
         return buf.peek(128 + 4)[128:] == b"DICM"
 
+    def read_dataset(self):
+        tag = {}
+
+        group = self.buf.ru16l()
+        element = self.buf.ru16l()
+        ver = (group, element)
+        tag["tag"] = f"({hex(group)[2:].zfill(4)},{hex(element)[2:].zfill(4)})"
+        tag["name"] = constants.DICOM_NAMES.get(tag["tag"], "Unknown")
+
+        if ver == (0xfffe, 0xe000):
+            vr = "list"
+            length = self.buf.ru32()
+        else:
+            if self.explicit:
+                vr = self.buf.read(2).decode("latin-1")
+                wide = vr in ("OB", "OW", "OF", "SQ", "UT", "UN")
+
+                if wide:
+                    self.buf.skip(2)
+
+                if self.little:
+                    length = self.buf.ru32l() if wide else self.buf.ru16l()
+                else:
+                    length = self.buf.ru32() if wide else self.buf.ru16()
+            else:
+                vr = None
+                length = self.buf.ru32l()
+
+        if length == 0xffffffff:
+            length = self.buf.unit if self.buf.unit is not None else self.buf.available(
+            )
+
+        if vr and vr != "list":
+            tag["vr"] = vr
+        tag["length"] = length
+
+        self.buf.pushunit()
+        self.buf.setunit(length)
+
+        match vr:
+            case "UL":
+                tag["value"] = self.buf.ru32l(
+                ) if self.little else self.buf.ru32()
+            case "OB" | "UN" | "OW":
+                if ver == (2, 1):
+                    tag["value"] = self.buf.ru16()
+                else:
+                    with self.buf.subunit():
+                        tag["value"] = chew(self.buf)
+            case "UI" | "SH" | "CS" | "DA" | "TM" | "LO" | "PN" | "IS" | "UT" | "AE" | "ST" | "AS" | "DS":
+                tag["value"] = self.buf.rs(self.buf.unit)
+
+                if vr == "DA":
+                    tag["value"] = datetime.datetime.strptime(
+                        tag["value"], "%Y%m%d").strftime("%Y-%m-%d")
+                elif vr == "TM":
+                    if "." in tag["value"]:
+                        main, frac = tag["value"].split(".", 1)
+                        frac = (frac + "000000")[:6]
+                        tag["value"] = f"{main}.{frac}"
+                        fmt = "%H%M%S.%f"
+                    else:
+                        fmt_map = {2: "%H", 4: "%H%M", 6: "%H%M%S"}
+                        fmt = fmt_map.get(len(tag["value"]))
+                        if not fmt:
+                            raise ValueError(
+                                f"Invalid DICOM TM string: {tag['value']}")
+
+                    tag["value"] = datetime.datetime.strptime(
+                        tag["value"], fmt).time().strftime("%H:%M:%S.%f")
+                elif vr == "AS":
+                    tag["value"] = {
+                        "value": int(tag["value"][:3]),
+                        "unit": {
+                            "D": "days",
+                            "M": "months",
+                            "Y": "years"
+                        }[tag["value"][3]]
+                    }
+                elif vr == "UI":
+                    try:
+                        tag["value"] = utils.lookup_oid(
+                            [int(x) for x in tag["value"].split(".")])
+                    except Exception:
+                        pass
+            case "SQ":
+                tag["value"] = []
+                while self.buf.unit > 0:
+                    if self.buf.peek(4) == b"\xfe\xff\xdd\xe0":
+                        self.buf.skip(8)
+                        self.buf.setunit(0)
+                        break
+
+                    tag["value"].append(self.read_dataset())
+            case "list":
+                tag["value"] = []
+                while self.buf.unit > 0:
+                    if self.buf.peek(4) == b"\xfe\xff\x0d\xe0":
+                        self.buf.skip(8)
+                        self.buf.setunit(0)
+                        break
+
+                    tag["value"].append(self.read_dataset())
+            case "FD":
+                tag["value"] = self.buf.rf64l(
+                ) if self.little else self.buf.rf64()
+            case "SL":
+                tag["value"] = self.buf.ri64l(
+                ) if self.little else self.buf.ri64()
+            case "US":
+                tag["value"] = self.buf.ru16l(
+                ) if self.little else self.buf.ru16()
+            case _:
+                raise ValueError(f"Unknown VR {vr}, {tag}")
+
+        match ver:
+            case (0x0002, 0x0010):
+                match tag["value"]["raw"]:
+                    case "1.2.840.10008.1.2":
+                        self.explicit = False
+                        self.little = True
+                    case "1.2.840.10008.1.2.1":
+                        self.explicit = True
+                        self.little = True
+                    case "1.2.840.10008.1.2.2":
+                        self.explicit = True
+                        self.little = False
+                    case _:
+                        raise ValueError(f"Unknown mode {tag['value']['raw']}")
+
+        self.buf.skipunit()
+        self.buf.popunit()
+
+        return tag
+
     def chew(self):
         meta = {}
         meta["type"] = "dicom"
 
-        meta["preamble"] = self.buf.rh(128)
+        meta["preamble"] = chew(self.buf.read(128))
+        self.buf.skip(4)
+
+        self.explicit = True
+        self.little = True
+
+        meta["tags"] = []
+        while self.buf.available() > 0:
+            meta["tags"].append(self.read_dataset())
+
+        self.buf.skip(self.buf.available())
 
         return meta

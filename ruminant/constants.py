@@ -1521,3 +1521,27 @@ HDRP_V3_PROTO = {
         4: "float"
     }
 }
+
+DICOM_NAMES = {
+    "(0002,0000)": "File Meta Information Group Length",
+    "(0002,0001)": "File Meta Information Version",
+    "(0002,0002)": "Media Storage SOP Class UID",
+    "(0002,0003)": "Media Storage SOP Instance UID",
+    "(0002,0010)": "Transfer Syntax UID",
+    "(0002,0012)": "Implementation Class UID",
+    "(0002,0013)": "Implementation Version Name",
+    "(0002,0016)": "Source Application Entity Title",
+    "(0002,0017)": "Sending Application Entity Title",
+    "(0002,0018)": "Receiving Application Entity Title",
+    "(0002,0026)": "Source Presentation Address",
+    "(0002,0027)": "Sending Presentation Address",
+    "(0002,0028)": "Receiving Presentation Address",
+    "(0002,0100)": "Private Information Creator UID",
+    "(0002,0102)": "Private Information",
+    "(0008,0005)": "Specific Character Set",
+    "(0028,0004)": "Photometric Interpretation",
+    "(7fe0,0010)": "Pixel Data",
+    "(fffe,e000)": "Item Start",
+    "(fffe,e00d)": "Indefinite Item End",
+    "(fffe,e0dd)": "Indefinite Sequence End"
+}
