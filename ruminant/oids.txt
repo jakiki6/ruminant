@@ -81,6 +81,8 @@
 1.2.840.10008.1: Digital Imaging and COmmunications in Medicine (DICOM) application contexts
 1.2.840.10008.1.2: Verification Service-Object Pair (SOP) class
 1.2.840.10008.1.2.1: Digital Imaging and COmmunications in Medicine (DICOM) explicit Value Representation (VR) little endian transfer syntax
+1.2.840.10008.1.3: Digital Imaging and COmmunications in Medicine (DICOM) stored print storage Service-Object Pair (SOP) classes
+1.2.840.10008.1.3.10: Media storage directory storage
 1.2.840.10008.3: Digital Imaging and COmmunications in Medicine (DICOM) transfer syntaxes
 1.2.840.10008.3.1: Transfer syntaxes
 1.2.840.10008.3.1.2: Transfer syntaxesModality performed

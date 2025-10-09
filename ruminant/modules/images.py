@@ -2663,6 +2663,9 @@ class DicomModule(module.RuminantModule):
             )
 
         if vr and vr != "list":
+            if vr == "\x00\x00":
+                vr = "UN"
+
             tag["vr"] = vr
         tag["length"] = length
 
@@ -2715,6 +2718,11 @@ class DicomModule(module.RuminantModule):
                             [int(x) for x in tag["value"].split(".")])
                     except Exception:
                         pass
+                else:
+                    tag["value"] = tag["value"].rstrip(" ")
+
+                    if "\\" in tag["value"]:
+                        tag["value"] = tag["value"].split("\\")
             case "SQ":
                 tag["value"] = []
                 while self.buf.unit > 0:
