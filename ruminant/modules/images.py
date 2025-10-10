@@ -1561,7 +1561,7 @@ class TIFFModule(module.RuminantModule):
             280: "MinSampleValue",
             281: "MaxSampleValue",
             282: "XResolution",
-            283: "XResolution",
+            283: "YResolution",
             284: "PlanarConfiguration",
             285: "PageName",
             286: "XPosition",

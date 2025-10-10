@@ -1332,7 +1332,8 @@ HDRP_V3_PROTO = {
             7: "DeviceOsVersion",
             8: "SoftwareCompileTimestamp",
             9: "App",
-            10: "Version"
+            10: "Version",
+            14: "MaxAnalogISO"
         },
         1: "utf-8",
         2: "utf-8",
@@ -1343,10 +1344,18 @@ HDRP_V3_PROTO = {
         9: "utf-8",
         10: "utf-8",
         12: {
+            "keys": {
+                1: "ExposureTimeMin",
+                2: "ExposureTimeMax"
+            },
             1: "float",
             2: "float"
         },
         13: {
+            "keys": {
+                1: "ISOMin",
+                2: "ISOMax"
+            },
             1: "float",
             2: "float"
         },
