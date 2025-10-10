@@ -1328,7 +1328,8 @@ class IsoModule(module.RuminantModule):
                             self.buf.skip(8)
 
                             with self.buf.subunit():
-                                atom["data"]["raw"] = chew(self.buf, blob_mode=True)
+                                atom["data"]["raw"] = chew(self.buf,
+                                                           blob_mode=True)
 
                             self.buf.popunit()
         except Exception:
@@ -2000,5 +2001,110 @@ class MpegTsModule(module.RuminantModule):
 
             del chunk["index"]
             del chunk["blob"]
+
+        return meta
+
+
+@module.register
+class AsfModule(module.RuminantModule):
+
+    def identify(buf, ctx):
+        return buf.available() > 16 and buf.pguid() == "75b22630-668e-11cf-a6d9-00aa0062ce6c"
+
+    def filetime_to_date(self, ts):
+        return (datetime.datetime(1601, 1, 1) +
+                datetime.timedelta(microseconds=ts / 10)).isoformat() + "Z"
+
+    def read_object(self):
+        obj = {}
+
+        obj["uuid"] = self.buf.rguid()
+        obj["offset"] = self.buf.tell() - 16
+        obj["length"] = self.buf.ru64l()
+
+        self.buf.pushunit()
+        self.buf.setunit(obj["length"] - 24)
+
+        obj["name"] = "Unknown"
+        obj["data"] = {}
+        match obj["uuid"]:
+            case "75b22630-668e-11cf-a6d9-00aa0062ce6c":
+                obj["name"] = "Header"
+                obj["data"]["subobject-count"] = self.buf.ru32l()
+                obj["data"]["reserved1"] = self.buf.ru8()
+                obj["data"]["reserved2"] = self.buf.ru8()
+
+                obj["data"]["subobjects"] = []
+                for i in range(0, obj["data"]["subobject-count"]):
+                    obj["data"]["subobjects"].append(self.read_object())
+            case "8cabdca1-a947-11cf-8ee4-00c00c205365":
+                obj["name"] = "File Properties"
+                obj["data"]["file-guid"] = self.buf.rguid()
+                obj["data"]["file-size"] = self.buf.ru64l()
+                obj["data"]["creation-date"] = self.filetime_to_date(
+                    self.buf.ru64l())
+                obj["data"]["data-packets-count"] = self.buf.ru64l()
+
+                temp = self.buf.ru64l()
+                obj["data"]["play-duration"] = {
+                    "raw": temp,
+                    "seconds": temp / 10000000
+                }
+
+                temp = self.buf.ru64l()
+                obj["data"]["send-duration"] = {
+                    "raw": temp,
+                    "seconds": temp / 10000000
+                }
+
+                temp = self.buf.ru64l()
+                obj["data"]["preroll"] = {"raw": temp, "seconds": temp / 1000}
+
+                flags = self.buf.ru32l()
+                obj["data"]["flags"] = {
+                    "raw": flags,
+                    "live": bool(flags & (1 << 0)),
+                    "huge-data-units": bool(flags & (1 << 1))
+                }
+
+                obj["data"]["min-data-packet-size"] = self.buf.ru32l()
+                obj["data"]["max-data-packet-size"] = self.buf.ru32l()
+                obj["data"]["max-bitrate"] = self.buf.ru32l()
+            case "5fbf03b5-a92e-11cf-8ee3-00c00c205365":
+                obj["name"] = "Header Extension"
+                obj["data"]["reserved1"] = self.buf.rguid()
+                obj["data"]["reserved2"] = self.buf.ru16l()
+                obj["data"]["subobject-size"] = self.buf.ru32l()
+
+                self.buf.pushunit()
+                self.buf.setunit(obj["data"]["subobject-size"])
+
+                obj["data"]["subobjects"] = []
+                while self.buf.unit > 0:
+                    obj["data"]["subobjects"].append(self.read_object())
+
+                self.buf.popunit()
+            case "7c4346a9-efe0-4bfc-b229-393ede415c85":
+                obj["name"] = "Language List"
+                obj["data"]["language-count"] = self.buf.ru16l()
+                obj["data"]["languages"] = [
+                    self.buf.rs(self.buf.ru8(), "utf16")
+                    for i in range(0, obj["data"]["language-count"])
+                ]
+            case _:
+                obj["unknown"] = True
+
+        self.buf.skipunit()
+        self.buf.popunit()
+
+        return obj
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "asf"
+
+        meta["objects"] = []
+        while self.buf.available() > 0:
+            meta["objects"].append(self.read_object())
 
         return meta

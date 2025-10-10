@@ -424,6 +424,26 @@ class Buf(object):
     def puuid(self):
         return str(uuid.UUID(bytes=self.peek(16)))
 
+    def rguid(self):
+        guid = b""
+        guid += self.read(4)[::-1]
+        guid += self.read(2)[::-1]
+        guid += self.read(2)[::-1]
+        guid += self.read(8)
+
+        return str(uuid.UUID(bytes=guid))
+
+    def pguid(self):
+        guid = b""
+
+        with self:
+            guid += self.read(4)[::-1]
+            guid += self.read(2)[::-1]
+            guid += self.read(2)[::-1]
+            guid += self.read(8)
+
+        return str(uuid.UUID(bytes=guid))
+
     def ruleb(self):
         c = self.ru8()
         v = c & 0x7f

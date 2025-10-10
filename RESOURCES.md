@@ -69,3 +69,7 @@ This is a list of useful resources.
 * https://webassembly.github.io/spec/core/binary/index.html
 * https://github.com/WebAssembly/tool-conventions/blob/main/ProducersSection.md
 * https://github.com/WebAssembly/tool-conventions/blob/main/Linking.md
+
+# ASF
+* https://datatracker.ietf.org/doc/html/draft-fleischman-asf-01
+* https://download.microsoft.com/download/7/9/0/790fecaa-f64a-4a5e-a430-0bccdab3f1b4/asf_specification.doc
