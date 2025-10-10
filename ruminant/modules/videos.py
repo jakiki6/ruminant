@@ -29,7 +29,7 @@ class IsoModule(module.RuminantModule):
 
         file["type"] = "iso"
         file["atoms"] = []
-        while not self.buf.isend():
+        while self.buf.available() >= 8:
             file["atoms"].append(self.read_atom())
 
         with self.buf:
@@ -1328,7 +1328,7 @@ class IsoModule(module.RuminantModule):
                             self.buf.skip(8)
 
                             with self.buf.subunit():
-                                atom["data"]["raw"] = chew(self.buf)
+                                atom["data"]["raw"] = chew(self.buf, blob_mode=True)
 
                             self.buf.popunit()
         except Exception:
