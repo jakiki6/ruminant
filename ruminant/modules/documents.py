@@ -106,7 +106,7 @@ class PdfModule(module.RuminantModule):
         ver_15_offsets = []
 
         self.global_offset = 0
-        if self.buf.peek(4) != b"xref" and self.buf.peek(3) != b"obj":
+        if self.buf.peek(4) != b"xref" and b"obj" not in self.buf.pl():
             while self.buf.peek(4) != b"xref":
                 self.buf.skip(1)
                 self.global_offset += 1

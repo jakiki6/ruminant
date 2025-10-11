@@ -128,6 +128,10 @@ class Buf(object):
 
         return line
 
+    def pl(self):
+        with self:
+            return self.rl()
+
     def tell(self):
         return self._file.tell() - self._offset
 
