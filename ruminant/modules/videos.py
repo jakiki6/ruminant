@@ -2009,7 +2009,8 @@ class MpegTsModule(module.RuminantModule):
 class AsfModule(module.RuminantModule):
 
     def identify(buf, ctx):
-        return buf.available() > 16 and buf.pguid() == "75b22630-668e-11cf-a6d9-00aa0062ce6c"
+        return buf.available() > 16 and buf.pguid(
+        ) == "75b22630-668e-11cf-a6d9-00aa0062ce6c"
 
     def filetime_to_date(self, ts):
         return (datetime.datetime(1601, 1, 1) +

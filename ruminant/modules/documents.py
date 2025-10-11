@@ -105,12 +105,22 @@ class PdfModule(module.RuminantModule):
 
         ver_15_offsets = []
 
+        self.global_offset = 0
+        if self.buf.peek(4) != b"xref" and self.buf.peek(3) != b"obj":
+            while self.buf.peek(4) != b"xref":
+                self.buf.skip(1)
+                self.global_offset += 1
+
+        meta["global-offset"] = self.global_offset
+
         if self.buf.peek(4) == b"xref":
             self.buf.rl()
 
             obj_id = 0
             while True:
                 line = self.buf.rl().decode("latin-1")
+                if len(line.strip()) == 0:
+                    continue
 
                 if "trailer" in line:
                     while self.buf.peek(7) != b"trailer":
@@ -209,21 +219,32 @@ class PdfModule(module.RuminantModule):
 
         return value
 
-    def parse_object(self, buf, packed=None, obj_id=None):
+    def parse_object(self, buf, packed=None, obj_id=None, offsetted=False):
         obj = {}
         obj["offset"] = buf.tell()
 
         if obj_id is None:
-            line = b""
-            while not line.endswith(b"obj"):
-                line += buf.read(1)
+            try:
+                line = b""
+                while not line.endswith(b"obj"):
+                    line += buf.read(1)
 
-            line = line.decode("latin-1")
+                line = line.decode("latin-1")
 
-            while buf.peek(1) in (b" ", b"\r", b"\n"):
-                self.buf.skip(1)
+                while buf.peek(1) in (b" ", b"\r", b"\n"):
+                    self.buf.skip(1)
 
-            obj_id, obj_generation, _ = line.split(" ")[:3]
+                obj_id, obj_generation, _ = line.split(" ")[:3]
+                int(obj_id)
+                int(obj_generation)
+            except Exception as e:
+                if not offsetted:
+                    buf.seek(obj["offset"] + self.global_offset)
+                    return self.parse_object(buf,
+                                             packed=packed,
+                                             offsetted=True)
+                else:
+                    raise e
         else:
             obj_generation = 0
 
