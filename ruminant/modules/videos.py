@@ -2092,6 +2092,100 @@ class AsfModule(module.RuminantModule):
                     self.buf.rs(self.buf.ru8(), "utf16")
                     for i in range(0, obj["data"]["language-count"])
                 ]
+            case "14e6a5cb-c672-4332-8399-a96952065b5a":
+                obj["name"] = "Extended Stream Properties Object"
+                obj["data"]["start-time-ms"] = self.buf.ru64l()
+                obj["data"]["end-time-ms"] = self.buf.ru64l()
+                obj["data"]["data-bitrate"] = self.buf.ru32l()
+                obj["data"]["buffer-size"] = self.buf.ru32l()
+                obj["data"]["initial-buffer-fullness"] = self.buf.ru32l()
+                obj["data"]["alternate-data-bitrate"] = self.buf.ru32l()
+                obj["data"]["alternate-buffer-size"] = self.buf.ru32l()
+                obj["data"][
+                    "alternate-initial-buffer-fullness"] = self.buf.ru32l()
+                obj["data"]["maximum-object-size"] = self.buf.ru32l()
+
+                flags = self.buf.ru32l()
+                obj["data"]["flags"] = {
+                    "raw": flags,
+                    "reliable": bool(flags & (1 << 0)),
+                    "seekable": bool(flags & (1 << 1)),
+                    "no-cleanpoints": bool(flags & (1 << 2)),
+                    "resend-live-cleanpoints": bool(flags & (1 << 3))
+                }
+
+                obj["data"]["stream-number"] = self.buf.ru16l()
+                obj["data"]["stream-language-id-index"] = self.buf.ru16l()
+                obj["data"]["avg-time-per-frame"] = self.buf.ru64l()
+                obj["data"]["stream-name-count"] = self.buf.ru16l()
+                obj["data"]["payload-extension-system-count"] = self.buf.ru16l(
+                )
+
+                obj["data"]["stream-names"] = []
+                for i in range(0, obj["data"]["stream-name-count"]):
+                    name = {}
+                    name["language-id-index"] = self.buf.ru16l()
+                    name["stream-name"] = self.buf.rs(self.buf.ru16l(),
+                                                      "utf16")
+
+                    obj["data"]["stream-names"].append(name)
+
+                obj["data"]["payload-extension-systems"] = []
+                for i in range(0,
+                               obj["data"]["payload-extension-system-count"]):
+                    extension = {}
+                    extension["system-id"] = self.buf.rguid()
+                    extension["data-size"] = self.buf.ru16l()
+                    extension["system-info"] = self.buf.rh(self.buf.ru32l())
+
+                    obj["data"]["payload-extension-systems"].append(extension)
+
+                obj["data"]["subobjects"] = []
+                while self.buf.unit > 0:
+                    obj["data"]["subobjects"].append(self.read_object())
+            case "d2d0a440-e307-11d2-97f0-00a0c95ea850":
+                obj["name"] = "Extended Content Description Object"
+                obj["data"]["content-descriptor-count"] = self.buf.ru16l()
+
+                obj["data"]["content-descriptors"] = []
+                for i in range(0, obj["data"]["content-descriptor-count"]):
+                    desc = {}
+                    desc["name"] = self.buf.rs(self.buf.ru16l(), "utf16")
+
+                    typ = self.buf.ru16l()
+                    desc["type"] = utils.unraw(
+                        typ, 2, {
+                            0: "Unicode string",
+                            1: "BYTE array",
+                            2: "BOOL",
+                            3: "DWORD",
+                            4: "QWORD",
+                            5: "WORD"
+                        })
+
+                    self.buf.pushunit()
+                    self.buf.setunit(self.buf.ru16l())
+
+                    match desc["type"]["name"]:
+                        case "Unicode string":
+                            desc["value"] = self.buf.rs(self.buf.unit, "utf16")
+                        case "BYTE array":
+                            desc["value"] = self.buf.rh(self.buf.unit)
+                        case "BOOL":
+                            desc["value"] = bool(self.buf.ru32l())
+                        case "DWORD":
+                            desc["value"] = self.buf.ru32l()
+                        case "QWORD":
+                            desc["value"] = self.buf.ru64l()
+                        case "WORD":
+                            desc["value"] = self.buf.ru16l()
+                        case _:
+                            desc["unknown"] = True
+
+                    self.buf.skipunit()
+                    self.buf.popunit()
+
+                    obj["data"]["content-descriptors"].append(desc)
             case _:
                 obj["unknown"] = True
 
