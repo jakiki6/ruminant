@@ -260,9 +260,10 @@ def main(dev=False):
 
             print("\n  ]\n}")
 
-        elif os.path.isfile(args.file):
-            with open(args.file, "rb") as file:
-                print(process(file, args.walk))
         else:
-            print("File not found.", file=sys.stderr)
-            exit(1)
+            try:
+                with open(args.file, "rb") as file:
+                    print(process(file, args.walk))
+            except FileNotFoundError:
+                print("File not found.", file=sys.stderr)
+                exit(1)

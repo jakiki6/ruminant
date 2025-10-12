@@ -3,6 +3,7 @@ from ..buf import Buf
 from . import chew
 import base64
 import hashlib
+import json
 
 
 @module.register
@@ -354,5 +355,53 @@ class AgeModule(module.RuminantModule):
                 self.buf.skip(self.buf.available())
             case _:
                 meta["unknown"] = True
+
+        return meta
+
+
+@module.register
+class LuksModule(module.RuminantModule):
+
+    def identify(buf, ctx):
+        return buf.peek(6) == b"LUKS\xba\xbe"
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "luks"
+
+        self.buf.skip(6)
+        meta["header"] = {}
+        meta["header"]["version"] = self.buf.ru16()
+        meta["header"]["header-length"] = self.buf.ru64()
+
+        self.buf.pushunit()
+        self.buf.setunit(meta["header"]["header-length"] - 16)
+
+        meta["header"]["sequence-id"] = self.buf.ru64()
+        meta["header"]["label"] = self.buf.rs(48)
+        meta["header"]["checksum-algorithm"] = self.buf.rs(32)
+        meta["header"]["salt"] = self.buf.rh(64)
+        meta["header"]["uuid"] = self.buf.rs(40)
+        meta["header"]["subsystem"] = self.buf.rs(48)
+        meta["header"]["header-offset"] = self.buf.ru64()
+        self.buf.skip(184)
+        meta["header"]["checksum"] = self.buf.rh(64)
+        self.buf.skip(7 * 512)
+
+        if meta["header"]["version"] == 2:
+            meta["json"] = json.loads(self.buf.rs(self.buf.unit))
+
+        self.buf.skipunit()
+        self.buf.popunit()
+
+        m = 0
+        for _, v in meta["json"].get("segments", {}).items():
+            if v.get("size") == "dynamic":
+                m = self.buf.size()
+                break
+
+            m = max(m, int(v.get("offset", 0)) + int(v.get("size", 0)))
+
+        self.buf.seek(m)
 
         return meta
