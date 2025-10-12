@@ -1,4 +1,6 @@
-from .. import module, utils, buf
+from .. import module, utils
+from ..buf import Buf
+from . import chew
 import base64
 import hashlib
 
@@ -52,7 +54,7 @@ class PemModule(module.RuminantModule):
         while self.buf.peek(1) in (b"\r", b"\n"):
             self.buf.skip(1)
 
-        meta["data"] = utils.read_der(buf.Buf(base64.b64decode(content)))
+        meta["data"] = utils.read_der(Buf(base64.b64decode(content)))
 
         return meta
 
@@ -108,7 +110,7 @@ class PgpModule(module.RuminantModule):
                 while content[-1] != b"="[0]:
                     content = content[:-1]
 
-            fd = buf.Buf(base64.b64decode(content))
+            fd = Buf(base64.b64decode(content))
         else:
             fd = self.buf
 
@@ -271,5 +273,86 @@ class KdbxModule(module.RuminantModule):
             meta["block-count"] += 1
             self.buf.skip(32)
             self.buf.skip(self.buf.ru32l())
+
+        return meta
+
+
+@module.register
+class AgeModule(module.RuminantModule):
+
+    def identify(buf, ctx):
+        return buf.peek(
+            34) == b"-----BEGIN AGE ENCRYPTED FILE-----" or buf.peek(
+                20) == b"age-encryption.org/v"
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "age"
+
+        meta["data"] = {}
+        meta["data"]["armored"] = self.buf.peek(1) == b"-"
+
+        if meta["data"]["armored"]:
+            self.buf.rl()
+
+            content = b""
+            while True:
+                line = self.buf.rl()
+                if line.startswith(b"----"):
+                    break
+
+                content += line
+
+            content = base64.b64decode(content)
+            return chew(content)
+
+        self.buf.skip(20)
+        meta["data"]["version"] = int(self.buf.rl())
+
+        match meta["data"]["version"]:
+            case 1:
+                meta["data"]["stanzas"] = []
+
+                while True:
+                    stanza = {}
+
+                    line = self.buf.rl()
+                    if line.startswith(b"---"):
+                        meta["data"]["header-mac"] = base64.b64decode(
+                            line[4:] + b"==").hex()
+                        break
+
+                    stanza["type"] = utils.decode(line).split(" ")[1]
+                    stanza["arguments"] = {}
+                    args = utils.decode(line).split(" ")[2:]
+                    match stanza["type"]:
+                        case "X25519":
+                            stanza["arguments"]["ephemeral-share"] = args[
+                                0].hex()
+                        case "scrypt":
+                            stanza["arguments"]["salt"] = base64.b64decode(
+                                args[0] + "==").hex()
+                            stanza["arguments"]["work"] = 1 << int(args[1])
+                        case "tlock":
+                            stanza["arguments"]["round"] = int(args[0])
+                            stanza["arguments"]["chain"] = args[1]
+                        case _:
+                            stanza["arguments"] = args
+                            stanza["unknown"] = True
+
+                    line = b""
+                    while self.buf.peek(3) not in (b"---", b"-> "):
+                        line += self.buf.rl()
+
+                    stanza["wrapped-key"] = base64.b64decode(line +
+                                                             b"==").hex()
+
+                    meta["data"]["stanzas"].append(stanza)
+
+                meta["data"]["block-count"] = (self.buf.available() + 65536 +
+                                               15) // (65536 + 16)
+                self.buf.skip(self.buf.available())
+            case _:
+                meta["unknown"] = True
 
         return meta

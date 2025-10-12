@@ -33,7 +33,7 @@ class Utf8Module(module.RuminantModule):
                 case "utf8":
                     data = data.encode("utf-8")
                 case "base64":
-                    data = base64.b64decode(data)
+                    data = base64.b64decode(data, validate=True)
                 case _:
                     raise ValueError()
 
