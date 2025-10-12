@@ -2186,6 +2186,156 @@ class AsfModule(module.RuminantModule):
                     self.buf.popunit()
 
                     obj["data"]["content-descriptors"].append(desc)
+            case "b7dc0791-a9b7-11cf-8ee6-00c00c205365":
+                obj["name"] = "Stream Properties Object"
+
+                temp = self.buf.rguid()
+                obj["data"]["stream-type"] = {
+                    "raw": temp,
+                    "name": {
+                        "bc19efc0-5b4d-11cf-a8fd-00805f5c442b": "Video Media",
+                        "f8699e40-5b4d-11cf-a8fd-00805f5c442b": "Audio Media"
+                    }.get(temp, "Unknown")
+                }
+
+                temp = self.buf.rguid()
+                obj["data"]["ecc-type"] = {
+                    "raw": temp,
+                    "name": {
+                        "20fb5700-5b55-11cf-a8fd-00805f5c442b":
+                        "No Error Correction",
+                        "bfc3cd50-618f-11cf-8bb2-00aa00b4e220": "Audio Spread"
+                    }.get(temp, "Unknown")
+                }
+
+                obj["data"]["time-offset"] = self.buf.ru64l()
+                obj["data"]["type-specific-data-length"] = self.buf.ru32l()
+                obj["data"]["ecc-data-length"] = self.buf.ru32l()
+
+                flags = self.buf.ru16l()
+                obj["data"]["flags"] = {
+                    "raw": flags,
+                    "stream-number": flags & 0x7f,
+                    "encrypted": bool(flags & (1 << 15))
+                }
+
+                obj["data"]["reserved"] = self.buf.ru32l()
+
+                self.buf.pushunit()
+                self.buf.setunit(obj["data"]["type-specific-data-length"])
+
+                match obj["data"]["stream-type"]["name"]:
+                    case "Video Media":
+                        obj["data"]["type-specific-data"] = {}
+                        obj["data"]["type-specific-data"][
+                            "image-width"] = self.buf.ru32l()
+                        obj["data"]["type-specific-data"][
+                            "image-height"] = self.buf.ru32l()
+                        obj["data"]["type-specific-data"][
+                            "reserved"] = self.buf.ru8()
+                        obj["data"]["type-specific-data"][
+                            "format-data-length"] = self.buf.ru16l()
+
+                        obj["data"]["type-specific-data"]["format-data"] = {}
+                        obj["data"]["type-specific-data"]["format-data"][
+                            "format-data-length"] = self.buf.ru32l()
+                        obj["data"]["type-specific-data"]["format-data"][
+                            "image-width"] = self.buf.ru32l()
+                        obj["data"]["type-specific-data"]["format-data"][
+                            "image-height"] = self.buf.ru32l()
+                        obj["data"]["type-specific-data"]["format-data"][
+                            "reserved"] = self.buf.ru16l()
+                        obj["data"]["type-specific-data"]["format-data"][
+                            "bits-per-pixel"] = self.buf.ru16l()
+                        obj["data"]["type-specific-data"]["format-data"][
+                            "compression-id"] = self.buf.rs(4)
+                        obj["data"]["type-specific-data"]["format-data"][
+                            "image-size"] = self.buf.ru32l()
+                        obj["data"]["type-specific-data"]["format-data"][
+                            "horiz-pixels-per-meter"] = self.buf.ru32l()
+                        obj["data"]["type-specific-data"]["format-data"][
+                            "vert-pixels-per-meter"] = self.buf.ru32l()
+                        obj["data"]["type-specific-data"]["format-data"][
+                            "colors-used"] = self.buf.ru32l()
+                        obj["data"]["type-specific-data"]["format-data"][
+                            "important-colors"] = self.buf.ru32l()
+                        obj["data"]["type-specific-data"]["format-data"][
+                            "codec-specific-data"] = self.buf.rh(self.buf.unit)
+                    case "Audio Media":
+                        obj["data"]["type-specific-data"] = {}
+                        obj["data"]["type-specific-data"][
+                            "codec-id"] = self.buf.ru16l()
+                        obj["data"]["type-specific-data"][
+                            "channel-count"] = self.buf.ru16l()
+                        obj["data"]["type-specific-data"][
+                            "samples-per-second"] = self.buf.ru32l()
+                        obj["data"]["type-specific-data"][
+                            "avg-bytes-per-second"] = self.buf.ru32l()
+                        obj["data"]["type-specific-data"][
+                            "block-alignment"] = self.buf.ru16l()
+                        obj["data"]["type-specific-data"][
+                            "bits-per-sample"] = self.buf.ru16l()
+                        obj["data"]["type-specific-data"][
+                            "codec-specific-data"] = self.buf.rh(
+                                self.buf.ru16l())
+                    case _:
+                        obj["data"]["type-specific-data"] = self.buf.rh(
+                            self.buf.unit)
+                        obj["unknown"] = True
+
+                self.buf.skipunit()
+                self.buf.popunit()
+
+                self.buf.pushunit()
+                self.buf.setunit(obj["data"]["ecc-data-length"])
+
+                match obj["data"]["ecc-type"]["name"]:
+                    case "Audio Spread":
+                        obj["data"]["ecc-data"] = {}
+                        obj["data"]["ecc-data"]["span"] = self.buf.ru8()
+                        obj["data"]["ecc-data"][
+                            "virtual-packet-length"] = self.buf.ru16l()
+                        obj["data"]["ecc-data"][
+                            "virtual-channel-length"] = self.buf.ru16l()
+                        obj["data"]["ecc-data"]["silence-data"] = self.buf.rh(
+                            self.buf.ru16l())
+                    case "No Error Correction":
+                        obj["data"]["ecc-data"] = self.buf.rh(self.buf.unit)
+                    case _:
+                        obj["data"]["ecc-data"] = self.buf.rh(self.buf.unit)
+                        obj["unknown"] = True
+
+                self.buf.skipunit()
+                self.buf.popunit()
+            case "86d15240-311d-11d0-a3a4-00a0c90348f6":
+                obj["name"] = "Codec List"
+                obj["data"]["reserved"] = self.buf.rguid()
+                obj["data"]["codec-entry-count"] = self.buf.ru32l()
+
+                obj["data"]["codec-entries"] = []
+                for i in range(0, obj["data"]["codec-entry-count"]):
+                    codec = {}
+                    codec["type"] = utils.unraw(self.buf.ru16l(), 2, {
+                        1: "Audio",
+                        2: "Video"
+                    })
+                    codec["name"] = self.buf.rs(self.buf.ru16l() << 1, "utf16")
+                    codec["description"] = self.buf.rs(self.buf.ru16l() << 1,
+                                                       "utf16")
+                    codec["information"] = self.buf.rh(self.buf.ru16l())
+
+                    obj["data"]["codec-entries"].append(codec)
+            case "75b22636-668e-11cf-a6d9-00aa0062ce6c":
+                obj["name"] = "Data"
+                obj["data"]["file-guid"] = self.buf.rguid()
+                obj["data"]["total-packet-count"] = self.buf.ru64l()
+                obj["data"]["reserved"] = self.buf.ru16l()
+            case "33000890-e5b1-11cf-89f4-00a0c90349cb":
+                obj["name"] = "Simple Index"
+                obj["data"]["file-guid"] = self.buf.rguid()
+                obj["data"]["index-entry-time-interval"] = self.buf.ru64l()
+                obj["data"]["max-packet-count"] = self.buf.ru32l()
+                obj["data"]["index-entries-count"] = self.buf.ru32l()
             case _:
                 obj["unknown"] = True
 
