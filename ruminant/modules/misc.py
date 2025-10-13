@@ -422,6 +422,16 @@ class JavaClassModule(module.RuminantModule):
                         val[key2] = self.buf.ru16()
                 case "SourceFile":
                     val = self.resolve(self.buf.ru16())
+                case "LocalVariableTable":
+                    val = []
+                    for i in range(0, self.buf.ru16()):
+                        val.append({
+                            "start-pc": self.buf.ru16(),
+                            "length": self.buf.ru16(),
+                            "name": self.resolve(self.buf.ru16()),
+                            "descriptor": self.resolve(self.buf.ru16()),
+                            "index": self.buf.ru16()
+                        })
                 case _:
                     val = self.buf.rh(self.buf.unit)
 
@@ -564,13 +574,13 @@ class JavaClassModule(module.RuminantModule):
             "abstract": bool(flags & (1 << 10))
         }
 
-        meta["this-class"] = meta["constants"][self.buf.ru16() - 1]
-        meta["super-class"] = meta["constants"][self.buf.ru16() - 1]
+        meta["this-class"] = self.resolve(self.buf.ru16())
+        meta["super-class"] = self.resolve(self.buf.ru16())
 
         meta["interface-count"] = self.buf.ru16()
         meta["interfaces"] = []
         for i in range(0, meta["interface-count"]):
-            meta["interfaces"].append(meta["constants"][self.buf.ru16() - 1])
+            meta["interfaces"].append(self.resolve(self.buf.ru16()))
 
         meta["field-count"] = self.buf.ru16()
         meta["fields"] = []
@@ -591,8 +601,8 @@ class JavaClassModule(module.RuminantModule):
                 "enum": bool(flags & (1 << 14))
             }
 
-            field["name"] = meta["constants"][self.buf.ru16() - 1]
-            field["descriptor"] = meta["constants"][self.buf.ru16() - 1]
+            field["name"] = self.resolve(self.buf.ru16())
+            field["descriptor"] = self.resolve(self.buf.ru16())
 
             self.read_attributes(field)
 
@@ -620,8 +630,8 @@ class JavaClassModule(module.RuminantModule):
                 "synthetic": bool(flags & (1 << 12))
             }
 
-            method["name"] = meta["constants"][self.buf.ru16() - 1]
-            method["descriptor"] = meta["constants"][self.buf.ru16() - 1]
+            method["name"] = self.resolve(self.buf.ru16())
+            method["descriptor"] = self.resolve(self.buf.ru16())
 
             self.read_attributes(method)
 
