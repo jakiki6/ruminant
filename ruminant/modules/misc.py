@@ -2,6 +2,7 @@ from .. import module, utils
 from . import chew
 import tempfile
 import sqlite3
+import datetime
 
 
 @module.register
@@ -1099,5 +1100,133 @@ class ElfModule(module.RuminantModule):
             meta["header"]["shnum"] * meta["header"]["shentsize"])
 
         self.buf.seek(m)
+
+        return meta
+
+
+@module.register
+class PeModule(module.RuminantModule):
+
+    def identify(buf, ctx):
+        return buf.peek(2) == b"MZ"
+
+    def hex(self, val):
+        return {"raw": val, "hex": "0x" + hex(val)[2:].zfill(8)}
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "pe"
+
+        self.buf.skip(2)
+        meta["msdos-header"] = {}
+        meta["msdos-header"]["stub"] = self.buf.rh(0x3a)
+        meta["msdos-header"]["pe-header-offset"] = self.buf.ru32l()
+
+        self.buf.seek(meta["msdos-header"]["pe-header-offset"])
+        if self.buf.read(4) != b"PE\x00\x00":
+            return meta
+
+        meta["pe-header"] = {}
+        meta["pe-header"]["machine"] = utils.unraw(self.buf.ru16l(), 2, {
+            0x0000: "Unknown",
+            0x8664: "x64"
+        })
+        meta["pe-header"]["section-count"] = self.buf.ru16l()
+        meta["pe-header"]["timestamp"] = datetime.datetime.fromtimestamp(
+            self.buf.ru32l(), datetime.timezone.utc).isoformat()
+        meta["pe-header"]["symbol-table-offset"] = self.buf.ru32l()
+        meta["pe-header"]["symbol-count"] = self.buf.ru32l()
+        meta["pe-header"]["optional-header-size"] = self.buf.ru16l()
+        meta["pe-header"]["characteristics"] = {
+            "raw": self.buf.ru16l(),
+            "names": []
+        }
+
+        if meta["pe-header"]["characteristics"]["raw"] & 0x0001:
+            meta["pe-header"]["characteristics"]["names"].append(
+                "RELOCS_STRIPPED")
+        if meta["pe-header"]["characteristics"]["raw"] & 0x0002:
+            meta["pe-header"]["characteristics"]["names"].append(
+                "EXECUTABLE_IMAGE")
+        if meta["pe-header"]["characteristics"]["raw"] & 0x0004:
+            meta["pe-header"]["characteristics"]["names"].append(
+                "LINE_NUMS_STRIPPED")
+        if meta["pe-header"]["characteristics"]["raw"] & 0x0008:
+            meta["pe-header"]["characteristics"]["names"].append(
+                "LOCAL_SYMS_STRIPPED")
+        if meta["pe-header"]["characteristics"]["raw"] & 0x0010:
+            meta["pe-header"]["characteristics"]["names"].append(
+                "AGGRESSIVE_WS_TRIM")
+        if meta["pe-header"]["characteristics"]["raw"] & 0x0020:
+            meta["pe-header"]["characteristics"]["names"].append(
+                "LARGE_ADDRESS_AWARE")
+        if meta["pe-header"]["characteristics"]["raw"] & 0x0040:
+            meta["pe-header"]["characteristics"]["names"].append("RESERVED")
+        if meta["pe-header"]["characteristics"]["raw"] & 0x0080:
+            meta["pe-header"]["characteristics"]["names"].append(
+                "BYTES_REVERSED_LO")
+        if meta["pe-header"]["characteristics"]["raw"] & 0x0100:
+            meta["pe-header"]["characteristics"]["names"].append(
+                "32BIT_MACHINE")
+        if meta["pe-header"]["characteristics"]["raw"] & 0x0200:
+            meta["pe-header"]["characteristics"]["names"].append(
+                "DEBUG_STRIPPED ")
+        if meta["pe-header"]["characteristics"]["raw"] & 0x0400:
+            meta["pe-header"]["characteristics"]["names"].append(
+                "REMOVABLE_RUN_FROM_SWAP ")
+        if meta["pe-header"]["characteristics"]["raw"] & 0x0800:
+            meta["pe-header"]["characteristics"]["names"].append(
+                "NET_RUN_FROM_SWAP ")
+        if meta["pe-header"]["characteristics"]["raw"] & 0x1000:
+            meta["pe-header"]["characteristics"]["names"].append("SYSTEM")
+        if meta["pe-header"]["characteristics"]["raw"] & 0x2000:
+            meta["pe-header"]["characteristics"]["names"].append("DLL")
+        if meta["pe-header"]["characteristics"]["raw"] & 0x4000:
+            meta["pe-header"]["characteristics"]["names"].append(
+                "UP_SYSTEM_ONLY")
+        if meta["pe-header"]["characteristics"]["raw"] & 0x8000:
+            meta["pe-header"]["characteristics"]["names"].append(
+                "BYTES_REVERSED_HI")
+
+        if meta["pe-header"]["optional-header-size"] > 0:
+            meta["optional-header"] = {}
+
+            typ = self.buf.ru16l()
+            match typ:
+                case 0x010b:
+                    meta["optional-header"]["type"] = "PE32"
+                    self.plus = False
+                case 0x020b:
+                    meta["optional-header"]["type"] = "PE32+"
+                    self.plus = True
+                case _:
+                    meta["optional-header"][
+                        "type"] = f"Unknown (0x{hex(typ)[2:].zfill(4)})"
+                    meta["optional-header"]["unknown"] = True
+
+            self.buf.pushunit()
+            self.buf.setunit(meta["pe-header"]["optional-header-size"] - 2)
+
+            if "unknown" not in meta["optional-header"]:
+                meta["optional-header"]["major-linker-version"] = self.buf.ru8(
+                )
+                meta["optional-header"]["minor-linker-version"] = self.buf.ru8(
+                )
+                meta["optional-header"]["size-of-code"] = self.buf.ru32l()
+                meta["optional-header"][
+                    "size-of-initialized-data"] = self.buf.ru32l()
+                meta["optional-header"][
+                    "size-of-uninitialized-data"] = self.buf.ru32l()
+                meta["optional-header"]["address-of-entrypoint"] = self.hex(
+                    self.buf.ru32l())
+                meta["optional-header"]["base-of-code"] = self.hex(
+                    self.buf.ru32l())
+
+                if not self.plus:
+                    meta["optional-header"]["base-of-data"] = self.hex(
+                        self.buf.ru32l())
+
+            self.buf.skipunit()
+            self.buf.popunit()
 
         return meta
