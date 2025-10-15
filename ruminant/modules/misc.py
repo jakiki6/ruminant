@@ -1018,7 +1018,7 @@ class ElfModule(module.RuminantModule):
                     if sh["name"]["string"] in (".comment", ".interp"):
                         sh["parsed"]["string"] = self.buf.rs(
                             self.buf.available())
-                    elif sh["name"]["string"].startswith(".note."):
+                    elif sh["name"]["string"].startswith(".note.") and self.buf.available() > 0:
                         base = self.buf.tell()
                         sh["parsed"]["namesz"] = self.buf.ru32l(
                         ) if self.little else self.buf.ru32()
