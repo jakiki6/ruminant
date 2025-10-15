@@ -75,6 +75,7 @@ Ruminant is still in early alpha but it can already process the following file t
 * ASF files
   * WMA files
   * WMV files
+* age encrypted files
 * LUKS headers
 * Java class files
 * ELF files
