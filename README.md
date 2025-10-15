@@ -77,6 +77,10 @@ Ruminant is still in early alpha but it can already process the following file t
   * WMV files
 * LUKS headers
 * Java class files
+* ELF files
+  * .comment sections
+  * .interp sections
+  * .note sections
 
 # How do I install it?
 Run `pip3 install ruminant`.

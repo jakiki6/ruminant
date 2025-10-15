@@ -640,3 +640,463 @@ class JavaClassModule(module.RuminantModule):
         self.read_attributes(meta)
 
         return meta
+
+
+@module.register
+class ElfModule(module.RuminantModule):
+
+    def identify(buf, ctx):
+        return buf.peek(4) == b"\x7fELF"
+
+    def hex(self, val):
+        return {
+            "raw": val,
+            "hex": "0x" + hex(val)[2:].zfill(16 if self.wide else 8)
+        }
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "elf"
+
+        self.buf.skip(4)
+
+        meta["header"] = {}
+        meta["header"]["class"] = utils.unraw(self.buf.ru8(), 1, {
+            1: "32-bit",
+            2: "64-bit"
+        })
+        self.wide = meta["header"]["class"]["raw"] != 1
+
+        meta["header"]["data"] = utils.unraw(self.buf.ru8(), 1, {
+            1: "little endian",
+            2: "big endian"
+        })
+        self.little = meta["header"]["data"]["raw"] == 1
+
+        meta["header"]["version"] = self.buf.ru8()
+        meta["header"]["abi"] = utils.unraw(
+            self.buf.ru8(), 1, {
+                0x00: "System V",
+                0x01: "HP-UX",
+                0x02: "NetBSD",
+                0x03: "Linux",
+                0x04: "GNU Hurd",
+                0x06: "Solaris",
+                0x07: "AIX (Monterey)",
+                0x08: "IRIX",
+                0x09: "FreeBSD",
+                0x0A: "Tru64",
+                0x0B: "Novell Modesto",
+                0x0C: "OpenBSD",
+                0x0D: "OpenVMS",
+                0x0E: "NonStop Kernel",
+                0x0F: "AROS",
+                0x10: "FenixOS",
+                0x11: "Nuxi CloudABI",
+                0x12: "Stratus Technologies OpenVOS"
+            })
+        meta["header"]["abi-version"] = self.buf.ru8()
+        meta["header"]["padding"] = self.buf.rh(7)
+        meta["header"]["type"] = utils.unraw(
+            self.buf.ru16l() if self.little else self.buf.ru16(), 2, {
+                0x00: "ET_NONE",
+                0x01: "ET_REL",
+                0x02: "ET_EXEC",
+                0x03: "ET_DYN",
+                0x04: "ET_CORE"
+            })
+        meta["header"]["machine"] = utils.unraw(
+            self.buf.ru16l() if self.little else self.buf.ru16(), 2, {
+                0x00: "None",
+                0x01: "AT&T WE 32100",
+                0x02: "SPARC",
+                0x03: "x86",
+                0x04: "Motorola 68000 (M68k)",
+                0x05: "Motorola 88000 (M88k)",
+                0x06: "Intel MCU",
+                0x07: "Intel 80860",
+                0x08: "MIPS",
+                0x09: "IBM System/370",
+                0x0a: "MIPS RS3000 Little-endian",
+                0x0b: "Reserved",
+                0x0c: "Reserved",
+                0x0d: "Reserved",
+                0x0e: "Reserved",
+                0x0f: "Hewlett-Packard PA-RISC",
+                0x13: "Intel 80960",
+                0x14: "PowerPC",
+                0x15: "PowerPC (64-bit)",
+                0x16: "S390, including S390x",
+                0x17: "IBM SPU/SPC",
+                0x18: "Reserved",
+                0x19: "Reserved",
+                0x1a: "Reserved",
+                0x1b: "Reserved",
+                0x1c: "Reserved",
+                0x1d: "Reserved",
+                0x1e: "Reserved",
+                0x1f: "Reserved",
+                0x20: "Reserved",
+                0x21: "Reserved",
+                0x22: "Reserved",
+                0x23: "Reserved",
+                0x24: "NEC V800",
+                0x25: "Fujitsu FR20",
+                0x26: "TRW RH-32",
+                0x27: "Motorola RCE",
+                0x28: "Arm (up to Armv7/AArch32)",
+                0x29: "Digital Alpha",
+                0x2a: "SuperH",
+                0x2b: "SPARC Version 9",
+                0x2c: "Siemens TriCore embedded processor",
+                0x2d: "Argonaut RISC Core",
+                0x2e: "Hitachi H8/300",
+                0x2f: "Hitachi H8/300H",
+                0x30: "Hitachi H8S",
+                0x31: "Hitachi H8/500",
+                0x32: "IA-64",
+                0x33: "Stanford MIPS-X",
+                0x34: "Motorola ColdFire",
+                0x35: "Motorola M68HC12",
+                0x36: "Fujitsu MMA Multimedia Accelerator",
+                0x37: "Siemens PCP",
+                0x38: "Sony nCPU embedded RISC processor",
+                0x39: "Denso NDR1 microprocessor",
+                0x3a: "Motorola Star*Core processor",
+                0x3b: "Toyota ME16 processor",
+                0x3c: "STMicroelectronics ST100 processor",
+                0x3d: "Advanced Logic Corp. TinyJ embedded processor family",
+                0x3e: "AMD x86-64",
+                0x3f: "Sony DSP Processor",
+                0x40: "Digital Equipment Corp. PDP-10",
+                0x41: "Digital Equipment Corp. PDP-11",
+                0x42: "Siemens FX66 microcontroller",
+                0x43: "STMicroelectronics ST9+ 8/16-bit microcontroller",
+                0x44: "STMicroelectronics ST7 8-bit microcontroller",
+                0x45: "Motorola MC68HC16 Microcontroller",
+                0x46: "Motorola MC68HC11 Microcontroller",
+                0x47: "Motorola MC68HC08 Microcontroller",
+                0x48: "Motorola MC68HC05 Microcontroller",
+                0x49: "Silicon Graphics SVx",
+                0x4a: "STMicroelectronics ST19 8-bit microcontroller",
+                0x4b: "Digital VAX",
+                0x4c: "Axis Communications 32-bit embedded processor",
+                0x4d: "Infineon Technologies 32-bit embedded processor",
+                0x4e: "Element 14 64-bit DSP Processor",
+                0x4f: "LSI Logic 16-bit DSP Processor",
+                0x8c: "TMS320C6000 Family",
+                0xaf: "MCST Elbrus e2k",
+                0xb7: "Arm 64-bits (Armv8/AArch64)",
+                0xdc: "Zilog Z80",
+                0xf3: "RISC-V",
+                0xf7: "Berkeley Packet Filter",
+                0x101: "WDC 65C816",
+                0x102: "LoongArch"
+            })
+
+        meta["header"]["version2"] = self.buf.ru32l(
+        ) if self.little else self.buf.ru32()
+        meta["header"]["entry-point"] = self.hex((self.buf.ru64l(
+        ) if self.little else self.buf.ru64()) if self.wide else (
+            self.buf.ru32l() if self.little else self.buf.ru32()))
+        meta["header"]["phoff"] = (
+            self.buf.ru64l()
+            if self.little else self.buf.ru64()) if self.wide else (
+                self.buf.ru32l() if self.little else self.buf.ru32())
+        meta["header"]["shoff"] = (
+            self.buf.ru64l()
+            if self.little else self.buf.ru64()) if self.wide else (
+                self.buf.ru32l() if self.little else self.buf.ru32())
+        meta["header"]["flags"] = self.buf.ru32l(
+        ) if self.little else self.buf.ru32()
+        meta["header"]["ehsize"] = self.buf.ru16l(
+        ) if self.little else self.buf.ru16()
+        meta["header"]["phentsize"] = self.buf.ru16l(
+        ) if self.little else self.buf.ru16()
+        meta["header"]["phnum"] = self.buf.ru16l(
+        ) if self.little else self.buf.ru16()
+        meta["header"]["shentsize"] = self.buf.ru16l(
+        ) if self.little else self.buf.ru16()
+        meta["header"]["shnum"] = self.buf.ru16l(
+        ) if self.little else self.buf.ru16()
+        meta["header"]["shstrndx"] = self.buf.ru16l(
+        ) if self.little else self.buf.ru16()
+
+        self.buf.seek(meta["header"]["phoff"])
+        meta["program-headers"] = []
+        for i in range(0, meta["header"]["phnum"]):
+            ph = {}
+            ph["type"] = utils.unraw(
+                self.buf.ru32l() if self.little else self.buf.ru32(), 2, {
+                    0x00000000: "PT_NULL",
+                    0x00000001: "PT_LOAD",
+                    0x00000002: "PT_DYNAMIC",
+                    0x00000003: "PT_INTERP",
+                    0x00000004: "PT_NOTE",
+                    0x00000005: "PT_SHLIB",
+                    0x00000006: "PT_PHDR",
+                    0x00000007: "PT_TLS",
+                    0x6474e550: "PT_GNU_EH_FRAME",
+                    0x6474e551: "PT_GNU_STACK",
+                    0x6474e552: "PT_GNU_RELRO",
+                    0x6474e553: "PT_GNU_PROPERTY"
+                })
+
+            if self.wide:
+                ph["flags"] = self.buf.ru32l(
+                ) if self.little else self.buf.ru32()
+
+            ph["offset"] = (
+                self.buf.ru64l()
+                if self.little else self.buf.ru64()) if self.wide else (
+                    self.buf.ru32l() if self.little else self.buf.ru32())
+            ph["vaddr"] = self.hex((self.buf.ru64l(
+            ) if self.little else self.buf.ru64()) if self.wide else (
+                self.buf.ru32l() if self.little else self.buf.ru32()))
+            ph["paddr"] = self.hex((self.buf.ru64l(
+            ) if self.little else self.buf.ru64()) if self.wide else (
+                self.buf.ru32l() if self.little else self.buf.ru32()))
+            ph["filesz"] = (
+                self.buf.ru64l()
+                if self.little else self.buf.ru64()) if self.wide else (
+                    self.buf.ru32l() if self.little else self.buf.ru32())
+            ph["memsz"] = (
+                self.buf.ru64l()
+                if self.little else self.buf.ru64()) if self.wide else (
+                    self.buf.ru32l() if self.little else self.buf.ru32())
+
+            if not self.wide:
+                ph["flags"] = self.buf.ru32l(
+                ) if self.little else self.buf.ru32()
+
+            ph["flags"] = {"raw": ph["flags"], "names": []}
+
+            if bool(ph["flags"]["raw"] & 0x01):
+                ph["flags"]["names"].append("PF_X")
+            if bool(ph["flags"]["raw"] & 0x02):
+                ph["flags"]["names"].append("PF_W")
+            if bool(ph["flags"]["raw"] & 0x04):
+                ph["flags"]["names"].append("PF_R")
+
+            ph["align"] = (
+                self.buf.ru64l()
+                if self.little else self.buf.ru64()) if self.wide else (
+                    self.buf.ru32l() if self.little else self.buf.ru32())
+
+            if meta["header"]["phentsize"] > (0x38 if self.wide else 0x20):
+                self.buf.skip(meta["header"]["phentsize"] -
+                              (0x38 if self.wide else 0x20))
+
+            with self.buf:
+                self.buf.seek(ph["offset"])
+                with self.buf.sub(ph["filesz"]):
+                    ph["blob"] = chew(self.buf, blob_mode=True)
+
+            meta["program-headers"].append(ph)
+
+        self.buf.seek(meta["header"]["shoff"])
+        meta["section-headers"] = []
+        for i in range(0, meta["header"]["shnum"]):
+            sh = {}
+            sh["name"] = {
+                "offset": self.buf.ru32l() if self.little else self.buf.ru32()
+            }
+            sh["type"] = utils.unraw(
+                self.buf.ru32l() if self.little else self.buf.ru32(), 4, {
+                    0x00000000: "SHT_NULL",
+                    0x00000001: "SHT_PROGBITS",
+                    0x00000002: "SHT_SYMTAB",
+                    0x00000003: "SHT_STRTAB",
+                    0x00000004: "SHT_RELA",
+                    0x00000005: "SHT_HASH",
+                    0x00000006: "SHT_DYNAMIC",
+                    0x00000007: "SHT_NOTE",
+                    0x00000008: "SHT_NOBITS",
+                    0x00000009: "SHT_REL",
+                    0x0000000a: "SHT_SHLIB",
+                    0x0000000b: "SHT_DYNSYM",
+                    0x0000000e: "SHT_INIT_ARRAY",
+                    0x0000000f: "SHT_FINI_ARRAY",
+                    0x00000010: "SHT_PREINIT_ARRAY",
+                    0x00000011: "SHT_GROUP",
+                    0x00000012: "SHT_SYMTAB_SHNDX",
+                    0x00000013: "SHT_NUM",
+                    0x6ffffff5: "SHT_GNU_ATTRIBUTES",
+                    0x6ffffff6: "SHT_GNU_HASH",
+                    0x6ffffff7: "SHT_GNU_LIBLIST",
+                    0x6ffffff8: "SHT_CHECKSUM",
+                    0x6ffffffd: "SHT_GNU_verdef",
+                    0x6ffffffe: "SHT_GNU_verneed",
+                    0x6fffffff: "SHT_GNU_versym"
+                })
+
+            flags = (self.buf.ru64l()
+                     if self.little else self.buf.ru64()) if self.wide else (
+                         self.buf.ru32l() if self.little else self.buf.ru32())
+            sh["flags"] = {"raw": flags, "names": []}
+
+            if bool(flags & 0x0001):
+                sh["flags"]["names"].append("SHF_WRITE")
+            if bool(flags & 0x0002):
+                sh["flags"]["names"].append("SHF_ALLOC")
+            if bool(flags & 0x0004):
+                sh["flags"]["names"].append("SHF_EXECINSTR")
+            if bool(flags & 0x0010):
+                sh["flags"]["names"].append("SHF_MERGE")
+            if bool(flags & 0x0020):
+                sh["flags"]["names"].append("SHF_STRINGS")
+            if bool(flags & 0x0040):
+                sh["flags"]["names"].append("SHF_INFO_LINK")
+            if bool(flags & 0x0080):
+                sh["flags"]["names"].append("SHF_LINK_ORDER")
+            if bool(flags & 0x0100):
+                sh["flags"]["names"].append("SHF_OS_NONCONFORMING")
+            if bool(flags & 0x0200):
+                sh["flags"]["names"].append("SHF_GROUP")
+            if bool(flags & 0x0400):
+                sh["flags"]["names"].append("SHF_TLS")
+
+            sh["addr"] = self.hex((self.buf.ru64l(
+            ) if self.little else self.buf.ru64()) if self.wide else (
+                self.buf.ru32l() if self.little else self.buf.ru32()))
+            sh["offset"] = (
+                self.buf.ru64l()
+                if self.little else self.buf.ru64()) if self.wide else (
+                    self.buf.ru32l() if self.little else self.buf.ru32())
+            sh["size"] = (self.buf.ru64l() if self.little else self.buf.ru64()
+                          ) if self.wide else (self.buf.ru32l() if self.little
+                                               else self.buf.ru32())
+            sh["link"] = self.buf.ru32l() if self.little else self.buf.ru32()
+            sh["info"] = self.buf.ru32l() if self.little else self.buf.ru32()
+            sh["addralign"] = (
+                self.buf.ru64l()
+                if self.little else self.buf.ru64()) if self.wide else (
+                    self.buf.ru32l() if self.little else self.buf.ru32())
+            sh["entsize"] = (
+                self.buf.ru64l()
+                if self.little else self.buf.ru64()) if self.wide else (
+                    self.buf.ru32l() if self.little else self.buf.ru32())
+
+            with self.buf:
+                self.buf.seek(sh["offset"])
+                with self.buf.sub(sh["size"]):
+                    sh["blob"] = chew(self.buf, blob_mode=True)
+
+            if meta["header"]["shentsize"] > (0x40 if self.wide else 0x28):
+                self.buf.skip(meta["header"]["shentsize"] -
+                              (0x40 if self.wide else 0x28))
+
+            meta["section-headers"].append(sh)
+
+        if meta["header"]["shstrndx"] < len(meta["section-headers"]):
+            section = meta["section-headers"][meta["header"]["shstrndx"]]
+            if section["type"]["raw"] == 0x00000003:
+                self.buf.seek(section["offset"])
+                self.buf.pushunit()
+                self.buf.setunit(section["size"])
+
+                for section in meta["section-headers"]:
+                    with self.buf:
+                        self.buf.skip(section["name"]["offset"])
+                        section["name"]["string"] = self.buf.rzs()
+
+                self.buf.popunit()
+
+        m = 0
+
+        for ph in meta["program-headers"]:
+            m = max(m, ph["offset"] + ph["filesz"])
+
+        for sh in meta["section-headers"]:
+            m = max(m, sh["offset"] + sh["size"])
+
+            with self.buf:
+                self.buf.seek(sh["offset"])
+                with self.buf.sub(sh["size"]):
+                    sh["parsed"] = {}
+
+                    if sh["name"]["string"] in (".comment", ".interp"):
+                        sh["parsed"]["string"] = self.buf.rs(
+                            self.buf.available())
+                    elif sh["name"]["string"].startswith(".note."):
+                        base = self.buf.tell()
+                        sh["parsed"]["namesz"] = self.buf.ru32l(
+                        ) if self.little else self.buf.ru32()
+                        sh["parsed"]["descsz"] = self.buf.ru32l(
+                        ) if self.little else self.buf.ru32()
+                        sh["parsed"]["type"] = self.buf.ru32l(
+                        ) if self.little else self.buf.ru32()
+                        sh["parsed"]["name"] = self.buf.rs(
+                            sh["parsed"]["namesz"])
+
+                        self.buf.skip((4 - sh["parsed"]["namesz"] % 4) if (
+                            sh["parsed"]["namesz"] % 4 != 0) else 0)
+                        self.buf.pushunit()
+                        self.buf.setunit(sh["parsed"]["descsz"])
+
+                        match sh["parsed"]["name"], sh["parsed"]["type"]:
+                            case "GNU", 0x00000005:
+                                sh["parsed"]["properties"] = []
+                                while self.buf.unit > 0:
+                                    prop = {}
+                                    prop["type"] = utils.unraw(
+                                        self.buf.ru32l()
+                                        if self.little else self.buf.ru32(), 4,
+                                        {0xc0008002: "X86_FEATURE_1_AND"})
+                                    prop["datasz"] = self.buf.ru32l(
+                                    ) if self.little else self.buf.ru32()
+
+                                    self.buf.pushunit()
+                                    self.buf.setunit(prop["datasz"])
+
+                                    match prop["type"]["name"]:
+                                        case "X86_FEATURE_1_AND":
+                                            prop["data"] = {}
+                                            prop["data"]["flags"] = {
+                                                "raw":
+                                                self.buf.ru32l() if self.little
+                                                else self.buf.ru32(),
+                                                "name": []
+                                            }
+
+                                            if prop["data"]["flags"][
+                                                    "raw"] & 0x00000001:
+                                                prop["data"]["flags"][
+                                                    "name"].append("IBT")
+                                            if prop["data"]["flags"][
+                                                    "raw"] & 0x00000002:
+                                                prop["data"]["flags"][
+                                                    "name"].append("SHSTK")
+                                        case "Unknown":
+                                            prop["data"] = self.buf.rh(
+                                                self.buf.unit)
+                                            prop["unknown"] = True
+
+                                    self.buf.skipunit()
+                                    self.buf.popunit()
+
+                                    self.buf.skip((
+                                        8 - (self.buf.tell() - base) % 8) if (
+                                            (self.buf.tell() - base) %
+                                            8 != 0) else 0)
+
+                                    sh["parsed"]["properties"].append(prop)
+                            case _, _:
+                                sh["parsed"]["desc"] = self.buf.rh(
+                                    self.buf.unit)
+                                sh["unknown"] = True
+
+                        self.buf.popunit()
+                    else:
+                        del sh["parsed"]
+
+        m = max(
+            m, meta["header"]["phoff"] +
+            meta["header"]["phnum"] * meta["header"]["phentsize"])
+        m = max(
+            m, meta["header"]["shoff"] +
+            meta["header"]["shnum"] * meta["header"]["shentsize"])
+
+        self.buf.seek(m)
+
+        return meta
