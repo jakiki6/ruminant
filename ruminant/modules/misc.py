@@ -1111,11 +1111,16 @@ class PeModule(module.RuminantModule):
         return buf.peek(2) == b"MZ"
 
     def hex(self, val):
-        return {"raw": val, "hex": "0x" + hex(val)[2:].zfill(8)}
+        return {
+            "raw": val,
+            "hex": "0x" + hex(val)[2:].zfill(16 if self.wide else 8)
+        }
 
     def chew(self):
         meta = {}
         meta["type"] = "pe"
+
+        self.wide = False
 
         self.buf.skip(2)
         meta["msdos-header"] = {}
@@ -1226,7 +1231,253 @@ class PeModule(module.RuminantModule):
                     meta["optional-header"]["base-of-data"] = self.hex(
                         self.buf.ru32l())
 
+                self.wide = self.plus
+
+                if self.buf.available() > 0:
+                    meta["optional-header"]["image-base"] = self.hex(
+                        self.buf.ru64l() if self.wide else self.buf.ru32l())
+                    meta["optional-header"][
+                        "section-alignment"] = self.buf.ru32l()
+                    meta["optional-header"]["file-alignment"] = self.buf.ru32l(
+                    )
+                    meta["optional-header"][
+                        "major-os-version"] = self.buf.ru16l()
+                    meta["optional-header"][
+                        "minor-os-version"] = self.buf.ru16l()
+                    meta["optional-header"][
+                        "major-image-version"] = self.buf.ru16l()
+                    meta["optional-header"][
+                        "minor-image-version"] = self.buf.ru16l()
+                    meta["optional-header"][
+                        "major-subsystem-version"] = self.buf.ru16l()
+                    meta["optional-header"][
+                        "minor-subsystem-version"] = self.buf.ru16l()
+                    meta["optional-header"]["win32-version"] = self.buf.ru32l()
+                    meta["optional-header"]["size-of-image"] = self.buf.ru32l()
+                    meta["optional-header"][
+                        "size-of-headers"] = self.buf.ru32l()
+                    meta["optional-header"]["checksum"] = self.buf.ru32l()
+                    meta["optional-header"]["subsystem"] = utils.unraw(
+                        self.buf.ru16l(), 2, {
+                            0x0000: "UNKNOWN",
+                            0x0001: "NATIVE",
+                            0x0002: "WINDOWS_GUI",
+                            0x0003: "WINDOWS_CUI",
+                            0x0005: "OS2_CUI",
+                            0x0007: "POSIX_CUI",
+                            0x0008: "NATIVE_WINDOWS",
+                            0x0009: "WINDOWS_CE_GUI",
+                            0x000a: "EFI_APPLICATION",
+                            0x000b: "EFI_BOOT_DEVICE_DRIVER",
+                            0x000c: "EFI_RUNTIME_DRIVER",
+                            0x000d: "EFI_ROM",
+                            0x000e: "XBOX",
+                            0x0010: "WINDOWS_BOOT_APPLICATION"
+                        })
+                    meta["optional-header"]["dll-characteristics"] = {
+                        "raw": self.buf.ru16l(),
+                        "names": []
+                    }
+                    if meta["optional-header"]["dll-characteristics"][
+                            "raw"] & 0x0020:
+                        meta["optional-header"]["dll-characteristics"][
+                            "names"].append("HIGH_ENTROPY_VA")
+                    if meta["optional-header"]["dll-characteristics"][
+                            "raw"] & 0x0040:
+                        meta["optional-header"]["dll-characteristics"][
+                            "names"].append("DYNAMIC_BASE")
+                    if meta["optional-header"]["dll-characteristics"][
+                            "raw"] & 0x0080:
+                        meta["optional-header"]["dll-characteristics"][
+                            "names"].append("FORCE_INTEGRITY")
+                    if meta["optional-header"]["dll-characteristics"][
+                            "raw"] & 0x0100:
+                        meta["optional-header"]["dll-characteristics"][
+                            "names"].append("NX_COMPAT")
+                    if meta["optional-header"]["dll-characteristics"][
+                            "raw"] & 0x0200:
+                        meta["optional-header"]["dll-characteristics"][
+                            "names"].append("NO_ISOLATION")
+                    if meta["optional-header"]["dll-characteristics"][
+                            "raw"] & 0x0400:
+                        meta["optional-header"]["dll-characteristics"][
+                            "names"].append("NO_SEH")
+                    if meta["optional-header"]["dll-characteristics"][
+                            "raw"] & 0x0800:
+                        meta["optional-header"]["dll-characteristics"][
+                            "names"].append("NO_BIND")
+                    if meta["optional-header"]["dll-characteristics"][
+                            "raw"] & 0x1000:
+                        meta["optional-header"]["dll-characteristics"][
+                            "names"].append("APPCONTAINER")
+                    if meta["optional-header"]["dll-characteristics"][
+                            "raw"] & 0x2000:
+                        meta["optional-header"]["dll-characteristics"][
+                            "names"].append("WDM_DRIVER")
+                    if meta["optional-header"]["dll-characteristics"][
+                            "raw"] & 0x4000:
+                        meta["optional-header"]["dll-characteristics"][
+                            "names"].append("GUARD_CF")
+                    if meta["optional-header"]["dll-characteristics"][
+                            "raw"] & 0x8000:
+                        meta["optional-header"]["dll-characteristics"][
+                            "names"].append("TERMINAL_SERVER_AWARE")
+                    meta["optional-header"][
+                        "size-of-stack-reserve"] = self.buf.ru64l(
+                        ) if self.plus else self.buf.ru32l()
+                    meta["optional-header"][
+                        "size-of-stack-commit"] = self.buf.ru64l(
+                        ) if self.plus else self.buf.ru32l()
+                    meta["optional-header"][
+                        "size-of-heap-reserve"] = self.buf.ru64l(
+                        ) if self.plus else self.buf.ru32l()
+                    meta["optional-header"][
+                        "size-of-heap-commit"] = self.buf.ru64l(
+                        ) if self.plus else self.buf.ru32l()
+                    meta["optional-header"]["loader-flags"] = self.buf.ru32l()
+
+                    meta["optional-header"][
+                        "number-of-rva-and-sizes"] = self.buf.ru64l()
+                    meta["optional-header"]["rvas"] = []
+                    for i in range(
+                            0, meta["optional-header"]
+                        ["number-of-rva-and-sizes"]):  # noqa: E131, E125
+                        if self.buf.unit < 8:
+                            break
+
+                        rva = {}
+                        rva["name"] = [
+                            "Export Table", "Import Table", "Resource Table",
+                            "Exception Table", "Certificate Table",
+                            "Base Relocation Table", "Debug", "Architecture",
+                            "Global Ptr", "TLS Table", "Load Config Table",
+                            "Bound Import", "IAT", "Delay Import Descriptor",
+                            "CLR Runtime Header", "Reserved"
+                        ][i]
+                        rva["base"] = self.buf.ru32l()
+                        rva["size"] = self.buf.ru32l()
+
+                        meta["optional-header"]["rvas"].append(rva)
+
             self.buf.skipunit()
             self.buf.popunit()
+
+            meta["sections"] = []
+            for i in range(0, meta["pe-header"]["section-count"]):
+                section = {}
+                section["name"] = self.buf.rs(8)
+                section["vsize"] = self.buf.ru32l()
+                section["vaddr"] = self.hex(self.buf.ru32l())
+                section["psize"] = self.buf.ru32l()
+                section["paddr"] = self.buf.ru32l()
+                section["relocs-paddr"] = self.buf.ru32l()
+                section["linenums-paddr"] = self.buf.ru32l()
+                section["relocs-count"] = self.buf.ru16l()
+                section["linenums-count"] = self.buf.ru16l()
+                section["characteristics"] = {
+                    "raw": self.buf.ru32l(),
+                    "names": []
+                }
+
+                if section["characteristics"]["raw"] & 0x00000008:
+                    section["characteristics"]["names"].append(
+                        "SCN_TYPE_NO_PAD")
+                if section["characteristics"]["raw"] & 0x00000020:
+                    section["characteristics"]["names"].append("SCN_CNT_CODE")
+                if section["characteristics"]["raw"] & 0x00000040:
+                    section["characteristics"]["names"].append(
+                        "SCN_CNT_INITIALIZED_DATA")
+                if section["characteristics"]["raw"] & 0x00000080:
+                    section["characteristics"]["names"].append(
+                        "SCN_CNT_UNINITIALIZED_DATA")
+                if section["characteristics"]["raw"] & 0x00000100:
+                    section["characteristics"]["names"].append("SCN_LNK_OTHER")
+                if section["characteristics"]["raw"] & 0x00000200:
+                    section["characteristics"]["names"].append("SCN_LNK_INFO")
+                if section["characteristics"]["raw"] & 0x00000800:
+                    section["characteristics"]["names"].append(
+                        "SCN_LNK_REMOVE")
+                if section["characteristics"]["raw"] & 0x00001000:
+                    section["characteristics"]["names"].append(
+                        "SCN_LNK_COMDAT")
+                if section["characteristics"]["raw"] & 0x00008000:
+                    section["characteristics"]["names"].append("SCN_GPREL")
+                if section["characteristics"]["raw"] & 0x00020000:
+                    section["characteristics"]["names"].append(
+                        "SCN_MEM_PURGEABLE")
+                if section["characteristics"]["raw"] & 0x00020000:
+                    section["characteristics"]["names"].append("SCN_MEM_16BIT")
+                if section["characteristics"]["raw"] & 0x00040000:
+                    section["characteristics"]["names"].append(
+                        "SCN_MEM_LOCKED")
+                if section["characteristics"]["raw"] & 0x00080000:
+                    section["characteristics"]["names"].append(
+                        "SCN_MEM_PRELOAD")
+                if section["characteristics"]["raw"] & 0x00100000:
+                    section["characteristics"]["names"].append(
+                        "SCN_ALIGN_1BYTES")
+                if section["characteristics"]["raw"] & 0x00200000:
+                    section["characteristics"]["names"].append(
+                        "SCN_ALIGN_2BYTES")
+                if section["characteristics"]["raw"] & 0x00300000:
+                    section["characteristics"]["names"].append(
+                        "SCN_ALIGN_4BYTES")
+                if section["characteristics"]["raw"] & 0x00400000:
+                    section["characteristics"]["names"].append(
+                        "SCN_ALIGN_8BYTES")
+                if section["characteristics"]["raw"] & 0x00500000:
+                    section["characteristics"]["names"].append(
+                        "SCN_ALIGN_16BYTES")
+                if section["characteristics"]["raw"] & 0x00600000:
+                    section["characteristics"]["names"].append(
+                        "SCN_ALIGN_32BYTES")
+                if section["characteristics"]["raw"] & 0x00700000:
+                    section["characteristics"]["names"].append(
+                        "SCN_ALIGN_64BYTES")
+                if section["characteristics"]["raw"] & 0x00800000:
+                    section["characteristics"]["names"].append(
+                        "SCN_ALIGN_128BYTES")
+                if section["characteristics"]["raw"] & 0x00900000:
+                    section["characteristics"]["names"].append(
+                        "SCN_ALIGN_256BYTES")
+                if section["characteristics"]["raw"] & 0x00A00000:
+                    section["characteristics"]["names"].append(
+                        "SCN_ALIGN_512BYTES")
+                if section["characteristics"]["raw"] & 0x00B00000:
+                    section["characteristics"]["names"].append(
+                        "SCN_ALIGN_1024BYTES")
+                if section["characteristics"]["raw"] & 0x00C00000:
+                    section["characteristics"]["names"].append(
+                        "SCN_ALIGN_2048BYTES")
+                if section["characteristics"]["raw"] & 0x00D00000:
+                    section["characteristics"]["names"].append(
+                        "SCN_ALIGN_4096BYTES")
+                if section["characteristics"]["raw"] & 0x00E00000:
+                    section["characteristics"]["names"].append(
+                        "SCN_ALIGN_8192BYTES")
+                if section["characteristics"]["raw"] & 0x01000000:
+                    section["characteristics"]["names"].append(
+                        "SCN_LNK_NRELOC_OVFL")
+                if section["characteristics"]["raw"] & 0x02000000:
+                    section["characteristics"]["names"].append(
+                        "SCN_MEM_DISCARDABLE")
+                if section["characteristics"]["raw"] & 0x04000000:
+                    section["characteristics"]["names"].append(
+                        "SCN_MEM_NOT_CACHED")
+                if section["characteristics"]["raw"] & 0x08000000:
+                    section["characteristics"]["names"].append(
+                        "SCN_MEM_NOT_PAGED")
+                if section["characteristics"]["raw"] & 0x10000000:
+                    section["characteristics"]["names"].append(
+                        "SCN_MEM_SHARED")
+                if section["characteristics"]["raw"] & 0x20000000:
+                    section["characteristics"]["names"].append(
+                        "SCN_MEM_EXECUTE")
+                if section["characteristics"]["raw"] & 0x40000000:
+                    section["characteristics"]["names"].append("SCN_MEM_READ")
+                if section["characteristics"]["raw"] & 0x80000000:
+                    section["characteristics"]["names"].append("SCN_MEM_WRITE")
+
+                meta["sections"].append(section)
 
         return meta
