@@ -1337,7 +1337,7 @@ class PeModule(module.RuminantModule):
                     meta["optional-header"]["loader-flags"] = self.buf.ru32l()
 
                     meta["optional-header"][
-                        "number-of-rva-and-sizes"] = self.buf.ru64l()
+                        "number-of-rva-and-sizes"] = self.buf.ru32l()
                     meta["optional-header"]["rvas"] = []
                     for i in range(
                             0, meta["optional-header"]
@@ -1479,5 +1479,34 @@ class PeModule(module.RuminantModule):
                     section["characteristics"]["names"].append("SCN_MEM_WRITE")
 
                 meta["sections"].append(section)
+
+        m = self.buf.tell()
+
+        if "optional-header" in meta:
+            for rva in meta["optional-header"]["rvas"]:
+                match rva["name"]:
+                    case "Certificate Table":
+                        self.buf.seek(rva["base"])
+                        self.buf.pasunit(rva["size"])
+
+                        self.buf.skip(4)
+                        rva["parsed"] = {}
+                        rva["parsed"]["revision"] = self.buf.ru16l()
+                        rva["parsed"]["type"] = utils.unraw(
+                            self.buf.ru16l(), 2, {
+                                0x0001: "X509",
+                                0x0002: "PKCS_SIGNED_DATA"
+                            })
+                        with self.buf.sub(self.buf.ru16l()):
+                            rva["parsed"]["certificate"] = utils.read_der(
+                                self.buf)
+
+                        self.buf.sapunit()
+
+        m = self.buf.tell()
+        for section in meta["sections"]:
+            m = max(m, section["paddr"] + section["psize"])
+
+        self.buf.seek(m)
 
         return meta

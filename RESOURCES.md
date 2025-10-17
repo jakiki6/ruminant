@@ -76,3 +76,6 @@ This is a list of useful resources.
 
 # Java
 * https://docs.oracle.com/javase/specs/jvms/se8/html
+
+# PE
+* https://learn.microsoft.com/en-us/windows/win32/debug/pe-format

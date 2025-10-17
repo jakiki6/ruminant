@@ -104,6 +104,14 @@ class Buf(object):
             self.unit = max(t - self._target, 0)
         self._target = t
 
+    def pasunit(self, val):
+        self.pushunit()
+        self.setunit(val)
+
+    def sapunit(self):
+        self.skipunit()
+        self.popunit()
+
     def backup(self):
         return (self.unit, self._target, self._stack, self.tell())
 

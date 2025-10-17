@@ -84,6 +84,7 @@ Ruminant is still in early alpha but it can already process the following file t
   * .interp sections
   * .note sections
 * PE files
+  * Authenticode signatures
 
 # How do I install it?
 Run `pip3 install ruminant`.
