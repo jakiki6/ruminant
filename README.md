@@ -85,6 +85,8 @@ Ruminant is still in early alpha but it can already process the following file t
   * .note sections
 * PE files
   * Authenticode signatures
+* Minecraft NBT files
+  * region files
 
 # How do I install it?
 Run `pip3 install ruminant`.

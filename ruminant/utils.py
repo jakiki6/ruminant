@@ -1128,3 +1128,57 @@ def read_bencode(buf, blob_mode=False):
             return chew(value, blob_mode=True)
         else:
             return value.decode("utf-8")
+
+
+def read_nbt(buf, has_name=True, tag=None, depth=1):
+    if has_name:
+        tag = buf.ru8()
+        name = buf.rs(buf.ru16())
+
+    match tag:
+        case 0x01:
+            value = buf.ri8()
+        case 0x02:
+            value = buf.ri16()
+        case 0x03:
+            value = buf.ri32()
+        case 0x04:
+            value = buf.ri64()
+        case 0x05:
+            value = buf.rf32()
+        case 0x06:
+            value = buf.rf64()
+        case 0x07:
+            value = [buf.ri8() for i in range(0, buf.ru32())]
+        case 0x08:
+            value = buf.rs(buf.ru16())
+        case 0x09:
+            tag2 = buf.ru8()
+
+            value = []
+            for i in range(0, buf.ru32()):
+                value.append(read_nbt(buf, False, tag2, depth=depth + 1))
+
+        case 0x0a:
+            value = {}
+            while buf.pu8() != 0:
+                key, value2 = read_nbt(buf, depth=depth + 1)
+                value[key] = value2
+
+            buf.skip(1)
+        case 0x0b:
+            value = [buf.ri32() for i in range(0, buf.ru32())]
+        case 0x0c:
+            value = [buf.ri64() for i in range(0, buf.ru32())]
+        case _:
+            if has_name:
+                raise ValueError(
+                    f"Unknown tag 0x{hex(tag)[2:].zfill(2)} with name '{name}'"
+                )
+            else:
+                raise ValueError(f"Unknown tag 0x{hex(tag)[2:].zfill(2)}")
+
+    if has_name:
+        return name, value
+    else:
+        return value

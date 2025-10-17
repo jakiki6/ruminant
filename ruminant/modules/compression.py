@@ -57,7 +57,8 @@ class GzipModule(module.RuminantModule):
                 10: "TOPS-20",
                 11: "NTFS",
                 12: "QDOS",
-                13: "RISCOS"
+                13: "RISCOS",
+                255: "None"
             })
 
         if flags & 0x04:

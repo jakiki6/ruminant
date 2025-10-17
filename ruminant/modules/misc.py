@@ -3,6 +3,8 @@ from . import chew
 import tempfile
 import sqlite3
 import datetime
+import gzip
+import zlib
 
 
 @module.register
@@ -1484,12 +1486,16 @@ class PeModule(module.RuminantModule):
 
         if "optional-header" in meta:
             for rva in meta["optional-header"]["rvas"]:
+                if rva["size"] == 0:
+                    continue
+
                 match rva["name"]:
                     case "Certificate Table":
                         self.buf.seek(rva["base"])
                         self.buf.pasunit(rva["size"])
 
                         self.buf.skip(4)
+
                         rva["parsed"] = {}
                         rva["parsed"]["revision"] = self.buf.ru16l()
                         rva["parsed"]["type"] = utils.unraw(
@@ -1506,6 +1512,125 @@ class PeModule(module.RuminantModule):
         m = self.buf.tell()
         for section in meta["sections"]:
             m = max(m, section["paddr"] + section["psize"])
+
+        self.buf.seek(m)
+
+        return meta
+
+
+@module.register
+class NbtModule(module.RuminantModule):
+
+    def identify(buf, ctx):
+        return (not ctx["walk"]) and (buf.pu32() & 0xffffffc0 == 0x0a000000)
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "nbt"
+
+        meta["data"] = {}
+        while self.buf.available() > 0:
+            key, value = utils.read_nbt(self.buf)
+            meta["data"][key] = value
+
+        return meta
+
+
+@module.register
+class McaModule(module.RuminantModule):
+    priority = 1
+
+    def identify(buf, ctx):
+        if ctx["walk"]:
+            return False
+
+        try:
+            with buf:
+                if buf.available() < 0x2000:
+                    return False
+
+                found_chunk = False
+                for i in range(0, 1024):
+                    offset = buf.ru32()
+                    length = (offset & 0xff) * 0x1000
+                    offset = (offset >> 8) * 0x1000
+
+                    if offset < 2 and length != 0:
+                        return False
+
+                    if length == 0:
+                        continue
+
+                    found_chunk = True
+
+                    with buf:
+                        buf.seek(offset)
+                        length2 = buf.ru32()
+                        if length2 > length:
+                            return False
+
+                        if buf.ru8() not in (0x01, 0x02, 0x03, 0x04, 0x7f):
+                            return False
+
+                    return found_chunk
+        except Exception:
+            return False
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "mca"
+
+        meta["chunk-count"] = 0
+        meta["chunks"] = {}
+        for i in range(0, 1024):
+            offset = self.buf.ru32()
+            length = (offset & 0xff) * 0x1000
+            offset = (offset >> 8) * 0x1000
+
+            if length != 0:
+                meta["chunk-count"] += 1
+                chunk = {}
+                meta["chunks"][f"({i % 32}, {i // 32})"] = chunk
+
+                chunk["offset"] = offset
+                chunk["padded-length"] = length
+                chunk["length"] = 0
+
+                with self.buf:
+                    self.buf.seek(0x1000 + i * 4)
+                    chunk["timestamp"] = datetime.datetime.fromtimestamp(
+                        self.buf.ru32(), datetime.timezone.utc).isoformat()
+
+                    self.buf.seek(offset)
+                    chunk["length"] = self.buf.ru32()
+                    self.buf.pasunit(chunk["length"])
+
+                    chunk["compression"] = utils.unraw(self.buf.ru8(), 1, {
+                        0x01: "GZip",
+                        0x02: "zlib",
+                        0x03: "Uncompressed"
+                    })
+
+                    data = None
+                    content = self.buf.readunit()
+                    match chunk["compression"]["raw"]:
+                        case 0x01:
+                            data = gzip.decompress(content)
+                        case 0x02:
+                            data = zlib.decompress(content)
+                        case 0x03:
+                            data = content
+                        case _:
+                            chunk["unknown"] = True
+
+                    if data is not None:
+                        chunk["data"] = chew(data)
+
+                    self.buf.sapunit()
+
+        m = 0x2000
+        for chunk in meta["chunks"].values():
+            m = max(m, chunk["offset"] + chunk["padded-length"])
 
         self.buf.seek(m)
 

@@ -79,3 +79,7 @@ This is a list of useful resources.
 
 # PE
 * https://learn.microsoft.com/en-us/windows/win32/debug/pe-format
+
+# NBT
+* https://minecraft.wiki/w/NBT_format
+* https://minecraft.wiki/w/Region_file_format
