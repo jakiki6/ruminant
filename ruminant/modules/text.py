@@ -72,3 +72,20 @@ class EmptyModule(module.RuminantModule):
 
     def chew(self):
         return {"type": "empty"}
+
+
+@module.register
+class ZeroesModule(module.RuminantModule):
+    priorty = 2
+
+    def identify(buf, ctx):
+        with buf:
+            s = 0
+            while buf.available() > 0:
+                s += sum(buf.read(min(buf.available(), 2**24)))
+
+        return s == 0
+
+    def chew(self):
+        self.buf.skip(self.buf.available())
+        return {"type": "zeroes"}

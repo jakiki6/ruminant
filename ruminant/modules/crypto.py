@@ -8,8 +8,10 @@ import json
 
 @module.register
 class DerModule(module.RuminantModule):
+    priority = 1
 
     def identify(buf, ctx):
+        return False
         return buf.pu8() == 0x30 and (buf.pu16() & 0xf0) in (0x80, 0x30)
 
     def chew(self):

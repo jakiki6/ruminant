@@ -11,11 +11,12 @@ blob_id = 0
 
 class EntryModule(module.RuminantModule):
 
-    def __init__(self, walk_mode, blob_mode, *args, **kwargs):
+    def __init__(self, walk_mode, blob_mode, flat, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.walk_mode = walk_mode
         self.blob_mode = blob_mode
+        self.flat = flat
 
     def chew(self):
         global blob_id
@@ -67,7 +68,8 @@ class EntryModule(module.RuminantModule):
 
                     matched = True
 
-                    if self.buf.available() and not self.walk_mode:
+                    if self.buf.available(
+                    ) and not self.walk_mode and not self.flat:
                         with self.buf.cut():
                             meta = {"type": "nested", "segments": [meta]}
 
@@ -114,8 +116,8 @@ class EntryModule(module.RuminantModule):
         return meta
 
 
-def chew(blob, walk_mode=False, blob_mode=False):
-    return EntryModule(walk_mode, blob_mode, Buf.of(blob)).chew()
+def chew(blob, walk_mode=False, blob_mode=False, flat=False):
+    return EntryModule(walk_mode, blob_mode, flat, Buf.of(blob)).chew()
 
 
 from . import containers, images, videos, documents, fonts, audio, crypto, compression, text, misc  # noqa: F401,E402

@@ -88,6 +88,7 @@ class GzipModule(module.RuminantModule):
         meta["footer-crc"] = None
         meta["size-mod-2^32"] = None
 
+        self.buf.unit = None
         with tempfile.TemporaryFile() as fd:
             decompressor = zlib.decompressobj(-zlib.MAX_WBITS)
 
@@ -103,8 +104,10 @@ class GzipModule(module.RuminantModule):
             fd.seek(0)
             meta["data"] = chew(fd)
 
-        meta["footer-crc"] = self.buf.rh(4)
-        meta["size-mod-2^32"] = self.buf.ru32l()
+        if self.buf.available() >= 4:
+            meta["footer-crc"] = self.buf.rh(4)
+        if self.buf.available() >= 4:
+            meta["size-mod-2^32"] = self.buf.ru32l()
 
         return meta
 

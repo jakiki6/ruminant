@@ -980,10 +980,11 @@ class ElfModule(module.RuminantModule):
                 if self.little else self.buf.ru64()) if self.wide else (
                     self.buf.ru32l() if self.little else self.buf.ru32())
 
-            with self.buf:
-                self.buf.seek(sh["offset"])
-                with self.buf.sub(sh["size"]):
-                    sh["blob"] = chew(self.buf, blob_mode=True)
+            if sh["type"]["name"] != "SHT_NOBITS":
+                with self.buf:
+                    self.buf.seek(sh["offset"])
+                    with self.buf.sub(sh["size"]):
+                        sh["blob"] = chew(self.buf, blob_mode=True)
 
             if meta["header"]["shentsize"] > (0x40 if self.wide else 0x28):
                 self.buf.skip(meta["header"]["shentsize"] -
@@ -1011,6 +1012,9 @@ class ElfModule(module.RuminantModule):
             m = max(m, ph["offset"] + ph["filesz"])
 
         for sh in meta["section-headers"]:
+            if sh["type"]["name"] == "SHT_NOBITS":
+                continue
+
             m = max(m, sh["offset"] + sh["size"])
 
             with self.buf:
@@ -1191,13 +1195,13 @@ class PeModule(module.RuminantModule):
                 "32BIT_MACHINE")
         if meta["pe-header"]["characteristics"]["raw"] & 0x0200:
             meta["pe-header"]["characteristics"]["names"].append(
-                "DEBUG_STRIPPED ")
+                "DEBUG_STRIPPED")
         if meta["pe-header"]["characteristics"]["raw"] & 0x0400:
             meta["pe-header"]["characteristics"]["names"].append(
-                "REMOVABLE_RUN_FROM_SWAP ")
+                "REMOVABLE_RUN_FROM_SWAP")
         if meta["pe-header"]["characteristics"]["raw"] & 0x0800:
             meta["pe-header"]["characteristics"]["names"].append(
-                "NET_RUN_FROM_SWAP ")
+                "NET_RUN_FROM_SWAP")
         if meta["pe-header"]["characteristics"]["raw"] & 0x1000:
             meta["pe-header"]["characteristics"]["names"].append("SYSTEM")
         if meta["pe-header"]["characteristics"]["raw"] & 0x2000:
@@ -1225,8 +1229,7 @@ class PeModule(module.RuminantModule):
                         "type"] = f"Unknown (0x{hex(typ)[2:].zfill(4)})"
                     meta["optional-header"]["unknown"] = True
 
-            self.buf.pushunit()
-            self.buf.setunit(meta["pe-header"]["optional-header-size"] - 2)
+            self.buf.pasunit(meta["pe-header"]["optional-header-size"] - 2)
 
             if "unknown" not in meta["optional-header"]:
                 meta["optional-header"]["major-linker-version"] = self.buf.ru8(
@@ -1375,8 +1378,7 @@ class PeModule(module.RuminantModule):
 
                         meta["optional-header"]["rvas"].append(rva)
 
-            self.buf.skipunit()
-            self.buf.popunit()
+            self.buf.sapunit()
 
             meta["sections"] = []
             for i in range(0, meta["pe-header"]["section-count"]):
@@ -1493,6 +1495,16 @@ class PeModule(module.RuminantModule):
                     section["characteristics"]["names"].append("SCN_MEM_READ")
                 if section["characteristics"]["raw"] & 0x80000000:
                     section["characteristics"]["names"].append("SCN_MEM_WRITE")
+
+                if section["psize"] != 0:
+                    with self.buf:
+                        self.buf.seek(section["paddr"])
+
+                        with self.buf.sub(section["psize"]):
+                            section["blob"] = chew(
+                                self.buf,
+                                blob_mode=not (section["name"] == "mods" and
+                                               self.buf.peek(4) == b"mimg"))
 
                 meta["sections"].append(section)
 
@@ -1696,5 +1708,61 @@ class McaModule(module.RuminantModule):
             m = max(m, chunk["offset"] + chunk["padded-length"])
 
         self.buf.seek(m)
+
+        return meta
+
+
+@module.register
+class GrubModuleModule(module.RuminantModule):
+
+    def identify(buf, ctx):
+        return buf.peek(4) == b"mimg"
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "grub-module"
+
+        self.buf.skip(4)
+        meta["data"] = {}
+        meta["data"]["padding"] = self.buf.ru32l()
+        meta["data"]["offset"] = self.buf.ru64l()
+        meta["data"]["size"] = self.buf.ru64l()
+        meta["data"]["modules"] = []
+
+        self.buf.pasunit(meta["data"]["size"] - 24)
+        self.buf.skip(meta["data"]["offset"] - 24)
+
+        while self.buf.unit > 0:
+            module = {}
+            module["type"] = utils.unraw(
+                self.buf.ru32l(), 4, {
+                    0x00000000: "ELF",
+                    0x00000001: "MEMDISK",
+                    0x00000002: "CONFIG",
+                    0x00000003: "PREFIX",
+                    0x00000004: "PUBKEY",
+                    0x00000005: "DTB",
+                    0x00000006: "DISABLE_SHIM_LOCK",
+                })
+            module["length"] = self.buf.ru32l()
+
+            self.buf.pasunit(module["length"] - 8)
+
+            match module["type"]["raw"]:
+                case 0 | 1:
+                    with self.buf.subunit():
+                        module["data"] = chew(self.buf)
+                case 3:
+                    module["data"] = self.buf.rs(self.buf.unit)
+                case _:
+                    module["unknown"] = True
+                    with self.buf.subunit():
+                        module["data"] = chew(self.buf, blob_mode=True)
+
+            self.buf.sapunit()
+
+            meta["data"]["modules"].append(module)
+
+        self.buf.sapunit()
 
         return meta

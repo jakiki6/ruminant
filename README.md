@@ -87,6 +87,7 @@ Ruminant is still in early alpha but it can already process the following file t
   * Authenticode signatures
 * Minecraft NBT files
   * region files
+* GRUB modules
 
 # How do I install it?
 Run `pip3 install ruminant`.

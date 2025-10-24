@@ -113,10 +113,11 @@ class Buf(object):
         self.popunit()
 
     def backup(self):
-        return (self.unit, self._target, self._stack, self.tell())
+        return (self.unit, self._target, self._stack, self.tell(),
+                self._offset, self._size)
 
     def restore(self, bak):
-        self.unit, self._target, self._stack, offset = bak
+        self.unit, self._target, self._stack, offset, self._offset, self._size = bak
         self.seek(offset)
 
     def rl(self):
@@ -150,7 +151,8 @@ class Buf(object):
         self._file.seek(pos, whence)
 
     def sub(self, size):
-        assert size <= self.size(), "sub buffer is bigger than host buffer"
+        assert size <= self.available(
+        ), "sub buffer is bigger than host buffer"
 
         class SubWrapper(object):
 
@@ -162,8 +164,6 @@ class Buf(object):
                 self._size = size
 
             def __exit__(self2, *args):
-                self._offset = self2._offset
-                self._size = self2._size
                 self.restore(self2._bak)
 
         return SubWrapper()

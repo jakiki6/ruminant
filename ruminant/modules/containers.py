@@ -446,7 +446,8 @@ class TarModule(module.RuminantModule):
         file_length = self.buf.rs(12).rstrip(" ").rstrip("\x00")
         meta["size"] = file_length
 
-        meta["modification-date"] = self.buf.rs(12).rstrip(" ").rstrip("\x00")
+        meta["modification-date"] = utils.unix_to_date(
+            int(self.buf.rs(12).rstrip(" ").rstrip("\x00"), 8))
         meta["checksum"] = self.buf.rs(8).rstrip(" ").rstrip("\x00")
         meta["file-type"] = utils.unraw(
             self.buf.ru8(), 1, {

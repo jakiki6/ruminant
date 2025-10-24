@@ -1229,3 +1229,7 @@ def read_nbt(buf, has_name=True, tag=None, depth=1):
 def filetime_to_date(ts):
     return (datetime(1601, 1, 1) +
             timedelta(microseconds=ts / 10)).isoformat() + "Z"
+
+
+def unix_to_date(ts):
+    return datetime.fromtimestamp(ts, timezone.utc).isoformat()
