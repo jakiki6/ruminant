@@ -1508,18 +1508,28 @@ class PeModule(module.RuminantModule):
                         self.buf.seek(rva["base"])
                         self.buf.pasunit(rva["size"])
 
-                        self.buf.skip(4)
-
                         rva["parsed"] = {}
-                        rva["parsed"]["revision"] = self.buf.ru16l()
-                        rva["parsed"]["type"] = utils.unraw(
-                            self.buf.ru16l(), 2, {
-                                0x0001: "X509",
-                                0x0002: "PKCS_SIGNED_DATA"
-                            })
-                        with self.buf.sub(self.buf.ru16l()):
-                            rva["parsed"]["certificate"] = utils.read_der(
-                                self.buf)
+                        rva["parsed"]["entries"] = []
+                        while self.buf.unit > 0:
+                            entry = {}
+                            entry["length"] = self.buf.ru32l()
+                            self.buf.pasunit(entry["length"])
+                            rev = self.buf.ru16l()
+                            entry["revision"] = f"{rev >> 8}.{rev & 0xff}"
+                            entry["type"] = utils.unraw(
+                                self.buf.ru16l(), 2, {
+                                    0x0001: "X509",
+                                    0x0002: "PKCS_SIGNED_DATA"
+                                })
+                            entry["blob"] = chew(self.buf.peek(self.buf.unit),
+                                                 blob_mode=True)
+                            entry["signature"] = utils.read_der(self.buf)
+
+                            self.buf.sapunit()
+                            if self.buf.unit >= 8 and entry["length"] % 8 != 0:
+                                self.buf.skip(8 - (entry["length"] % 8))
+
+                            rva["parsed"]["entries"].append(entry)
 
                         self.buf.sapunit()
                     case "CLR Runtime Header":
