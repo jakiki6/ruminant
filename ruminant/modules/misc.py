@@ -1118,11 +1118,24 @@ class PeModule(module.RuminantModule):
             "hex": "0x" + hex(val)[2:].zfill(16 if self.wide else 8)
         }
 
+    def seek_vaddr(self, vaddr):
+        for section in self.meta["sections"]:
+            if vaddr >= section["vaddr"]["raw"] and vaddr < (
+                    section["vaddr"]["raw"] + section["psize"]):
+                self.buf.seek(section["paddr"])
+                self.buf.pasunit(section["psize"])
+                self.buf.skip(vaddr - section["vaddr"]["raw"])
+                return
+
+        raise ValueError(
+            f"Cannot find section that maps {self.hex(vaddr)['hex']}")
+
     def chew(self):
         meta = {}
         meta["type"] = "pe"
 
         self.wide = False
+        self.meta = meta
 
         self.buf.skip(2)
         meta["msdos-header"] = {}
@@ -1136,6 +1149,7 @@ class PeModule(module.RuminantModule):
         meta["pe-header"] = {}
         meta["pe-header"]["machine"] = utils.unraw(self.buf.ru16l(), 2, {
             0x0000: "Unknown",
+            0x014c: "i386",
             0x8664: "x64"
         })
         meta["pe-header"]["section-count"] = self.buf.ru16l()
@@ -1506,6 +1520,45 @@ class PeModule(module.RuminantModule):
                         with self.buf.sub(self.buf.ru16l()):
                             rva["parsed"]["certificate"] = utils.read_der(
                                 self.buf)
+
+                        self.buf.sapunit()
+                    case "CLR Runtime Header":
+                        self.seek_vaddr(rva["base"])
+                        self.buf.setunit(min(self.buf.unit, rva["size"]))
+
+                        rva["parsed"] = {}
+                        rva["parsed"]["size"] = self.buf.ru32l()
+                        self.buf.setunit(min(self.buf.unit, rva["size"] - 2))
+                        rva["parsed"][
+                            "major-runtime-version"] = self.buf.ru16l()
+                        rva["parsed"][
+                            "minor-runtime-version"] = self.buf.ru16l()
+                        rva["parsed"]["metadata"] = {
+                            "base": self.hex(self.buf.ru32l()),
+                            "size": self.hex(self.buf.ru32l())
+                        }
+                        rva["parsed"]["flags"] = self.buf.ru32l()
+                        rva["parsed"]["entry"] = self.hex(self.buf.ru32l())
+                        rva["parsed"]["resources"] = {
+                            "base": self.hex(self.buf.ru32l()),
+                            "size": self.hex(self.buf.ru32l())
+                        }
+                        rva["parsed"]["code-manager-table"] = {
+                            "base": self.hex(self.buf.ru32l()),
+                            "size": self.hex(self.buf.ru32l())
+                        }
+                        rva["parsed"]["vtable-fixups"] = {
+                            "base": self.hex(self.buf.ru32l()),
+                            "size": self.hex(self.buf.ru32l())
+                        }
+                        rva["parsed"]["export-address-table-jumps"] = {
+                            "base": self.hex(self.buf.ru32l()),
+                            "size": self.hex(self.buf.ru32l())
+                        }
+                        rva["parsed"]["managed-native-header"] = {
+                            "base": self.hex(self.buf.ru32l()),
+                            "size": self.hex(self.buf.ru32l())
+                        }
 
                         self.buf.sapunit()
 

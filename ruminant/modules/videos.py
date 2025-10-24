@@ -2012,10 +2012,6 @@ class AsfModule(module.RuminantModule):
         return buf.available() > 16 and buf.pguid(
         ) == "75b22630-668e-11cf-a6d9-00aa0062ce6c"
 
-    def filetime_to_date(self, ts):
-        return (datetime.datetime(1601, 1, 1) +
-                datetime.timedelta(microseconds=ts / 10)).isoformat() + "Z"
-
     def read_object(self):
         obj = {}
 
@@ -2042,7 +2038,7 @@ class AsfModule(module.RuminantModule):
                 obj["name"] = "File Properties"
                 obj["data"]["file-guid"] = self.buf.rguid()
                 obj["data"]["file-size"] = self.buf.ru64l()
-                obj["data"]["creation-date"] = self.filetime_to_date(
+                obj["data"]["creation-date"] = utils.filetime_to_date(
                     self.buf.ru64l())
                 obj["data"]["data-packets-count"] = self.buf.ru64l()
 

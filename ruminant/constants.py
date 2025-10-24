@@ -527,6 +527,14 @@ PGP_SIGNATURE_TYPES = {
     0x50: "Third-party confirmation signature"
 }
 
+PGP_S2K_TYPES = {
+    0x00: "Simple",
+    0x01: "Salted",
+    0x02: "Reserved",
+    0x03: "Iterated and Salted",
+    0x04: "Argon2"
+}
+
 JPEG_QUANTIZATION_TABLES = {}
 
 

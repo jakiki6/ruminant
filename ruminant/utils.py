@@ -1,5 +1,5 @@
 from .oids import OIDS
-from .constants import PGP_HASHES, PGP_PUBLIC_KEYS, PGP_CIPHERS, PGP_AEADS, PGP_SIGNATURE_TYPES
+from .constants import PGP_HASHES, PGP_PUBLIC_KEYS, PGP_CIPHERS, PGP_AEADS, PGP_SIGNATURE_TYPES, PGP_S2K_TYPES
 from .buf import Buf, _decode
 from .modules import chew
 import uuid
@@ -735,6 +735,39 @@ def _read_pgp(buf, fake=None):
                     }
                 case _:
                     data["signature"] = {"unknown": True}
+        case 0x03:
+            packet["tag"] = "Symmetric Key Encrypted Session Key"
+            data["version"] = buf.ru8()
+
+            match data["version"]:
+                case 4:
+                    data["algorithm"] = unraw(buf.ru8(), 1, PGP_S2K_TYPES)
+
+                    match data["algorithm"]["raw"]:
+                        case 0:
+                            data["hash-algorithm"] = unraw(
+                                buf.ru8(), 1, PGP_HASHES)
+                        case 1:
+                            data["hash-algorithm"] = unraw(
+                                buf.ru8(), 1, PGP_HASHES)
+                            data["salt"] = buf.rh(8)
+                        case 3:
+                            data["hash-algorithm"] = unraw(
+                                buf.ru8(), 1, PGP_HASHES)
+                            data["salt"] = buf.rh(8)
+                            c = buf.ru8()
+                            data["count"] = (16 + (c & 0x0f)) << ((c >> 4) + 6)
+                        case 4:
+                            data["salt"] = buf.rh(16)
+                            data["t"] = buf.ru8()
+                            data["p"] = buf.ru8()
+                            c = buf.ru8()
+                            data["memory"] = ((16 + (c & 0x0f)) <<
+                                              ((c >> 4) + 6)) * 1024
+                        case _:
+                            packet["unknown"] = True
+                case _:
+                    packet["unknown"] = True
         case 0x04:
             packet["tag"] = "One-pass Signature"
             data["version"] = buf.ru8()
@@ -865,6 +898,15 @@ def _read_pgp(buf, fake=None):
                     data["content"].append(read_pgp(cbuf))
             else:
                 data["unknown"] = True
+        case 0x09:
+            packet["tag"] = "Symetrically Encrypted Data"
+        case 0x0a:
+            packet["tag"] = "Marker"
+            data["valid"] = buf.unit == 3 and buf.peek(3) == b"PGP"
+
+            if not data["valid"]:
+                with buf.subunit():
+                    data["blob"] = chew(buf, blob_mode=True)
         case 0x0b:
             packet["tag"] = "Literal Data"
             data["format"] = buf.read(1).decode("latin-1")
@@ -1182,3 +1224,8 @@ def read_nbt(buf, has_name=True, tag=None, depth=1):
         return name, value
     else:
         return value
+
+
+def filetime_to_date(ts):
+    return (datetime(1601, 1, 1) +
+            timedelta(microseconds=ts / 10)).isoformat() + "Z"

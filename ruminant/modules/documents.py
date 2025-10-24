@@ -598,3 +598,87 @@ class PdfModule(module.RuminantModule):
             return token
         else:
             raise ValueError(f"Unknown token: {token}")
+
+
+@module.register
+class Ole2Module(module.RuminantModule):
+
+    def identify(buf, ctx):
+        return buf.peek(8) == b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
+
+    def read(self, sector):
+        data = b""
+        with self.buf:
+            while sector < 0xfffffffc:
+                self.buf.seek((sector + 1) * self.sector_size)
+                data += self.buf.read(self.sector_size)
+                sector = self.fat[sector]
+
+        return data
+
+    def read_directory(self, sector):
+        buf = Buf(self.read(sector))
+
+        directory = []
+        while buf.available():
+            entry = {}
+            entry["name"] = buf.rs(64, "utf-16le")
+            entry["name-length"] = buf.ru16l()
+            entry["object-type"] = utils.unraw(buf.ru8(), 1, {
+                1: "Storage",
+                2: "Stream",
+                5: "Root"
+            })
+            entry["color-flag"] = buf.ru8()
+            entry["left"] = buf.ru32l()
+            entry["right"] = buf.ru32l()
+            entry["child"] = buf.ru32l()
+            entry["clsid"] = buf.rguid()
+            entry["state-bits"] = buf.ru32l()
+            entry["creation-time"] = buf.ru64l()
+            entry["modification-time"] = buf.ru64l()
+            entry["start-sector"] = buf.ru32l()
+            entry["stream-size"] = buf.ru64l()
+
+            directory.append(entry)
+
+        return directory
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "ole2"
+
+        self.buf.skip(8)
+        meta["header"] = {}
+        meta["header"]["clsid"] = self.buf.rguid()
+        meta["header"]["minor-version"] = self.buf.ru16l()
+        meta["header"]["major-version"] = self.buf.ru16l()
+        meta["header"]["byte-order"] = utils.unraw(self.buf.ru16l(), 2,
+                                                   {65534: "little"})
+        meta["header"]["sector-size"] = 1 << self.buf.ru16l()
+        self.sector_size = meta["header"]["sector-size"]
+        meta["header"]["mini-sector-size"] = 1 << self.buf.ru16l()
+        meta["header"]["reserved"] = self.buf.rh(6)
+        meta["header"]["directory-sector-count"] = self.buf.ru32l()
+        meta["header"]["fat-sector-count"] = self.buf.ru32l()
+        meta["header"]["directory-start"] = self.buf.ru32l()
+        meta["header"]["transaction-signature"] = self.buf.ru32l()
+        meta["header"]["mini-stream-cutoff"] = self.buf.ru32l()
+        meta["header"]["mini-fat-start"] = self.buf.ru32l()
+        meta["header"]["mini-fat-sector-count"] = self.buf.ru32l()
+        meta["header"]["difat-start"] = self.buf.ru32l()
+        meta["header"]["difat-sector-count"] = self.buf.ru32l()
+
+        self.buf.pasunit(meta["header"]["fat-sector-count"] *
+                         self.sector_size + 436)
+
+        self.fat = []
+        while self.buf.unit > 0:
+            self.fat.append(self.buf.ru32l())
+
+        self.buf.sapunit()
+
+        rootdir = self.read_directory(meta["header"]["directory-start"])
+        meta["files"] = rootdir
+
+        return meta
