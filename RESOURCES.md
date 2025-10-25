@@ -83,3 +83,7 @@ This is a list of useful resources.
 # NBT
 * https://minecraft.wiki/w/NBT_format
 * https://minecraft.wiki/w/Region_file_format
+
+# SPIR-V
+* https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html
+* https://github.com/KhronosGroup/SPIRV-Headers

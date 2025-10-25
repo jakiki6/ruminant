@@ -434,8 +434,11 @@ def decode(*args, **kwargs):
     return _decode(*args, **kwargs)
 
 
-def unraw(i, width, choices):
-    return {"raw": i, "name": choices.get(i, "Unknown")}
+def unraw(i, width, choices, short=False):
+    if short:
+        return choices.get(i, f"Unknown (0x{hex(i)[2:].zfill(width * 2)})")
+    else:
+        return {"raw": i, "name": choices.get(i, "Unknown")}
 
 
 def read_pgp_mpi(buf):

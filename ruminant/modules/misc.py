@@ -1,4 +1,4 @@
-from .. import module, utils
+from .. import module, utils, constants
 from . import chew
 import tempfile
 import sqlite3
@@ -1764,5 +1764,308 @@ class GrubModuleModule(module.RuminantModule):
             meta["data"]["modules"].append(module)
 
         self.buf.sapunit()
+
+        return meta
+
+
+@module.register
+class SpirVModule(module.RuminantModule):
+
+    def identify(buf, ctx):
+        return buf.peek(4) in (b"\x07\x23\x02\x03", b"\x03\x02\x23\x07")
+
+    def read(self):
+        if self.little:
+            return self.buf.ru32l()
+        else:
+            return self.buf.ru32()
+
+    def read_rest(self, func=None):
+        if func is None:
+            func = self.read
+
+        vals = []
+        while self.buf.unit > 0:
+            vals.append(func())
+
+        return vals
+
+    def read_string(self):
+        s = b""
+        while True:
+            c = self.read()
+            s += c.to_bytes(4, "little")
+            if c & 0xff000000 == 0:
+                break
+
+        return utils.decode(s).rstrip("\x00")
+
+    def read_memory_operands(self):
+        val = {"raw": self.read(), "names": []}
+
+        if val["raw"] & 0x00000001:
+            val["names"].append("Volatile")
+        if val["raw"] & 0x00000002:
+            val["names"].append("Aligned")
+        if val["raw"] & 0x00000004:
+            val["names"].append("Nontemporal")
+        if val["raw"] & 0x00000008:
+            val["names"].append("MakePointerAvailable")
+        if val["raw"] & 0x00000010:
+            val["names"].append("MakePointerVisible")
+        if val["raw"] & 0x00000020:
+            val["names"].append("NonPrivatePointer")
+        if val["raw"] & 0x00010000:
+            val["names"].append("AliasScopeINTELMask")
+        if val["raw"] & 0x00020000:
+            val["names"].append("NoAliasINTELMask")
+
+        return val
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "spir-v"
+
+        meta["header"] = {}
+        self.little = self.buf.ru32l() == 0x07230203
+        meta["header"]["endian"] = "little" if self.little else "big"
+        ver = self.read()
+        meta["header"]["version"] = f"{(ver >> 16) & 0xff}.{(ver >> 8) & 0xff}"
+        ver = self.read()
+        meta["header"]["generator"] = utils.unraw(
+            ver >> 16, 2, {
+                0x0000: "Khronos",
+                0x0001: "LunarG",
+                0x0002: "Valve",
+                0x0003: "Codeplay",
+                0x0004: "NVIDIA",
+                0x0005: "ARM",
+                0x0006: "Khronos - LLVM/SPIR-V Translator",
+                0x0007: "Khronos - SPIR-V Tools Assembler",
+                0x0008: "Khronos - Glslang Reference Front End",
+                0x0009: "Qualcomm",
+                0x000a: "AMD",
+                0x000b: "Intel",
+                0x000c: "Imagination",
+                0x000d: "Google - Shaderc over Glslang",
+                0x000e: "Google - spiregg",
+                0x000f: "Google - rspirv",
+                0x0010: "X-LEGEND - Mesa-IR/SPIR-V Translator",
+                0x0011: "Khronos - SPIR-V Tools Linker",
+                0x0012: "Wine - VKD3D Shader Compiler",
+                0x0013: "Tellusim - Clay Shader Compiler",
+                0x0014: "W3C WebGPU Group - WHLSL Shader Translator",
+                0x0015: "Google - Clspv",
+                0x0016: "LLVM - MLIR SPIR-V Serializer",
+                0x0017: "Google - Tint Compiler",
+                0x0018: "Google - ANGLE Shader Compiler",
+                0x0019: "Netease Games - Messiah Shader Compiler",
+                0x001a: "Xenia - Xenia Emulator Microcode Translator",
+                0x001b: "Embark Studios - Rust GPU Compiler Backend",
+                0x001c: "gfx-rs community - Naga",
+                0x001d: "Mikkosoft Productions - MSP Shader Compiler",
+                0x001e: "SpvGenTwo community - SpvGenTwo SPIR-V IR Tools",
+                0x001f: "Google - Skia SkSL",
+                0x0020: "TornadoVM - Beehive SPIRV Toolkit",
+                0x0021: "DragonJoker - ShaderWriter",
+                0x0022: "Rayan Hatout - SPIRVSmith",
+                0x0023: "Saarland University - Shady",
+                0x0024: "Taichi Graphics - Taichi",
+                0x0025: "heroseh - Hero C Compiler",
+                0x0026: "Meta - SparkSL",
+                0x0027: "SirLynix - Nazara ShaderLang Compiler",
+                0x0028: "Khronos - Slang Compiler",
+                0x0029: "Zig Software Foundation - Zig Compiler",
+                0x002a: "Rendong Liang - spq",
+                0x002b: "LLVM - LLVM SPIR-V Backend",
+                0x002c: "Robert Konrad - Kongruent",
+                0x002d:
+                "Kitsunebi Games - Nuvk SPIR-V Emitter and DLSL compiler",
+                0x002e: "Nintendo",
+                0x002f: "ARM",
+                0x0030: "Goopax",
+                0x0031: "Icyllis Milica - Arc3D Shader Compiler"
+            })
+        meta["header"]["generator-version"] = ver & 0xffff
+        meta["header"]["bound"] = self.read()
+        meta["header"]["reserved"] = self.read()
+
+        meta["stream"] = []
+        while self.buf.available():
+            inst = {}
+            opcode = self.read()
+            inst["opcode"] = utils.unraw(opcode & 0xffff, 2,
+                                         constants.SPIRV_OPCODES, True)
+            inst["length"] = opcode >> 16
+
+            self.buf.pasunit((inst["length"] - 1) * 4)
+
+            inst["arguments"] = {}
+            match inst["opcode"]:
+                case "Capability":
+                    inst["arguments"]["capability"] = utils.unraw(
+                        self.read(), 4, constants.SPIRV_CAPABILITIES, True)
+                case "ExtInstImport":
+                    inst["arguments"]["result-id"] = self.read()
+                    inst["arguments"]["name"] = self.read_string()
+                case "MemoryModel":
+                    inst["arguments"]["addressing-model"] = utils.unraw(
+                        self.read(), 4, {
+                            0x00000000: "Logical",
+                            0x00000001: "Physical32",
+                            0x00000002: "Physical64",
+                            0x000014e4: "PhysicalStorageBuffer64"
+                        }, True)
+
+                    inst["arguments"]["memory-model"] = utils.unraw(
+                        self.read(), 4, {
+                            0x00000000: "Simple",
+                            0x00000001: "GLSL450",
+                            0x00000002: "OpenCL",
+                            0x00000003: "Vulkan"
+                        }, True)
+                case "EntryPoint":
+                    inst["arguments"]["execution-model"] = utils.unraw(
+                        self.read(), 4, {
+                            0x00000000: "Vertex",
+                            0x00000001: "TessellationControl",
+                            0x00000002: "TessellationEvaluation",
+                            0x00000003: "Geometry",
+                            0x00000004: "Fragment",
+                            0x00000005: "GLCompute",
+                            0x00000006: "Kernel",
+                            0x00001493: "TaskNV",
+                            0x00001494: "MeshNV",
+                            0x000014c1: "RayGenerationKHR",
+                            0x000014c2: "IntersectionKHR",
+                            0x000014c3: "AnyHitKHR",
+                            0x000014c4: "ClosestHitKHR",
+                            0x000014c5: "MissKHR",
+                            0x000014c6: "CallableKHR",
+                            0x000014f4: "TaskEXT",
+                            0x000014f5: "MeshEXT"
+                        }, True)
+                    inst["arguments"]["entry-point-id"] = self.read()
+                    inst["arguments"]["name"] = self.read_string()
+                    inst["arguments"]["interface-ids"] = self.read_rest()
+                case "ExecutionMode":
+                    inst["arguments"]["entry-point-id"] = self.read()
+                    inst["arguments"]["execution-mode"] = utils.unraw(
+                        self.read(), 4, constants.SPIRV_EXECUTION_MODES, True)
+                    inst["arguments"]["strings"] = self.read_rest(
+                        func=self.read_string)
+                case "Source":
+                    inst["arguments"]["source-language"] = utils.unraw(
+                        self.read(), 4, {
+                            0x00000000: "Unknown",
+                            0x00000001: "ESSL",
+                            0x00000002: "GLSL",
+                            0x00000003: "OpenCL_C",
+                            0x00000004: "OpenCL_CPP",
+                            0x00000005: "HLSL",
+                            0x00000006: "CPP_for_OpenCL",
+                            0x00000007: "SYCL",
+                            0x00000008: "HERO_C",
+                            0x00000009: "NZSL",
+                            0x0000000a: "WGSL",
+                            0x0000000b: "Slang",
+                            0x0000000c: "Zig",
+                            0x0000000d: "Rust"
+                        }, True)
+                    inst["arguments"]["version"] = self.read()
+                    if self.buf.unit > 0:
+                        inst["arguments"]["file-id"] = self.read()
+                    if self.buf.unit > 0:
+                        inst["arguments"]["source"] = self.read_string()
+                case "Name":
+                    inst["arguments"]["target-id"] = self.read()
+                    inst["arguments"]["name"] = self.read_string()
+                case "Decorate":
+                    inst["arguments"]["target-id"] = self.read()
+                    inst["arguments"]["decoration"] = utils.unraw(
+                        self.read(), 4, constants.SPIRV_DECORATIONS, True)
+
+                    match inst["arguments"]["decoration"]:
+                        case _:
+                            inst["arguments"]["operands"] = self.read_rest()
+                case "TypeVoid":
+                    inst["arguments"]["result-id"] = self.read()
+                case "TypeFunction":
+                    inst["arguments"]["result-id"] = self.read()
+                    inst["arguments"]["return-type-id"] = self.read()
+                    inst["arguments"]["parameter-type-ids"] = self.read_rest()
+                case "TypeVector":
+                    inst["arguments"]["result-id"] = self.read()
+                    inst["arguments"]["component-type-id"] = self.read()
+                    inst["arguments"]["component-count"] = self.read()
+                case "TypePointer":
+                    inst["arguments"]["result-id"] = self.read()
+                    inst["arguments"]["storage-class"] = utils.unraw(
+                        self.read(), 4, constants.SPIRV_STORAGE_CLASSES, True)
+                    inst["arguments"]["type-id"] = self.read()
+                case "TypeFloat":
+                    inst["arguments"]["result-id"] = self.read()
+                    inst["arguments"]["width"] = self.read()
+                case "Variable":
+                    inst["arguments"]["result-type-id"] = self.read()
+                    inst["arguments"]["result-id"] = self.read()
+                    inst["arguments"]["storage-class"] = utils.unraw(
+                        self.read(), 4, constants.SPIRV_STORAGE_CLASSES, True)
+                    if self.buf.unit > 0:
+                        inst["arguments"]["initializer-id"] = self.read()
+                case "Function":
+                    inst["arguments"]["result-type-id"] = self.read()
+                    inst["arguments"]["result-id"] = self.read()
+                    inst["arguments"]["function-control"] = {
+                        "raw": self.read(),
+                        "names": []
+                    }
+
+                    if inst["arguments"]["function-control"][
+                            "raw"] & 0x00000001:
+                        inst["arguments"]["function-control"]["names"].append(
+                            "Inline")
+                    if inst["arguments"]["function-control"][
+                            "raw"] & 0x00000002:
+                        inst["arguments"]["function-control"]["names"].append(
+                            "DontInline")
+                    if inst["arguments"]["function-control"][
+                            "raw"] & 0x00000004:
+                        inst["arguments"]["function-control"]["names"].append(
+                            "Pure")
+                    if inst["arguments"]["function-control"][
+                            "raw"] & 0x00000008:
+                        inst["arguments"]["function-control"]["names"].append(
+                            "Const")
+                    if inst["arguments"]["function-control"][
+                            "raw"] & 0x00010000:
+                        inst["arguments"]["function-control"]["names"].append(
+                            "OptNoneExt")
+
+                    inst["arguments"]["function-type-id"] = self.read()
+                case "Label":
+                    inst["arguments"]["result-id"] = self.read()
+                case "Load":
+                    inst["arguments"]["result-type-id"] = self.read()
+                    inst["arguments"]["result-id"] = self.read()
+                    inst["arguments"]["pointer-id"] = self.read()
+                    if self.buf.unit > 0:
+                        inst["arguments"][
+                            "pointer-id"] = self.read_memory_operands()
+                case "Store":
+                    inst["arguments"]["pointer-id"] = self.read()
+                    inst["arguments"]["object-id"] = self.read()
+                    if self.buf.unit > 0:
+                        inst["arguments"][
+                            "pointer-id"] = self.read_memory_operands()
+                case "Return" | "FunctionEnd":
+                    pass
+                case _:
+                    inst["arguments"]["raw"] = self.read_rest()
+                    inst["unknown"] = True
+
+            self.buf.sapunit()
+
+            meta["stream"].append(inst)
 
         return meta
