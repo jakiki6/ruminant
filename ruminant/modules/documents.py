@@ -261,6 +261,16 @@ class PdfModule(module.RuminantModule):
         obj["value"] = self.read_value(buf)
 
         if isinstance(obj["value"], dict):
+            match obj["value"].get("Type"), obj["value"].get("Subtype"):
+                case "/Annot", _:
+                    if "AAPL:AKExtras" in obj[
+                            "value"] and "AAPL:AKAnnotationObject" in obj[
+                                "value"]["AAPL:AKExtras"]:
+                        obj["data"] = {}
+                        obj["data"]["bplist"] = chew(
+                            obj["value"]["AAPL:AKExtras"]
+                            ["AAPL:AKAnnotationObject"].encode("utf-8"))
+
             if "Length" in obj["value"]:
                 length = self.resolve(obj["value"]["Length"])
 
@@ -395,8 +405,14 @@ class PdfModule(module.RuminantModule):
                                 try:
                                     with buf:
                                         buf.restore(bak)
-                                        tokens = list(
-                                            self.tokenize(buf.rs(buf.unit)))
+                                        text = buf.rs(buf.unit)
+
+                                        assert len(text)
+                                        for char in text:
+                                            assert ord(char) >= 0x20 or ord(
+                                                char) in (0x0a, 0x0d, 0x09)
+
+                                        tokens = list(self.tokenize(text))
 
                                         values = []
                                         while len(tokens) > 0:

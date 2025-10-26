@@ -184,8 +184,11 @@ def to_uuid(blob):
 
 def mp4_time_to_iso(mp4_time):
     mp4_epoch = datetime(1904, 1, 1, tzinfo=timezone.utc)
-    dt = mp4_epoch + timedelta(seconds=mp4_time)
-    return dt.isoformat()
+    try:
+        dt = mp4_epoch + timedelta(seconds=mp4_time)
+        return dt.isoformat()
+    except OverflowError:
+        return "??? - " + str(mp4_time)
 
 
 def stream_deflate(src, dst, compressed_size, chunk_size=1 << 24):
@@ -1236,3 +1239,95 @@ def filetime_to_date(ts):
 
 def unix_to_date(ts):
     return datetime.fromtimestamp(ts, timezone.utc).isoformat()
+
+
+def read_marshal(buf, version):
+    typ = buf.ru8()
+    flag_ref = bool(typ & 0x80)  # noqa: F841
+    typ = chr(typ & 0x7f)
+
+    match typ:
+        case "c":
+            obj = {}
+
+            if version < 3250:
+                obj["co_argcount"] = buf.ru32l()
+                obj["co_nlocals"] = buf.ru32l()
+                obj["co_stacksize"] = buf.ru32l()
+                obj["co_flags"] = buf.ru32l()
+                obj["co_code"] = read_marshal(buf, version)
+                obj["co_consts"] = read_marshal(buf, version)
+                obj["co_names"] = read_marshal(buf, version)
+                obj["co_varnames"] = read_marshal(buf, version)
+                obj["co_freevars"] = read_marshal(buf, version)
+                obj["co_cellvars"] = read_marshal(buf, version)
+                obj["co_filename"] = read_marshal(buf, version)
+                obj["co_name"] = read_marshal(buf, version)
+                obj["co_firstlineno"] = buf.ru32l()
+                obj["co_lnotab"] = read_marshal(buf, version)
+            elif version < 3400:
+                obj["co_argcount"] = buf.ru32l()
+                obj["co_kwonlyargcount"] = buf.ru32l()
+                obj["co_nlocals"] = buf.ru32l()
+                obj["co_stacksize"] = buf.ru32l()
+                obj["co_flags"] = buf.ru32l()
+                obj["co_code"] = read_marshal(buf, version)
+                obj["co_consts"] = read_marshal(buf, version)
+                obj["co_names"] = read_marshal(buf, version)
+                obj["co_varnames"] = read_marshal(buf, version)
+                obj["co_freevars"] = read_marshal(buf, version)
+                obj["co_cellvars"] = read_marshal(buf, version)
+                obj["co_filename"] = read_marshal(buf, version)
+                obj["co_name"] = read_marshal(buf, version)
+                obj["co_firstlineno"] = buf.ru32l()
+                obj["co_lnotab"] = read_marshal(buf, version)
+            elif version < 3450:
+                obj["co_argcount"] = buf.ru32l()
+                obj["co_posonlyargcount"] = buf.ru32l()
+                obj["co_kwonlyargcount"] = buf.ru32l()
+                obj["co_nlocals"] = buf.ru32l()
+                obj["co_stacksize"] = buf.ru32l()
+                obj["co_flags"] = buf.ru32l()
+                obj["co_code"] = read_marshal(buf, version)
+                obj["co_consts"] = read_marshal(buf, version)
+                obj["co_names"] = read_marshal(buf, version)
+                obj["co_varnames"] = read_marshal(buf, version)
+                obj["co_freevars"] = read_marshal(buf, version)
+                obj["co_cellvars"] = read_marshal(buf, version)
+                obj["co_filename"] = read_marshal(buf, version)
+                obj["co_name"] = read_marshal(buf, version)
+                obj["co_firstlineno"] = buf.ru32l()
+                obj["co_lnotab"] = read_marshal(buf, version)
+            elif version < 3655:
+                obj["co_argcount"] = buf.ru32l()
+                obj["co_posonlyargcount"] = buf.ru32l()
+                obj["co_kwonlyargcount"] = buf.ru32l()
+                obj["co_stacksize"] = buf.ru32l()
+                obj["co_flags"] = buf.ru32l()
+                obj["co_code"] = read_marshal(buf, version)
+                return obj
+                obj["co_consts"] = read_marshal(buf, version)
+                obj["co_names"] = read_marshal(buf, version)
+                obj["co_localplusnames"] = read_marshal(buf, version)
+                obj["co_localspluskinds"] = read_marshal(buf, version)
+                obj["co_varnames"] = read_marshal(buf, version)
+                obj["co_freevars"] = read_marshal(buf, version)
+                obj["co_cellvars"] = read_marshal(buf, version)
+                obj["co_filename"] = read_marshal(buf, version)
+                obj["co_qualname"] = read_marshal(buf, version)
+                obj["co_name"] = read_marshal(buf, version)
+                obj["co_firstlineno"] = buf.ru32l()
+                obj["co_linetable"] = read_marshal(buf, version)
+                obj["co_exceptiontable"] = read_marshal(buf, version)
+            else:
+                raise ValueError(f"Unsupported version {version}")
+        case "s":
+            obj = buf.read(buf.ru32l()).hex()
+        case ")":
+            obj = []
+            for i in range(0, buf.ru32l()):
+                obj.append(read_marshal(buf, version))
+        case _:
+            raise ValueError(f"Unknown marshal typ '{typ}'")
+
+    return obj

@@ -5,6 +5,7 @@ import sqlite3
 import datetime
 import gzip
 import zlib
+import time
 
 
 @module.register
@@ -2067,5 +2068,42 @@ class SpirVModule(module.RuminantModule):
             self.buf.sapunit()
 
             meta["stream"].append(inst)
+
+        return meta
+
+
+@module.register
+class PycModule(module.RuminantModule):
+
+    def identify(buf, ctx):
+        if buf.available() < 10:
+            return False
+
+        with buf:
+            if buf.read(4)[2:] != b"\x0d\x0a":
+                return False
+
+            if buf.ru16():
+                return True
+
+            return buf.ru32() < int(time.time()) + (60 * 60 * 24 * 365 * 10)
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "pyc"
+
+        meta["header"] = {}
+        meta["header"]["magic"] = utils.unraw(self.buf.ru16l(), 2,
+                                              constants.CPYTHON_MAGICS)
+        self.buf.skip(2)
+        meta["header"]["flags"] = self.buf.ru32l()
+        if meta["header"]["flags"] & 0x0001:
+            meta["header"]["source-hash"] = self.buf.rh(8)
+        else:
+            meta["header"]["timestamp"] = utils.unix_to_date(self.buf.ru32l())
+            meta["header"]["source-length"] = self.buf.ru32l()
+
+        meta["data"] = utils.read_marshal(self.buf,
+                                          meta["header"]["magic"]["raw"])
 
         return meta

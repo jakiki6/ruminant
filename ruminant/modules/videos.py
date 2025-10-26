@@ -919,7 +919,7 @@ class IsoModule(module.RuminantModule):
             while self.buf.unit:
                 length = self.buf.ru32()
                 atom["entries"].append({
-                    "id": self.buf.ru32(),
+                    "id": self.buf.rs(4),
                     "content": self.read_atom()
                 })
         elif typ in ("clef", "prof", "enof"):

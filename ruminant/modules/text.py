@@ -12,7 +12,7 @@ class Utf8Module(module.RuminantModule):
         try:
             assert buf.available() > 0 and buf.available() < 1000000
             for i in buf.peek(buf.available()).decode("utf-8"):
-                assert ord(i) > 0
+                assert ord(i) >= 0x20 or ord(i) in (0x0a, 0x0d, 0x09)
 
             return True
         except Exception:
@@ -51,8 +51,18 @@ class Utf8Module(module.RuminantModule):
                     meta["decoder"] = "json"
                 except Exception:
                     try:
-                        blob = chew(base64.b64decode(content))
-                        assert blob["type"] != "unknown"
+                        blob = None
+                        for i in range(0, 4):
+                            try:
+                                blob = chew(
+                                    base64.b64decode(content + "=" * i,
+                                                     validate=True))
+                                break
+                            except base64.binascii.Error:
+                                pass
+
+                        assert blob is not None
+
                         content = blob
                         meta["decoder"] = "base64"
                     except Exception:
@@ -83,8 +93,10 @@ class ZeroesModule(module.RuminantModule):
             s = 0
             while buf.available() > 0:
                 s += sum(buf.read(min(buf.available(), 2**24)))
+                if s != 0:
+                    return False
 
-        return s == 0
+        return True
 
     def chew(self):
         self.buf.skip(self.buf.available())
