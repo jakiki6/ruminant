@@ -101,3 +101,92 @@ class ZeroesModule(module.RuminantModule):
     def chew(self):
         self.buf.skip(self.buf.available())
         return {"type": "zeroes"}
+
+
+@module.register
+class AndroidXmlModule(module.RuminantModule):
+
+    def identify(buf, ctx):
+        return buf.pu32l(
+        ) == 0x00080003 and buf.pu64l() >> 32 <= buf.available()
+
+    def read_chunk(self):
+        chunk = {}
+        chunk["type"] = utils.unraw(
+            self.buf.ru16l(), 2, {
+                0x0000: "RES_NULL_TYPE",
+                0x0001: "RES_STRING_POOL_TYPE",
+                0x0002: "RES_TABLE_TYPE",
+                0x0003: "RES_XML_TYPE",
+                0x0100: "RES_XML_START_NAMESPACE_TYPE",
+                0x0101: "RES_XML_END_NAMESPACE_TYPE",
+                0x0102: "RES_XML_START_ELEMENT_TYPE",
+                0x0103: "RES_XML_END_ELEMENT_TYPE",
+                0x0104: "RES_XML_CDATA_TYPE",
+                0x017f: "RES_XML_LAST_CHUNK_TYPE",
+                0x0180: "RES_XML_RESOURCE_MAP_TYPE",
+                0x0200: "RES_TABLE_PACKAGE_TYPE",
+                0x0201: "RES_TABLE_TYPE_TYPE",
+                0x0202: "RES_TABLE_TYPE_SPEC_TYPE",
+                0x0203: "RES_TABLE_LIBRARY_TYPE",
+                0x0204: "RES_TABLE_OVERLAYABLE_TYPE",
+                0x0205: "RES_TABLE_OVERLAYABLE_POLICY_TYPE",
+                0x0206: "RES_TABLE_STAGED_ALIAS_TYPE"
+            }, True)
+        chunk["header-length"] = self.buf.ru16l()
+        chunk["payload-length"] = self.buf.ru32l()
+
+        self.buf.pasunit(chunk["payload-length"] - 8)
+
+        match chunk["type"]:
+            case "RES_XML_TYPE":
+                chunk["subchunks"] = []
+                while self.buf.unit > 0:
+                    chunk["subchunks"].append(self.read_chunk())
+            case "RES_STRING_POOL_TYPE":
+                chunk["data"] = {}
+                chunk["data"]["string-count"] = self.buf.ru32l()
+                chunk["data"]["style-count"] = self.buf.ru32l()
+
+                chunk["data"]["flags"] = {
+                    "raw": self.buf.ru32l(),
+                    "names": []
+                }
+                if chunk["data"]["flags"]["raw"] & 0x00000001:
+                    chunk["data"]["flags"]["names"].append("SORTED")
+                if chunk["data"]["flags"]["raw"] & 0x00000100:
+                    chunk["data"]["flags"]["names"].append("UTF8")
+
+                chunk["data"]["strings-start"] = self.buf.ru32l()
+                chunk["data"]["styles-start"] = self.buf.ru32l()
+
+                chunk["data"]["strings"] = []
+                self.buf.skip(chunk["data"]["strings-start"] - 28)
+                encoding = "utf8" if "UTF8" in chunk["data"]["flags"]["names"] else "utf16"
+                while self.buf.unit > 0:
+                    chunk["data"]["strings"].append(self.buf.rs(self.buf.ru16l() * (2 if encoding == "utf16" else 1), encoding))
+                    self.buf.skip(2)
+            case "RES_XML_RESOURCE_MAP_TYPE":
+                chunk["data"] = [self.buf.ru32l() for i in range(0, self.buf.unit // 4)]
+            case "RES_XML_START_NAMESPACE_TYPE" | "RES_XML_START_ELEMENT_TYPE":
+                chunk["data"] = {}
+                chunk["data"]["line-number"] = self.buf.ru32l()
+                chunk["data"]["comment-index"] = self.buf.ri32l()
+            case "RES_XML_END_ELEMENT_TYPE" | "RES_XML_END_NAMESPACE_TYPE":
+                chunk["data"] = {}
+                chunk["data"]["ns-index"] = self.buf.ri32l()
+                chunk["data"]["name-index"] = self.buf.ri32l()
+            case _:
+                chunk["unknown"] = True
+
+        self.buf.sapunit()
+
+        return chunk
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "android-xml"
+
+        meta["root-chunk"] = self.read_chunk()
+
+        return meta
