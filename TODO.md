@@ -2,6 +2,7 @@
   * DJVU
   * INDD
   * WOFF2
+  * EXR
 * expand file formats
   * Jpeg XL
   * DICOM

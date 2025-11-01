@@ -497,3 +497,86 @@ class TarModule(module.RuminantModule):
                 self.buf.skip(512 - (file_length % 512))
 
         return meta
+
+
+@module.register
+class ArModule(module.RuminantModule):
+
+    def identify(buf, ctx):
+        return buf.peek(8) == b"!<arch>\n"
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "ar"
+
+        self.buf.skip(8)
+        meta["files"] = []
+        while self.buf.available() >= 58:
+            file = {}
+            file["name"] = self.buf.rs(16).rstrip(" ")
+            file["modification-time"] = utils.unix_to_date(
+                int("0" + self.buf.rs(12).rstrip(" ")))
+            file["owner-id"] = int("0" + self.buf.rs(6).rstrip(" "))
+            file["group-id"] = int("0" + self.buf.rs(6).rstrip(" "))
+            file["mode"] = self.buf.rs(8).rstrip(" ")
+            file["size"] = int("0" + self.buf.rs(10).rstrip(" "))
+            self.buf.skip(2)
+
+            if self.buf.tell() % 2 != 0:
+                self.buf.skip(1)
+
+            self.buf.pasunit(file["size"])
+            with self.buf.subunit():
+                file["content"] = chew(self.buf)
+            self.buf.sapunit()
+
+            meta["files"].append(file)
+
+        return meta
+
+
+@module.register
+class CpioModule(module.RuminantModule):
+
+    def identify(buf, ctx):
+        return buf.peek(6) in (b"070701", b"070702")
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "cpio"
+
+        meta["files"] = []
+        while self.buf.available() >= 110 and self.buf.peek(6) == b"070701":
+            file = {}
+            self.buf.skip(6)
+            file["inode"] = int(self.buf.rs(8), 16)
+            file["mode"] = self.buf.rs(8)
+            file["user-id"] = int(self.buf.rs(8), 16)
+            file["group-id"] = int(self.buf.rs(8), 16)
+            file["link-count"] = int(self.buf.rs(8), 16)
+            file["modification-time"] = utils.unix_to_date(
+                int(self.buf.rs(8), 16))
+            file["size"] = int(self.buf.rs(8), 16)
+            file["device-major"] = int(self.buf.rs(8), 16)
+            file["device-minor"] = int(self.buf.rs(8), 16)
+            file["special-device-major"] = int(self.buf.rs(8), 16)
+            file["special-device-minor"] = int(self.buf.rs(8), 16)
+            file["name-size"] = int(self.buf.rs(8), 16)
+            file["crc"] = self.buf.rs(8)
+
+            file["name"] = self.buf.rs(file["name-size"])
+            while self.buf.tell() % 4 != 0:
+                self.buf.skip(1)
+
+            if file["size"] > 0:
+                self.buf.pasunit(file["size"])
+                with self.buf.subunit():
+                    file["content"] = chew(self.buf)
+                self.buf.sapunit()
+
+                while self.buf.tell() % 4 != 0:
+                    self.buf.skip(1)
+
+            meta["files"].append(file)
+
+        return meta

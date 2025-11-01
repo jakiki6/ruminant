@@ -148,10 +148,7 @@ class AndroidXmlModule(module.RuminantModule):
                 chunk["data"]["string-count"] = self.buf.ru32l()
                 chunk["data"]["style-count"] = self.buf.ru32l()
 
-                chunk["data"]["flags"] = {
-                    "raw": self.buf.ru32l(),
-                    "names": []
-                }
+                chunk["data"]["flags"] = {"raw": self.buf.ru32l(), "names": []}
                 if chunk["data"]["flags"]["raw"] & 0x00000001:
                     chunk["data"]["flags"]["names"].append("SORTED")
                 if chunk["data"]["flags"]["raw"] & 0x00000100:
@@ -162,12 +159,18 @@ class AndroidXmlModule(module.RuminantModule):
 
                 chunk["data"]["strings"] = []
                 self.buf.skip(chunk["data"]["strings-start"] - 28)
-                encoding = "utf8" if "UTF8" in chunk["data"]["flags"]["names"] else "utf16"
+                encoding = "utf8" if "UTF8" in chunk["data"]["flags"][
+                    "names"] else "utf16"
                 while self.buf.unit > 0:
-                    chunk["data"]["strings"].append(self.buf.rs(self.buf.ru16l() * (2 if encoding == "utf16" else 1), encoding))
+                    chunk["data"]["strings"].append(
+                        self.buf.rs(
+                            self.buf.ru16l() *
+                            (2 if encoding == "utf16" else 1), encoding))
                     self.buf.skip(2)
             case "RES_XML_RESOURCE_MAP_TYPE":
-                chunk["data"] = [self.buf.ru32l() for i in range(0, self.buf.unit // 4)]
+                chunk["data"] = [
+                    self.buf.ru32l() for i in range(0, self.buf.unit // 4)
+                ]
             case "RES_XML_START_NAMESPACE_TYPE" | "RES_XML_START_ELEMENT_TYPE":
                 chunk["data"] = {}
                 chunk["data"]["line-number"] = self.buf.ru32l()
