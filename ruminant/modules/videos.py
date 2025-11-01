@@ -54,7 +54,7 @@ class IsoModule(module.RuminantModule):
         self.buf.restore(bak)
         self.buf.skipunit()
 
-    def read_atom(self):
+    def read_atom(self, root_context=None):
         offset = self.buf.tell()
 
         length = self.buf.ru32()
@@ -392,11 +392,18 @@ class IsoModule(module.RuminantModule):
             self.read_version(atom)
             atom["data"]["or"] = self.buf.readunit().hex()
         elif typ == "data":
-            self.read_version(atom)
             atom["data"]["type"] = self.buf.ru32()
-            atom["data"]["payload"] = utils.decode(
-                self.buf.readunit(),
-                "utf-16" if atom["data"]["type"] == 1 else "utf-8")
+            self.buf.skip(4)
+
+            match atom["data"]["type"]:
+                case 0x00000001:
+                    atom["data"]["payload"] = self.buf.rs(self.buf.unit)
+                case 0x00000002:
+                    atom["data"]["payload"] = self.buf.rs(
+                        self.buf.unit, "utf-16")
+                case _:
+                    with self.buf.subunit():
+                        atom["data"]["payload"] = chew(self.buf)
         elif typ in ("free", "skip"):
             atom["data"]["non-zero"] = sum(self.buf.peek(self.buf.unit)) > 0
             if atom["data"]["non-zero"]:
@@ -918,9 +925,12 @@ class IsoModule(module.RuminantModule):
             atom["entries"] = []
             while self.buf.unit:
                 length = self.buf.ru32()
+                i = self.buf.rs(4)
                 atom["entries"].append({
-                    "id": self.buf.rs(4),
-                    "content": self.read_atom()
+                    "id":
+                    i,
+                    "content":
+                    self.read_atom(root_context=i)
                 })
         elif typ in ("clef", "prof", "enof"):
             self.read_version(atom)
