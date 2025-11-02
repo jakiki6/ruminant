@@ -1,4 +1,5 @@
 from .. import module, utils, constants
+from ..buf import Buf
 from . import chew
 import tempfile
 import sqlite3
@@ -1007,6 +1008,11 @@ class ElfModule(module.RuminantModule):
 
                 self.buf.popunit()
 
+        for sh in meta["section-headers"]:
+            if sh["name"]["string"] == ".strtab":
+                with self.buf:
+                    self.buf.seek(sh["offset"])
+                    self.namebuf = Buf(self.buf.read(sh["size"]))
         m = 0
 
         for ph in meta["program-headers"]:
@@ -1096,6 +1102,40 @@ class ElfModule(module.RuminantModule):
                                 sh["unknown"] = True
 
                         self.buf.popunit()
+                    elif sh["name"]["string"] == ".symtab":
+                        sh["parsed"]["symbols"] = []
+                        while self.buf.available() > 0:
+                            sym = {}
+                            sym["name"] = {
+                                "index":
+                                self.buf.ru32l()
+                                if self.little else self.buf.ru32()
+                            }
+                            self.namebuf.seek(sym["name"]["index"])
+                            sym["name"]["string"] = self.namebuf.rzs()
+
+                            if self.wide:
+                                sym["info"] = self.buf.ru8()
+                                sym["other"] = self.buf.ru8()
+                                sym["section-index"] = self.buf.ru16l(
+                                ) if self.little else self.buf.ru16()
+                                sym["addr"] = hex(
+                                    self.buf.ru64l() if self.little else self.
+                                    buf.ru64())[2:].zfill(8)
+                                sym["size"] = self.buf.ru64l(
+                                ) if self.little else self.buf.ru64()
+                            else:
+                                sym["addr"] = hex(
+                                    self.buf.ru32l() if self.little else self.
+                                    buf.ru32())[2:].zfill(16)
+                                sym["size"] = self.buf.ru32l(
+                                ) if self.little else self.buf.ru32()
+                                sym["info"] = self.buf.ru8()
+                                sym["other"] = self.buf.ru8()
+                                sym["section-index"] = self.buf.ru16l(
+                                ) if self.little else self.buf.ru16()
+
+                            sh["parsed"]["symbols"].append(sym)
                     else:
                         del sh["parsed"]
 
