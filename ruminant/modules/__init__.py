@@ -38,6 +38,8 @@ class EntryModule(module.RuminantModule):
         else:
             for m in module.modules:
                 if m.identify(self.buf, {"walk": self.walk_mode}):
+                    old_offset = self.buf.tell()
+
                     try:
                         rest = m(self.buf).chew()
                     except Exception as e:
@@ -68,16 +70,21 @@ class EntryModule(module.RuminantModule):
 
                     matched = True
 
+                    new_offset = self.buf.tell()
                     if self.buf.available(
-                    ) and not self.walk_mode and not self.flat:
+                    ) > 0 and not self.walk_mode and not self.flat:
                         with self.buf.cut():
                             meta = {"type": "nested", "segments": [meta]}
 
-                            trailer = self.chew()
-                            if trailer["type"] == "nested":
-                                meta["segments"] += trailer["segments"]
+                            if new_offset == old_offset:
+                                self.blob_mode = True
+                                meta["segments"].append(self.chew())
                             else:
-                                meta["segments"].append(trailer)
+                                trailer = self.chew()
+                                if trailer["type"] == "nested":
+                                    meta["segments"] += trailer["segments"]
+                                else:
+                                    meta["segments"].append(trailer)
 
                         self.buf.skip(self.buf.available())
                     break
