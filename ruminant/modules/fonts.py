@@ -4,6 +4,7 @@ from . import chew
 
 @module.register
 class TrueTypeModule(module.RuminantModule):
+    desc = "TrueType font files."
 
     def identify(buf, ctx):
         return buf.peek(5) in (b"\x00\x01\x00\x00\x00", b"OTTO\x00")

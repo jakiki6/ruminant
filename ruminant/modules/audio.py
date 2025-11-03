@@ -6,6 +6,7 @@ import json
 
 @module.register
 class FlacModule(module.RuminantModule):
+    desc = "FLAC audio files."
 
     def identify(buf, ctx):
         return buf.peek(4) == b"fLaC"
@@ -113,6 +114,7 @@ class FlacModule(module.RuminantModule):
 
 @module.register
 class ID3v2Module(module.RuminantModule):
+    desc = "ID3 version 2 metadata in MP3 files or MPEG-TS streams."
 
     def identify(buf, ctx):
         return buf.peek(3) == b"ID3"

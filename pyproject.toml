@@ -25,3 +25,14 @@ ruminant = "ruminant.main:main"
 [project.urls]
 "Homepage" = "https://github.com/jakiki6/ruminant"
 "Issues" = "https://github.com/jakiki6/ruminant/issues"
+
+[project.optional-dependencies]
+recommended = [
+  "tqdm",
+  "pyzstd",
+  "backports.zstd"
+]
+dev = [
+  "yapf",
+  "flake8"
+]

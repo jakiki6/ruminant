@@ -11,6 +11,7 @@ import time
 
 @module.register
 class WasmModule(module.RuminantModule):
+    desc = "WASM module files."
 
     def identify(buf, ctx):
         return buf.peek(4) == b"\x00asm"
@@ -166,6 +167,7 @@ class WasmModule(module.RuminantModule):
 
 @module.register
 class TorrentModule(module.RuminantModule):
+    desc = "BitTorrent files."
 
     def identify(buf, ctx):
         with buf:
@@ -194,6 +196,7 @@ class TorrentModule(module.RuminantModule):
 
 @module.register
 class Sqlite3Module(module.RuminantModule):
+    desc = "sqlite3 database files."
 
     def identify(buf, ctx):
         return buf.peek(16) == b"SQLite format 3\x00"
@@ -256,6 +259,8 @@ class Sqlite3Module(module.RuminantModule):
 
 @module.register
 class JavaClassModule(module.RuminantModule):
+    desc = "Java class files including a disassembler."
+
     NAMES = [
         "nop", "aconst_null", "iconst_m1", "iconst_0", "iconst_1", "iconst_2",
         "iconst_3", "iconst_4", "iconst_5", "lconst_0", "lconst_1", "fconst_0",
@@ -649,6 +654,7 @@ class JavaClassModule(module.RuminantModule):
 
 @module.register
 class ElfModule(module.RuminantModule):
+    desc = "ELF files."
 
     def identify(buf, ctx):
         return buf.peek(4) == b"\x7fELF"
@@ -1136,6 +1142,10 @@ class ElfModule(module.RuminantModule):
                                 ) if self.little else self.buf.ru16()
 
                             sh["parsed"]["symbols"].append(sym)
+                    elif sh["name"]["string"] == ".modinfo":
+                        sh["parsed"]["entries"] = []
+                        while self.buf.available() > 0:
+                            sh["parsed"]["entries"].append(self.buf.rzs())
                     else:
                         del sh["parsed"]
 
@@ -1153,6 +1163,7 @@ class ElfModule(module.RuminantModule):
 
 @module.register
 class PeModule(module.RuminantModule):
+    desc = "PE files like EXE or EFI files."
 
     def identify(buf, ctx):
         return buf.peek(2) == b"MZ"
@@ -1636,6 +1647,7 @@ class PeModule(module.RuminantModule):
 
 @module.register
 class NbtModule(module.RuminantModule):
+    desc = "Minecraft NBT files."
 
     def identify(buf, ctx):
         return (not ctx["walk"]) and (buf.pu32() & 0xffffffc0 == 0x0a000000)
@@ -1655,6 +1667,7 @@ class NbtModule(module.RuminantModule):
 @module.register
 class McaModule(module.RuminantModule):
     priority = 1
+    desc = "Minecraft chunk region files."
 
     def identify(buf, ctx):
         if ctx["walk"]:
@@ -1755,6 +1768,7 @@ class McaModule(module.RuminantModule):
 
 @module.register
 class GrubModuleModule(module.RuminantModule):
+    desc = "GRUB 2 module files."
 
     def identify(buf, ctx):
         return buf.peek(4) == b"mimg"
@@ -1811,6 +1825,7 @@ class GrubModuleModule(module.RuminantModule):
 
 @module.register
 class SpirVModule(module.RuminantModule):
+    desc = "SPIR-V Vulkan shader files."
 
     def identify(buf, ctx):
         return buf.peek(4) in (b"\x07\x23\x02\x03", b"\x03\x02\x23\x07")
@@ -2114,6 +2129,7 @@ class SpirVModule(module.RuminantModule):
 
 @module.register
 class PycModule(module.RuminantModule):
+    desc = "Python compiled bytecode files, currently kinda broken."
 
     def identify(buf, ctx):
         if buf.available() < 10:
@@ -2145,5 +2161,193 @@ class PycModule(module.RuminantModule):
 
         meta["data"] = utils.read_marshal(self.buf,
                                           meta["header"]["magic"]["raw"])
+
+        return meta
+
+
+@module.register
+class BlendModule(module.RuminantModule):
+    desc = "Blender project files, currently kinda broken."
+
+    def identify(buf, ctx):
+        return buf.peek(7) == b"BLENDER"
+
+    def r16(self):
+        match self.mode:
+            case "le32" | "le64":
+                return self.buf.ru16l()
+            case "be32" | "be64":
+                return self.buf.ru16()
+
+    def r32(self):
+        match self.mode:
+            case "le32" | "le64":
+                return self.buf.ru32l()
+            case "be32" | "be64":
+                return self.buf.ru32()
+
+    def rptr(self):
+        match self.mode:
+            case "le32":
+                return self.buf.ru32l()
+            case "le64":
+                return self.buf.ru64l()
+            case "be32":
+                return self.buf.ru32()
+            case "be64":
+                return self.buf.ru64()
+
+    def rptrh(self):
+        return hex(self.rptr())[2:].zfill(8 if "32" in self.mode else 16)
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "blend"
+        self.buf.skip(7)
+        meta["mode"] = {
+            "_v": "le32",
+            "_V": "be32",
+            "-v": "le64",
+            "-V": "be64"
+        }[self.buf.rs(2)]
+        self.mode = meta["mode"]
+        meta["version"] = int(self.buf.rs(3))
+
+        meta["blocks"] = []
+        while self.buf.available() > 0:
+            block = {}
+            block["type"] = self.buf.rs(4)
+            block["size"] = self.r32()
+            block["ptr"] = self.rptrh()
+            block["sdna-index"] = self.r32()
+            block["count"] = self.r32()
+
+            self.buf.pasunit(block["size"])
+
+            block["data"] = {}
+            match block["type"]:
+                case "DNA1":
+                    self.buf.skip(4)
+                    block["data"]["sections"] = []
+
+                    with self.buf.subunit():
+                        while self.buf.available() > 0:
+                            section = {}
+                            section["name"] = self.buf.rs(4)
+                            section["data"] = {}
+
+                            match section["name"]:
+                                case "NAME" | "TYPE":
+                                    section["data"]["count"] = self.r32()
+                                    section["data"]["strings"] = [
+                                        self.buf.rzs() for i in range(
+                                            0, section["data"]["count"])
+                                    ]
+                                case "TLEN":
+                                    count = 0
+                                    for s in block["data"]["sections"]:
+                                        if s["name"] == "TYPE":
+                                            count = len(s["data"]["strings"])
+                                            break
+
+                                    section["data"]["sizes"] = [
+                                        self.r16() for i in range(0, count)
+                                    ]
+                                case _:
+                                    section["unknown"] = True
+                                    self.buf.skip(self.buf.available())
+
+                            block["data"]["sections"].append(section)
+                            while self.buf.tell() % 4 != 0:
+                                self.buf.skip(1)
+                case _:
+                    block["unknown"] = True
+                    with self.buf.subunit():
+                        block["data"]["blob"] = chew(self.buf)
+
+            self.buf.sapunit()
+            meta["blocks"].append(block)
+
+        return meta
+
+
+@module.register
+class GitModule(module.RuminantModule):
+    desc = "Git-related files"
+
+    def identify(buf, ctx):
+        try:
+            with buf:
+                line = buf.rzs()
+                line = line.split(" ")
+                assert len(line) == 2
+                assert line[0] in ("blob", "tree", "commit")
+                int(line[1])
+                return True
+        except Exception:
+            return False
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "git"
+
+        line = self.buf.rzs().split(" ")
+        meta["header"] = {}
+        meta["header"]["type"] = line[0]
+        meta["header"]["length"] = int(line[1])
+
+        self.buf.pasunit(meta["header"]["length"])
+
+        match meta["header"]["type"]:
+            case "tree":
+                meta["data"] = []
+                while self.buf.unit > 0:
+                    line = self.buf.rzs().split(" ")
+                    meta["data"].append({
+                        "filename": line[1],
+                        "mode": line[0],
+                        "sha1": self.buf.rh(20)
+                    })
+            case "blob":
+                with self.buf.subunit():
+                    meta["data"] = chew(self.buf)
+            case "commit":
+                meta["data"] = {}
+                meta["data"]["header"] = []
+                while True:
+                    line = utils.decode(self.buf.rl())
+                    if line == "":
+                        break
+
+                    if line.startswith("gpgsig"):
+                        line += "\n" + utils.decode(self.buf.rl()).strip()
+
+                        while not line.endswith("-----"):
+                            line += "\n" + utils.decode(self.buf.rl()).strip()
+
+                    line = line.split(" ")
+                    meta["data"]["header"].append({
+                        "key": line[0],
+                        "value": " ".join(line[1:])
+                    })
+
+                meta["data"]["commit-message"] = self.buf.rs(
+                    self.buf.unit).strip().split("\n")
+
+                for header in meta["data"]["header"]:
+                    match header["key"]:
+                        case "gpgsig":
+                            header["parsed"] = chew(
+                                header["value"].encode("utf-8"))
+                        case "author" | "committer":
+                            header["parsed"] = {}
+                            line = header["value"].split(" ")
+                            header["parsed"]["name"] = " ".join(line[:-3])
+                            header["parsed"]["email"] = line[-3][1:-1]
+                            header["parsed"]["timestamp"] = utils.unix_to_date(
+                                int(line[-2]))
+                            header["parsed"]["timezone"] = line[-1]
+
+        self.buf.sapunit()
 
         return meta

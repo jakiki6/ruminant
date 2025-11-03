@@ -4,10 +4,13 @@ from . import chew
 import datetime
 import tempfile
 import zlib
+import math
+import sys
 
 
 @module.register
 class GzipModule(module.RuminantModule):
+    desc = "gzip steams."
 
     def identify(buf, ctx):
         return buf.peek(2) == b"\x1f\x8b"
@@ -114,6 +117,7 @@ class GzipModule(module.RuminantModule):
 
 @module.register
 class Bzip2Module(module.RuminantModule):
+    desc = "bzip2 streams."
 
     def identify(buf, ctx):
         return buf.peek(2) == b"BZ"
@@ -133,5 +137,126 @@ class Bzip2Module(module.RuminantModule):
 
             fd.seek(0)
             meta["data"] = chew(fd)
+
+        return meta
+
+
+@module.register
+class ZstdModule(module.RuminantModule):
+    desc = "Zstandard streams.\nIdeally, you should install pyzstd or backports.zstd or run Python version 3.14 or higher to allow decompression of the content."
+
+    def identify(buf, ctx):
+        return buf.peek(4) == b"\x28\xb5\x2f\xfd"
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "zstd"
+
+        has_zstd = True
+        try:
+            import pyzstd as zstd
+        except ImportError:
+            try:
+                if sys.version_info >= (3, 14):
+                    from compression import zstd
+                else:
+                    from backports import zstd
+            except ImportError:
+                has_zstd = False
+
+        with self.buf:
+            self.buf.skip(4)
+            meta["header"] = {}
+            meta["header"]["flags"] = {"raw": self.buf.ru8(), "names": []}
+
+            meta["header"]["flags"]["names"].append(
+                ["FCS_1", "FCS_2", "FCS_4",
+                 "FCS_8"][meta["header"]["flags"]["raw"] >> 6])
+            if meta["header"]["flags"]["raw"] & (1 << 5):
+                meta["header"]["flags"]["names"].append("SINGLE_SEGMENT")
+                if "FCS_1" in meta["header"]["flags"]["names"]:
+                    meta["header"]["flags"]["names"].remove("FCS_1")
+            if meta["header"]["flags"]["raw"] & (1 << 2):
+                meta["header"]["flags"]["names"].append("CONTENT_CHECKSUM")
+            if meta["header"]["flags"]["raw"] & 0x03:
+                meta["header"]["flags"]["names"].append(
+                    [None, "DID_1", "DID_2",
+                     "DID_4"][meta["header"]["flags"]["raw"] & 0x03])
+
+            if "SINGLE_SEGMENT" not in meta["header"]["flags"]["names"]:
+                temp = self.buf.ru8()
+                exponent = temp >> 3
+                mantissa = temp & 0x03
+                meta["header"]["window-size"] = math.ceil(
+                    ((1 << (exponent + 10)) / 8) * mantissa +
+                    (1 << (exponent + 10)))
+
+            if "DID_1" in meta["header"]["flags"]["names"]:
+                meta["header"]["dictionary-id"] = self.buf.ru8()
+            elif "DID_2" in meta["header"]["flags"]["names"]:
+                meta["header"]["dictionary-id"] = self.buf.ru16l()
+            elif "DID_4" in meta["header"]["flags"]["names"]:
+                meta["header"]["dictionary-id"] = self.buf.ru32l()
+
+            if "FCS_1" in meta["header"]["flags"]["names"]:
+                meta["header"]["frame-content-size"] = self.buf.ru8()
+            elif "FCS_2" in meta["header"]["flags"]["names"]:
+                meta["header"]["frame-content-size"] = self.buf.ru16l()
+            elif "FCS_4" in meta["header"]["flags"]["names"]:
+                meta["header"]["frame-content-size"] = self.buf.ru32l()
+            elif "FCS_8" in meta["header"]["flags"]["names"]:
+                meta["header"]["frame-content-size"] = self.buf.ru64l()
+
+            base = self.buf.tell()
+
+        self.buf.seek(base)
+        while True:
+            header = self.buf.ru24l()
+            last = header & 0x01
+            typ = (header >> 1) & 0x03
+            length = header >> 3
+
+            if typ == 0 or typ == 2:
+                self.buf.skip(length)
+            else:
+                self.buf.skip(1)
+
+            if last:
+                break
+
+        if "CONTENT_CHECKSUM" in meta["header"]["flags"]["names"]:
+            self.buf.skip(4)
+
+        if has_zstd:
+            offset = self.buf.tell()
+
+            with self.buf:
+                self.buf.seek(0)
+
+                decompressor = zstd.ZstdDecompressor()
+                fd = utils.tempfd()
+                utils.stream_generic(decompressor, self.buf, fd, offset)
+
+                fd.seek(0)
+                meta["data"] = chew(fd)
+
+        return meta
+
+
+@module.register
+class ZlibModule(module.RuminantModule):
+    desc = "zlib streams."
+
+    def identify(buf, ctx):
+        return buf.peek(2) in (b"\x78\x01", b"\x78\x9c", b"\x78\xda")
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "zlib"
+
+        fd = utils.tempfd()
+        utils.stream_zlib(self.buf, fd, self.buf.available())
+        fd.seek(0)
+        meta["data"] = chew(fd)
 
         return meta

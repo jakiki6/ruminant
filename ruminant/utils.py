@@ -10,6 +10,7 @@ import bz2
 import base64
 import struct
 import json
+import tempfile
 
 
 def _xml_to_dict(elem):
@@ -215,6 +216,35 @@ def stream_bzip2(src, dst, compressed_size, chunk_size=1 << 24):
         remaining -= len(chunk)
 
     src.seek(-len(decompressor.unused_data), 1)
+
+
+def stream_generic(decompressor,
+                   src,
+                   dst,
+                   compressed_size,
+                   chunk_size=1 << 24):
+    remaining = compressed_size
+
+    while remaining > 0:
+        chunk = src.read(min(chunk_size, remaining))
+        dst.write(decompressor.decompress(chunk))
+        remaining -= len(chunk)
+
+    src.seek(-len(decompressor.unused_data), 1)
+
+
+def stream_zlib(src, dst, compressed_size, chunk_size=1 << 24):
+    remaining = compressed_size
+    decompressor = zlib.decompressobj()
+
+    while remaining > 0:
+        chunk = src.read(min(chunk_size, remaining))
+        dst.write(decompressor.decompress(chunk))
+        remaining -= len(chunk)
+
+    flushed = decompressor.flush()
+    if flushed:
+        dst.write(flushed)
 
 
 def read_oid(buf, limit=-1):
@@ -1331,3 +1361,7 @@ def read_marshal(buf, version):
             raise ValueError(f"Unknown marshal typ '{typ}'")
 
     return obj
+
+
+def tempfd():
+    return tempfile.TemporaryFile()

@@ -18,6 +18,7 @@ def mp4_decode_language(lang_bytes):
 
 @module.register
 class IsoModule(module.RuminantModule):
+    desc = "ISO Base Media files.\nThis includes may file formats like MP4, HEIC/HEIF, AVIF or JPEG2000."
 
     def identify(buf, ctx):
         return buf.peek(8)[4:] in (b"ftyp", b"styp", b"jP  ", b"jumb")
@@ -1349,6 +1350,8 @@ class IsoModule(module.RuminantModule):
 
 @module.register
 class MatroskaModule(module.RuminantModule):
+    desc = "Matroska files like WebM or MKV files."
+
     FIELDS = {
         0x1a45dfa3: ("EMBL", "master"),
         0x18538067: ("Segment", "master"),
@@ -1592,6 +1595,7 @@ class MatroskaModule(module.RuminantModule):
 
 @module.register
 class OggModule(module.RuminantModule):
+    desc = "Ogg files like OGG or OGV files."
 
     def identify(buf, ctx):
         return buf.peek(4) == b"OggS"
@@ -1753,6 +1757,7 @@ class OggModule(module.RuminantModule):
 
 @module.register
 class MpegTsModule(module.RuminantModule):
+    desc = "MPEG transport stream files like the ones served on the web by M3U8 playlists."
 
     def identify(buf, ctx):
         if buf.available() < 188:
@@ -2017,6 +2022,7 @@ class MpegTsModule(module.RuminantModule):
 
 @module.register
 class AsfModule(module.RuminantModule):
+    desc = "Advanced Systems Format files like WMA or WMV files."
 
     def identify(buf, ctx):
         return buf.available() > 16 and buf.pguid(

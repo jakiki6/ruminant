@@ -1,4 +1,4 @@
-from . import modules
+from . import modules, module
 from .buf import Buf
 import argparse
 import sys
@@ -105,10 +105,6 @@ def main(dev=False):
         signal.signal(signal.SIGUSR1, print_stacktrace)
 
         if len(sys.argv) == 2 and sys.argv[1] == "--dev":
-            if sys.platform != "linux":
-                print("This only works on Linux.")
-                exit(1)
-
             if not os.path.isdir(os.path.expanduser("~/ruminant")):
                 print("Please clone the repo to ~/ruminant first.")
                 exit(1)
@@ -155,6 +151,10 @@ def main(dev=False):
                         nargs="?",
                         help="Filename regex for directory mode")
 
+    parser.add_argument("--print-modules",
+                        action="store_true",
+                        help="Print list of registered modules and exit")
+
     has_tqdm = True
     try:
         import tqdm
@@ -172,6 +172,18 @@ def main(dev=False):
                             help="Print filenames in the progress bar")
 
     args = parser.parse_args()
+
+    if args.print_modules:
+        print(
+            f"There are {len(module.modules)} currently registered module{'' if len(module.modules) == 1 else 's'}:"
+        )
+        for mod in module.modules:
+            print(f"  * {mod.__name__}")
+            if mod.desc != "":
+                for line in mod.desc.strip().split("\n"):
+                    print(f"      {line}")
+
+        exit(0)
 
     if has_tqdm:
         has_tqdm = args.progress

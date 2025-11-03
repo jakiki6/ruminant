@@ -9,6 +9,7 @@ import json
 @module.register
 class DerModule(module.RuminantModule):
     priority = 1
+    desc = "ASN.1 DER binary files detected on a best-effort basis."
 
     def identify(buf, ctx):
         return buf.pu8() == 0x30 and (buf.pu16() & 0xf0) in (0x80, 0x30)
@@ -32,6 +33,7 @@ class DerModule(module.RuminantModule):
 
 @module.register
 class PemModule(module.RuminantModule):
+    desc = "PEM encoded files."
 
     def identify(buf, ctx):
         return buf.peek(27) == b"-----BEGIN CERTIFICATE-----" or buf.peek(
@@ -63,6 +65,7 @@ class PemModule(module.RuminantModule):
 
 @module.register
 class PgpModule(module.RuminantModule):
+    desc = "Binary or armored PGP files."
 
     def identify(buf, ctx):
         if buf.pu8() in (0x85, 0x89) and buf.peek(4)[3] in (0x03, 0x04):
@@ -125,6 +128,7 @@ class PgpModule(module.RuminantModule):
 
 @module.register
 class KdbxModule(module.RuminantModule):
+    desc = "KeePass database files."
 
     def identify(buf, ctx):
         return buf.peek(8) == b"\x03\xd9\xa2\x9ag\xfbK\xb5"
@@ -281,6 +285,7 @@ class KdbxModule(module.RuminantModule):
 
 @module.register
 class AgeModule(module.RuminantModule):
+    desc = "age encrypted files including the tlock extension."
 
     def identify(buf, ctx):
         return buf.peek(
@@ -362,6 +367,7 @@ class AgeModule(module.RuminantModule):
 
 @module.register
 class LuksModule(module.RuminantModule):
+    desc = "Linux Unified Key Setup version 2 headers."
 
     def identify(buf, ctx):
         return buf.peek(6) == b"LUKS\xba\xbe"
@@ -404,5 +410,62 @@ class LuksModule(module.RuminantModule):
             m = max(m, int(v.get("offset", 0)) + int(v.get("size", 0)))
 
         self.buf.seek(m)
+
+        return meta
+
+
+@module.register
+class SshSignatureModule(module.RuminantModule):
+    desc = "SSH signatures like the ones that Git uses"
+
+    def identify(buf, ctx):
+        return buf.peek(29) == b"-----BEGIN SSH SIGNATURE-----"
+
+    def rb(self, buf=None):
+        if buf is None:
+            buf = self.ibuf
+
+        return buf.read(self.ibuf.ru32())
+
+    def rs(self, buf=None):
+        if buf is None:
+            buf = self.ibuf
+
+        return buf.rs(self.ibuf.ru32())
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "ssh-signature"
+
+        self.buf.rl()
+        lines = b""
+        while True:
+            line = self.buf.rl()
+            if line == b"-----END SSH SIGNATURE-----":
+                break
+
+            lines += line
+
+        self.ibuf = Buf(base64.b64decode(lines))
+        self.ibuf.skip(6)
+
+        meta["data"] = {}
+        meta["data"]["version"] = self.ibuf.ru32()
+
+        self.ibuf.pasunit(self.ibuf.ru32())
+        meta["data"]["public-key"] = {}
+        meta["data"]["public-key"]["algorithm"] = self.rs()
+        meta["data"]["public-key"]["blob"] = self.rb().hex()
+        self.ibuf.sapunit()
+
+        meta["data"]["namespace"] = self.rs()
+        meta["data"]["reserved"] = self.rs()
+        meta["data"]["hash-algorithm"] = self.rs()
+
+        self.ibuf.pasunit(self.ibuf.ru32())
+        meta["data"]["signature"] = {}
+        meta["data"]["signature"]["algorithm"] = self.rs()
+        meta["data"]["signature"]["blob"] = self.rb().hex()
+        self.ibuf.sapunit()
 
         return meta

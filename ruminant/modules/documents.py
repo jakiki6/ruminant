@@ -72,6 +72,8 @@ class ReparsePoint(Exception):
 
 @module.register
 class PdfModule(module.RuminantModule):
+    desc = "PDF files.\nOn a side note: I fucking hate this format. Chances are, the PDF file you have\nwon't be parsable by ruminant because of some stupid edge case that the\nspecification allows. I recently obtained a PDF file that was published by\nSignal that literally had a broken xref table so I had to implement a feature\nto compensate for a global pointer offset. DEFLATE decompression is also done\nbyte-wise where you have to drop a byte if it produces an error and continue\nwith the next byte. Why Adobe? WHY???"
+
     TOKEN_PATTERN = re.compile(
         r"( << | >> | \[ | \] | /[^\s<>/\[\]()]+ | \d+\s+\d+\s+R | \d+\.\d+ | \d+ | \( (?: [^\\\)] | \\ . )* \) | <[0-9A-Fa-f\s]*> | true | false | null )",
         re.VERBOSE | re.DOTALL,
@@ -618,6 +620,7 @@ class PdfModule(module.RuminantModule):
 
 @module.register
 class Ole2Module(module.RuminantModule):
+    desc = "OLE2 files.\nThis includes DOC files and MSI files. Currently in development and very much broken."
 
     def identify(buf, ctx):
         return buf.peek(8) == b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"

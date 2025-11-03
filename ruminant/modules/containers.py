@@ -6,6 +6,7 @@ import tempfile
 
 @module.register
 class ZipModule(module.RuminantModule):
+    desc = "ZIP files.\nThis includes file formats that use ZIP files as a container like e.g. DOCX or JAR files."
 
     def identify(buf, ctx):
         return buf.peek(4) == b"\x50\x4b\x03\x04"
@@ -85,6 +86,7 @@ class ZipModule(module.RuminantModule):
 
 @module.register
 class RIFFModule(module.RuminantModule):
+    desc = "RIFF files.\nThis includes file types like WebP, WAV, AVI or DjVu."
 
     def identify(buf, ctx):
         return buf.peek(4) in (b"RIFF", b"AT&T")
@@ -430,6 +432,7 @@ class RIFFModule(module.RuminantModule):
 
 @module.register
 class TarModule(module.RuminantModule):
+    desc = "TAR files or more specifically USTAR files."
 
     def identify(buf, ctx):
         return buf.peek(262)[257:] == b"ustar"
@@ -501,6 +504,7 @@ class TarModule(module.RuminantModule):
 
 @module.register
 class ArModule(module.RuminantModule):
+    desc = "Unix ar files like the ones produced for static libraries."
 
     def identify(buf, ctx):
         return buf.peek(8) == b"!<arch>\n"
@@ -537,6 +541,7 @@ class ArModule(module.RuminantModule):
 
 @module.register
 class CpioModule(module.RuminantModule):
+    desc = "ASCII cpio files like the ones used for the Linux initramfs."
 
     def identify(buf, ctx):
         return buf.peek(6) in (b"070701", b"070702")

@@ -7,6 +7,7 @@ import base64
 @module.register
 class Utf8Module(module.RuminantModule):
     priority = 1
+    desc = "UTF-8 encoded text.\nThis is detected on a best-effort basis and also tries to detect base64, XML or JSON encoding."
 
     def identify(buf, ctx):
         try:
@@ -76,6 +77,7 @@ class Utf8Module(module.RuminantModule):
 
 @module.register
 class EmptyModule(module.RuminantModule):
+    desc = "Empty files."
 
     def identify(buf, ctx):
         return buf.available() == 0
@@ -87,6 +89,7 @@ class EmptyModule(module.RuminantModule):
 @module.register
 class ZeroesModule(module.RuminantModule):
     priorty = 2
+    desc = "Files containing only zero bytes."
 
     def identify(buf, ctx):
         with buf:
@@ -105,6 +108,7 @@ class ZeroesModule(module.RuminantModule):
 
 @module.register
 class AndroidXmlModule(module.RuminantModule):
+    desc = "Android binary XML files."
 
     def identify(buf, ctx):
         return buf.pu32l(

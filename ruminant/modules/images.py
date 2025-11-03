@@ -8,6 +8,8 @@ import gzip
 
 @module.register
 class IRBModule(module.RuminantModule):
+    desc = "IRB chunks inserted into JPEG files by Adobe Photoshop."
+
     RESOURCE_IDS = {
         1000: "Number of channels, rows, columns, depth, and mode (obsolete)",
         1001: "Macintosh print manager print info record",
@@ -557,6 +559,7 @@ class IRBModule(module.RuminantModule):
 
 @module.register
 class ICCProfileModule(module.RuminantModule):
+    desc = "ICC profile files."
 
     def read_tag(self, offset, length):
         tag = {}
@@ -851,6 +854,8 @@ class ICCProfileModule(module.RuminantModule):
 
 @module.register
 class JPEGModule(module.RuminantModule):
+    desc = "JPEG files."
+
     HAS_PAYLOAD = [
         0xc0,  # SOF0: Baseline DCT
         0xc1,  # SOF1: Extended sequential DCT
@@ -1215,6 +1220,7 @@ class JPEGModule(module.RuminantModule):
 
 @module.register
 class PNGModule(module.RuminantModule):
+    desc = "PNG files."
 
     def identify(buf, ctx):
         return buf.peek(8) == b"\x89PNG\r\n\x1a\n"
@@ -1504,6 +1510,8 @@ class PNGModule(module.RuminantModule):
 
 @module.register
 class TIFFModule(module.RuminantModule):
+    desc = "TIFF files including EXIF metadata."
+
     TAG_IDS = {
         "tiff": {
             0: "GPSVersionID",
@@ -2239,6 +2247,7 @@ class TIFFModule(module.RuminantModule):
 
 @module.register
 class GifModule(module.RuminantModule):
+    desc = "GIF files."
 
     def identify(buf, ctx):
         return buf.peek(3) == b"GIF"
@@ -2381,6 +2390,7 @@ class GifModule(module.RuminantModule):
 
 @module.register
 class HdrpMakernoteModule(module.RuminantModule):
+    desc = "Google HDR+ Makernote data, reverse engineered by me :D."
 
     def identify(buf, ctx):
         return buf.peek(4) == b"HDRP"
@@ -2432,6 +2442,7 @@ class HdrpMakernoteModule(module.RuminantModule):
 
 @module.register
 class PsdModule(IRBModule):
+    desc = "Adobe Photoshop files."
 
     def identify(buf, ctx):
         return buf.peek(4) == b"8BPS"
@@ -2610,6 +2621,7 @@ class PsdModule(IRBModule):
 
 @module.register
 class JpegXlModule(module.RuminantModule):
+    desc = "JPEG XL files, todo."
 
     def identify(buf, ctx):
         return buf.peek(2) == b"\xff\x0a"
@@ -2626,6 +2638,7 @@ class JpegXlModule(module.RuminantModule):
 
 @module.register
 class DicomModule(module.RuminantModule):
+    desc = "DICOM files like the ones you get on a CD after an MRI."
 
     def identify(buf, ctx):
         return buf.peek(128 + 4)[128:] == b"DICM"

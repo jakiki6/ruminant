@@ -91,6 +91,9 @@ Ruminant is still in early alpha but it can already process the following file t
 * SPIR-V binaries
 * Ar archives
 * Cpio archives
+* Zstd files
+* SSH signatures
+* Git object files
 
 # How do I install it?
 Run `pip3 install ruminant`.

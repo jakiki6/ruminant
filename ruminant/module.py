@@ -10,6 +10,7 @@ def register(cls):
 
 class RuminantModule(object):
     priority = 0
+    desc = ""
 
     def __init__(self, buf):
         self.buf = buf
