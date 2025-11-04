@@ -95,6 +95,9 @@
 1.2.840.10008.5.1.4.1.1: Computed radiography image storage
 1.2.840.10008.5.1.4.1.1.4: Magnetic Resonance (MR) image storage
 1.2.840.10040: x9-57
+1.2.840.10040.4: x9algorithm
+1.2.840.10040.4.1: dsa
+1.2.840.10040.4.3: dsa-with-sha1
 1.2.840.10045: ansi-x962
 1.2.840.10045.1: fieldType
 1.2.840.10045.1.1: prime-field

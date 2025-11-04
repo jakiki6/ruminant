@@ -1035,9 +1035,13 @@ class ElfModule(module.RuminantModule):
                 with self.buf.sub(sh["size"]):
                     sh["parsed"] = {}
 
-                    if sh["name"]["string"] in (".comment", ".interp"):
+                    if sh["name"]["string"] == ".interp":
                         sh["parsed"]["string"] = self.buf.rs(
                             self.buf.available())
+                    elif sh["name"]["string"] == ".comment":
+                        sh["parsed"]["strings"] = []
+                        while self.buf.available() > 0:
+                            sh["parsed"]["strings"].append(self.buf.rzs())
                     elif sh["name"]["string"].startswith(
                             ".note.") and self.buf.available() > 0:
                         base = self.buf.tell()
@@ -1119,6 +1123,13 @@ class ElfModule(module.RuminantModule):
                             }
                             self.namebuf.seek(sym["name"]["index"])
                             sym["name"]["string"] = self.namebuf.rzs()
+
+                            if sym["name"]["string"].startswith("_Z"):
+                                try:
+                                    sym["name"]["demangled"] = utils.demangle(
+                                        sym["name"]["string"])
+                                except Exception:
+                                    pass
 
                             if self.wide:
                                 sym["info"] = self.buf.ru8()
@@ -2129,7 +2140,8 @@ class SpirVModule(module.RuminantModule):
 
 @module.register
 class PycModule(module.RuminantModule):
-    desc = "Python compiled bytecode files, currently kinda broken."
+    dev = True
+    desc = "Python compiled bytecode files."
 
     def identify(buf, ctx):
         if buf.available() < 10:
@@ -2273,7 +2285,7 @@ class BlendModule(module.RuminantModule):
 
 @module.register
 class GitModule(module.RuminantModule):
-    desc = "Git-related files"
+    desc = "Git-related files."
 
     def identify(buf, ctx):
         try:

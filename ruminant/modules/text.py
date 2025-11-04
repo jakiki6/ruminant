@@ -108,6 +108,7 @@ class ZeroesModule(module.RuminantModule):
 
 @module.register
 class AndroidXmlModule(module.RuminantModule):
+    dev = True
     desc = "Android binary XML files."
 
     def identify(buf, ctx):

@@ -416,7 +416,7 @@ class LuksModule(module.RuminantModule):
 
 @module.register
 class SshSignatureModule(module.RuminantModule):
-    desc = "SSH signatures like the ones that Git uses"
+    desc = "SSH signatures like the ones that Git uses."
 
     def identify(buf, ctx):
         return buf.peek(29) == b"-----BEGIN SSH SIGNATURE-----"
@@ -467,5 +467,67 @@ class SshSignatureModule(module.RuminantModule):
         meta["data"]["signature"]["algorithm"] = self.rs()
         meta["data"]["signature"]["blob"] = self.rb().hex()
         self.ibuf.sapunit()
+
+        return meta
+
+
+@module.register
+class OpenSshPrivateKeyModule(module.RuminantModule):
+    dev = True
+    desc = "OpenSSH private keys."
+
+    def identify(buf, ctx):
+        return buf.peek(35) == b"-----BEGIN OPENSSH PRIVATE KEY-----"
+
+    def rb(self, buf=None):
+        if buf is None:
+            buf = self.ibuf
+
+        return buf.read(self.ibuf.ru32())
+
+    def rs(self, buf=None):
+        if buf is None:
+            buf = self.ibuf
+
+        return buf.rs(self.ibuf.ru32())
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "openssh-private-key"
+
+        self.buf.rl()
+        lines = b""
+        while True:
+            line = self.buf.rl()
+            if line == b"-----END OPENSSH PRIVATE KEY-----":
+                break
+
+            lines += line
+
+        self.ibuf = Buf(base64.b64decode(lines))
+
+        meta["data"] = {}
+        meta["data"]["magic"] = self.ibuf.rzs()
+        if meta["data"]["magic"] != "openssh-key-v1":
+            meta["unknown"] = True
+            return meta
+
+        meta["data"]["cipher"] = self.rs()
+        meta["data"]["kdfname"] = self.rs()
+        match meta["data"]["kdfname"]:
+            case "none":
+                meta["data"]["kdfoptions"] = self.rs()
+            case "bcrypt":
+                meta["data"]["kdfoptions"] = {
+                    "salt": self.rs(),
+                    "rounds": self.ibuf.ru32()
+                }
+            case _:
+                meta["unknown"] = True
+                return meta
+        meta["data"]["nkeys"] = self.ibuf.ru32()
+        meta["data"]["public-keys"] = [
+            self.rb().hex() for i in range(0, meta["data"]["nkeys"])
+        ]
 
         return meta

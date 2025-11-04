@@ -2621,7 +2621,8 @@ class PsdModule(IRBModule):
 
 @module.register
 class JpegXlModule(module.RuminantModule):
-    desc = "JPEG XL files, todo."
+    dev = True
+    desc = "JPEG XL files."
 
     def identify(buf, ctx):
         return buf.peek(2) == b"\xff\x0a"

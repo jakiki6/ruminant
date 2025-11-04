@@ -620,7 +620,8 @@ class PdfModule(module.RuminantModule):
 
 @module.register
 class Ole2Module(module.RuminantModule):
-    desc = "OLE2 files.\nThis includes DOC files and MSI files. Currently in development and very much broken."
+    dev = True
+    desc = "OLE2 files.\nThis includes DOC files and MSI files."
 
     def identify(buf, ctx):
         return buf.peek(8) == b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"

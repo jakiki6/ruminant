@@ -1,7 +1,12 @@
+import os
+
 modules = []
 
 
 def register(cls):
+    if cls.dev and os.environ.get("RUMINANT_DEV_MODE", "0") == "0":
+        return cls
+
     modules.append(cls)
     modules.sort(key=lambda x: x.priority)
 
@@ -10,6 +15,7 @@ def register(cls):
 
 class RuminantModule(object):
     priority = 0
+    dev = False
     desc = ""
 
     def __init__(self, buf):
