@@ -94,6 +94,7 @@ Ruminant is still in early alpha but it can already process the following file t
 * Zstd files
 * SSH signatures
 * Git object files
+* Intel microcode files
 
 # How do I install it?
 Run `pip3 install ruminant`.

@@ -2363,3 +2363,167 @@ class GitModule(module.RuminantModule):
         self.buf.sapunit()
 
         return meta
+
+
+@module.register
+class IntelFlashModule(module.RuminantModule):
+    dev = True
+    desc = "Intel-based motherboard flash dumps.\nYou can extract yours if you're on an Intel system by installing flashrom and running 'flashrom -p internal -r flash.bin'."
+
+    def identify(buf, ctx):
+        if buf.available() < 32:
+            return False
+
+        return buf.peek(20)[16:20] == b"\x5a\xa5\xf0\x0f"
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "intel-flash"
+
+        meta["flash-descriptor"] = {}
+
+        self.buf.pasunit(4096)
+        meta["flash-descriptor"]["reserved-vector"] = chew(self.buf.read(16),
+                                                           blob_mode=True)
+        meta["flash-descriptor"]["signature"] = hex(
+            self.buf.ru32l())[2:].zfill(8)
+        temp = self.buf.ru32l()
+        meta["flash-descriptor"]["flmap0"] = {
+            "raw": temp,
+            "component-base": (temp >> 0) & ((1 << 8) - 1),
+            "number-of-flash-chips": (temp >> 8) & ((1 << 2) - 1),
+            "padding0": (temp >> 10) & ((1 << 6) - 1),
+            "region-base": (temp >> 16) & ((1 << 8) - 1),
+            "number-of-regions": (temp >> 24) & ((1 << 3) - 1),
+            "padding1": (temp >> 27) & ((1 << 5) - 1)
+        }
+        meta["flash-descriptor"]["flmap1"] = {
+            "raw": temp,
+            "master-base": (temp >> 0) & ((1 << 8) - 1),
+            "number-of-regions": (temp >> 8) & ((1 << 2) - 1),
+            "padding0": (temp >> 10) & ((1 << 6) - 1),
+            "pch-straps-base": (temp >> 16) & ((1 << 8) - 1),
+            "number-of-pch-straps": (temp >> 24) & ((1 << 8) - 1)
+        }
+        meta["flash-descriptor"]["flmap2"] = {
+            "raw": temp,
+            "proc-straps-base": (temp >> 0) & ((1 << 8) - 1),
+            "number-of-proc-straps": (temp >> 8) & ((1 << 8) - 1),
+            "padding0": (temp >> 16) & ((1 << 16) - 1)
+        }
+        meta["flash-descriptor"]["flmap3"] = {
+            "raw": temp,
+        }
+
+        self.buf.skip(3836 - self.buf.tell())
+        meta["flash-descriptor"]["vscc-table-base"] = self.buf.ru8()
+        meta["flash-descriptor"]["vscc-table-size"] = self.buf.ru8()
+        meta["flash-descriptor"]["reserved9"] = self.buf.ru16()
+
+        self.buf.sapunit()
+
+        return meta
+
+
+@module.register
+class IntelMicrocodeModule(module.RuminantModule):
+    desc = "Intel microcode files."
+
+    def valid_bcd(val):
+        return (val & 0x0f) < 10 and (val >> 4) < 10
+
+    @classmethod
+    def identify(cls, buf, ctx):
+        if buf.available() < 48:
+            return False
+
+        with buf:
+            if buf.ru32l() != 1:
+                return False
+
+            buf.skip(4)
+
+            if not cls.valid_bcd(buf.ru8()):
+                return False
+
+            if buf.ru8() not in (0x19, 0x20):
+                return False
+
+            val = buf.ru8()
+            if not cls.valid_bcd(val) or val > 0x31:
+                return False
+
+            if buf.ru8() not in (0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                                 0x08, 0x09, 0x10, 0x11, 0x12):
+                return False
+
+            buf.seek(32)
+            length = buf.ru32l()
+            if length == 0:
+                length = 2048
+
+            buf.seek(0)
+
+            if length % 4 != 0 or length > buf.available():
+                return False
+
+            s = 0
+            for i in range(0, length, 4):
+                s += buf.ru32l()
+
+            return s & 0xffffffff == 0
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "intel-microcode"
+
+        meta["header"] = {}
+        meta["header"]["version"] = self.buf.ru32l()
+        meta["header"]["revision"] = self.buf.ru32l()
+
+        year = self.buf.ru16l()
+        day = self.buf.ru8()
+        month = self.buf.ru8()
+        meta["header"][
+            "date"] = f"{hex(year)[2:].zfill(4)}-{hex(month)[2:].zfill(2)}-{hex(day)[2:].zfill(2)}"
+        meta["header"]["processor-signature"] = {"raw": self.buf.ru32l()}
+        meta["header"]["processor-signature"]["hex"] = hex(
+            meta["header"]["processor-signature"]["raw"])[2:].zfill(8)
+        meta["header"]["processor-signature"]["stepping"] = (
+            meta["header"]["processor-signature"]["raw"] >> 0) & 0x0f
+        meta["header"]["processor-signature"]["model"] = (
+            meta["header"]["processor-signature"]["raw"] >> 4) & 0x0f
+        meta["header"]["processor-signature"]["family"] = (
+            meta["header"]["processor-signature"]["raw"] >> 8) & 0x0f
+        meta["header"]["processor-signature"]["processor-type"] = (
+            meta["header"]["processor-signature"]["raw"] >> 12) & 0x03
+        meta["header"]["processor-signature"]["extended-model"] = (
+            meta["header"]["processor-signature"]["raw"] >> 16) & 0x0f
+        meta["header"]["processor-signature"]["extended-family"] = (
+            meta["header"]["processor-signature"]["raw"] >> 20) & 0xff
+
+        family = meta["header"]["processor-signature"]["family"]
+        model = meta["header"]["processor-signature"]["model"]
+        if family == 0x0f:
+            family += meta["header"]["processor-signature"]["extended-family"]
+        if family in (0x06, 0x0f):
+            model += meta["header"]["processor-signature"][
+                "extended-model"] << 4
+
+        meta["header"]["processor-signature"][
+            "linux-name"] = f"{hex(family)[2:].zfill(2)}-{hex(model)[2:].zfill(2)}-{hex(meta['header']['processor-signature']['stepping'])[2:].zfill(2)}"
+        meta["header"]["checksum"] = self.buf.rh(4)
+        meta["header"]["loader-revision"] = self.buf.ru32l()
+        meta["header"]["data-size"] = self.buf.ru32l()
+        meta["header"]["total-size"] = self.buf.ru32l()
+        meta["header"]["reserved"] = self.buf.rh(12)
+
+        self.buf.pasunit((meta["header"]["total-size"] if meta["header"]
+                          ["total-size"] != 0 else 2048) - self.buf.tell())
+
+        with self.buf.subunit():
+            meta["payload"] = chew(self.buf, blob_mode=True)
+
+        self.buf.sapunit()
+
+        return meta

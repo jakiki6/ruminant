@@ -87,3 +87,7 @@ This is a list of useful resources.
 # SPIR-V
 * https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html
 * https://github.com/KhronosGroup/SPIRV-Headers
+
+# Intel flash
+* https://github.com/LongSoft/UEFITool/blob/c8553184fa61deb1165c3b20f694da9a30aa26ea/common/descriptor.h#L30
+* https://github.com/LongSoft/UEFITool/blob/c8553184fa61deb1165c3b20f694da9a30aa26ea/common/ffsparser.cpp#L301
