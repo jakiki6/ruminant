@@ -593,6 +593,10 @@ class JavaClassModule(module.RuminantModule):
                                 meta["constants"][k] = repr(v[1])
                             case "method-handle" | "invokedynamic":
                                 meta["constants"][k] = f"{v[1]} {v[2]}"
+                            case "interface-method-ref":
+                                meta["constants"][k] = f"{v[1]}.{v[2]}"
+                            case "method-type":
+                                meta["constants"][k] = v[1]
                             case _:
                                 raise ValueError(
                                     f"Cannot render type '{v[0]}' in {v}")
@@ -2311,6 +2315,12 @@ class GitModule(module.RuminantModule):
     desc = "Git-related files."
 
     def identify(buf, ctx):
+        if buf.available() < 6:
+            return False
+
+        if buf.peek(4) not in (b"blob", b"tree", b"comm"):
+            return False
+
         try:
             with buf:
                 line = buf.rzs()
