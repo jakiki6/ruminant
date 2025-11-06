@@ -514,65 +514,82 @@ class JavaClassModule(module.RuminantModule):
                     const = self.buf.rf64()
                     skip = True
                 case 7:
-                    const = ["class-ref", {"name": self.buf.ru16()}]
+                    const = ["class-ref", self.buf.ru16()]
                 case 8:
-                    const = ["string-ref", {"value": self.buf.ru16()}]
+                    const = ["string-ref", self.buf.ru16()]
                 case 9:
-                    const = [
-                        "field-ref", {
-                            "class": self.buf.ru16(),
-                            "name-and-type": self.buf.ru16()
-                        }
-                    ]
+                    const = ["field-ref", self.buf.ru16(), self.buf.ru16()]
                 case 10:
-                    const = [
-                        "method-ref", {
-                            "class": self.buf.ru16(),
-                            "name-and-type": self.buf.ru16()
-                        }
-                    ]
+                    const = ["method-ref", self.buf.ru16(), self.buf.ru16()]
                 case 11:
                     const = [
-                        "interface-method-ref", {
-                            "class": self.buf.ru16(),
-                            "name-and-type": self.buf.ru16()
-                        }
+                        "interface-method-ref",
+                        self.buf.ru16(),
+                        self.buf.ru16()
                     ]
                 case 12:
-                    const = [
-                        "name-and-type", {
-                            "name": self.buf.ru16(),
-                            "type": self.buf.ru16()
-                        }
-                    ]
+                    const = ["name-and-type", self.buf.ru16(), self.buf.ru16()]
                 case 15:
-                    const = [
-                        "method-handle", {
-                            "type": self.buf.ru8(),
-                            "index": self.buf.ru16()
-                        }
-                    ]
+                    const = ["method-handle", -self.buf.ru8(), self.buf.ru16()]
                 case 16:
-                    const = ["method-type", {"type": self.buf.ru16()}]
+                    const = ["method-type", self.buf.ru16()]
                 case 18:
                     const = [
-                        "invokedynamic", {
-                            "bootstrap-method": self.buf.ru16(),
-                            "name-and-type": self.buf.ru16()
-                        }
+                        "invokedynamic", -self.buf.ru16(),
+                        self.buf.ru16()
                     ]
                 case _:
                     raise ValueError(f"Unknown constant type {tag}")
 
             meta["constants"][i if not skip else i + 1] = const
 
-        for v in meta["constants"].values():
-            if isinstance(v, list):
-                for k, v2 in v[1].items():
-                    if v[0] == "method-handle" and k == "type":
-                        continue
+        done = False
+        while not done:
+            done = True
+            for k, v in meta["constants"].items():
+                if isinstance(v, list):
+                    done = False
 
-                    v[1][k] = self.resolve(v2)
+                    full = True
+                    for i in range(1, len(v)):
+                        if isinstance(v[i], int):
+                            if v[0] == "method-handle" and v[i] < 0:
+                                v[i] = {
+                                    1: "REF_getField",
+                                    2: "REF_getStatic",
+                                    3: "REF_putField",
+                                    4: "REF_putStatic",
+                                    5: "REF_invokeVirtual",
+                                    6: "REF_invokeStatic",
+                                    7: "REF_invokeSpecial",
+                                    8: "REF_newInvokeSpecial",
+                                    9: "REF_invokeInterface"
+                                }.get(-v[i])
+                            elif v[0] == "invokedynamic" and v[i] < 0:
+                                v[i] = f"#{-v[i]}"
+                            else:
+                                if isinstance(self.resolve(v[i]), str):
+                                    v[i] = self.resolve(v[i])
+                                elif self.resolve(v[i]) is None:
+                                    v[i] = "null"
+                                else:
+                                    full = False
+
+                    if full:
+                        match v[0]:
+                            case "class-ref":
+                                meta["constants"][k] = f"L{v[1]};"
+                            case "method-ref":
+                                meta["constants"][k] = f"({v[1]}){v[2]}"
+                            case "name-and-type" | "field-ref":
+                                meta["constants"][k] = f"{v[1]}:{v[2]}"
+                            case "string-ref":
+                                meta["constants"][k] = repr(v[1])
+                            case "method-handle" | "invokedynamic":
+                                meta["constants"][k] = f"{v[1]} {v[2]}"
+                            case _:
+                                raise ValueError(
+                                    f"Cannot render type '{v[0]}' in {v}")
 
         flags = self.buf.ru16()
         meta["access-flags"] = {
