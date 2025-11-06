@@ -310,6 +310,12 @@ class JavaClassModule(module.RuminantModule):
     def resolve(self, index):
         return self.meta["constants"].get(index - 1, None)
 
+    def sign(self, i):
+        if i >= 0:
+            return "+" + str(i)
+        else:
+            return str(i)
+
     def read_attributes(self, target):
         target["attribute-count"] = self.buf.ru16()
         target["attributes"] = {}
@@ -343,17 +349,17 @@ class JavaClassModule(module.RuminantModule):
                             case 0x15 | 0x16 | 0x17 | 0x18 | 0x19 | 0x36 | 0x37 | 0x38 | 0x39 | 0x3a:
                                 name = [
                                     name,
-                                    self.buf.ri16()
-                                    if wide else self.buf.ri8()
+                                    self.sign(self.buf.ri16(
+                                    ) if wide else self.buf.ri8())
                                 ]
                             case 0x10 | 0xbc:
-                                name = [name, self.buf.ri8()]
+                                name = [name, self.sign(self.buf.ri8())]
                             case 0x11 | 0x99 | 0x9a | 0x9b | 0x9c | 0x9d | 0x9e | 0x9f | 0xa0 | 0xa1 | 0xa2 | 0xa3 | 0xa4 | 0xa5 | 0xa6 | 0xa7 | 0xa8 | 0xc6 | 0xc7:
-                                name = [name, self.buf.ri16()]
+                                name = [name, self.sign(self.buf.ri16())]
                             case 0x13 | 0x14 | 0xb2 | 0xb3 | 0xb4 | 0xb5 | 0xb6 | 0xb7 | 0xb8 | 0xbb | 0xbd | 0xc0 | 0xc1:
                                 name = [name, self.buf.ru16()]
                             case 0xc8 | 0xc9:
-                                name = [name, self.buf.ri32()]
+                                name = [name, self.sign(self.buf.ri32())]
                             case 0xba:
                                 name = [name, self.buf.ru16(), self.buf.ru16()]
                             case 0xb9:
@@ -369,8 +375,8 @@ class JavaClassModule(module.RuminantModule):
                                 name = [
                                     name,
                                     self.buf.ru8(),
-                                    self.buf.ri16()
-                                    if wide else self.buf.ri8()
+                                    self.sign(self.buf.ri16(
+                                    ) if wide else self.buf.ri8())
                                 ]
                             case 0x12:
                                 name = [name, self.buf.ru8()]
