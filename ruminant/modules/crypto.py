@@ -379,7 +379,7 @@ class AgeModule(module.RuminantModule):
 
 @module.register
 class LuksModule(module.RuminantModule):
-    desc = "Linux Unified Key Setup version 2 headers."
+    desc = "Linux Unified Key Setup version 1 and 2 headers."
 
     def identify(buf, ctx):
         return buf.peek(6) == b"LUKS\xba\xbe"
@@ -391,37 +391,65 @@ class LuksModule(module.RuminantModule):
         self.buf.skip(6)
         meta["header"] = {}
         meta["header"]["version"] = self.buf.ru16()
-        meta["header"]["header-length"] = self.buf.ru64()
 
-        self.buf.pushunit()
-        self.buf.setunit(meta["header"]["header-length"] - 16)
+        match meta["header"]["version"]:
+            case 1:
+                meta["header"]["cipher-name"] = self.buf.rs(32)
+                meta["header"]["cipher-mode"] = self.buf.rs(32)
+                meta["header"]["hash-spec"] = self.buf.rs(32)
+                meta["header"]["payload-offset"] = self.buf.ru32()
+                meta["header"]["key-bytes"] = self.buf.ru32()
+                meta["header"]["mk-digest"] = self.buf.rh(20)
+                meta["header"]["mk-digest-salt"] = self.buf.rh(32)
+                meta["header"]["mk-digest-iter"] = self.buf.ru32()
+                meta["header"]["uuid"] = self.buf.rs(40)
 
-        meta["header"]["sequence-id"] = self.buf.ru64()
-        meta["header"]["label"] = self.buf.rs(48)
-        meta["header"]["checksum-algorithm"] = self.buf.rs(32)
-        meta["header"]["salt"] = self.buf.rh(64)
-        meta["header"]["uuid"] = self.buf.rs(40)
-        meta["header"]["subsystem"] = self.buf.rs(48)
-        meta["header"]["header-offset"] = self.buf.ru64()
-        self.buf.skip(184)
-        meta["header"]["checksum"] = self.buf.rh(64)
-        self.buf.skip(7 * 512)
+                meta["header"]["key-slots"] = []
+                for i in range(0, 8):
+                    ks = {}
+                    ks["active"] = utils.unraw(self.buf.ru32(), 4, {
+                        0x0000dead: "disabled",
+                        0x00ac71f3: "enabled"
+                    }, True)
+                    ks["iterations"] = self.buf.ru32()
+                    ks["salt"] = self.buf.rh(32)
+                    ks["key-material-offset"] = self.buf.ru32()
+                    ks["stripes"] = self.buf.ru32()
+                    meta["header"]["key-slots"].append(ks)
 
-        if meta["header"]["version"] == 2:
-            meta["json"] = json.loads(self.buf.rs(self.buf.unit))
+                self.buf.skip(self.buf.available())
+            case 2:
+                meta["header"]["header-length"] = self.buf.ru64()
 
-        self.buf.skipunit()
-        self.buf.popunit()
+                self.buf.pasunit(meta["header"]["header-length"] - 16)
 
-        m = 0
-        for _, v in meta["json"].get("segments", {}).items():
-            if v.get("size") == "dynamic":
-                m = self.buf.size()
-                break
+                meta["header"]["sequence-id"] = self.buf.ru64()
+                meta["header"]["label"] = self.buf.rs(48)
+                meta["header"]["checksum-algorithm"] = self.buf.rs(32)
+                meta["header"]["salt"] = self.buf.rh(64)
+                meta["header"]["uuid"] = self.buf.rs(40)
+                meta["header"]["subsystem"] = self.buf.rs(48)
+                meta["header"]["header-offset"] = self.buf.ru64()
+                self.buf.skip(184)
+                meta["header"]["checksum"] = self.buf.rh(64)
+                self.buf.skip(7 * 512)
 
-            m = max(m, int(v.get("offset", 0)) + int(v.get("size", 0)))
+                if meta["header"]["version"] == 2:
+                    meta["json"] = json.loads(self.buf.rs(self.buf.unit))
 
-        self.buf.seek(m)
+                self.buf.sapunit()
+
+                m = 0
+                for _, v in meta["json"].get("segments", {}).items():
+                    if v.get("size") == "dynamic":
+                        m = self.buf.size()
+                        break
+
+                    m = max(m, int(v.get("offset", 0)) + int(v.get("size", 0)))
+
+                self.buf.seek(m)
+            case _:
+                meta["unknown"] = True
 
         return meta
 

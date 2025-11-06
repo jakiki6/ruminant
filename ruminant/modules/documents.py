@@ -584,7 +584,7 @@ class PdfModule(module.RuminantModule):
                         _token = _token[1:]
 
                     if len(n) > 0:
-                        token += chr(int(n, 8))
+                        token += chr(int(n, 10))
                     else:
                         token += _token[0]
                         _token = _token[1:]
