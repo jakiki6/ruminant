@@ -1,5 +1,6 @@
 from .. import module, utils
 from ..buf import Buf
+from ..constants import AGE_DRAND_CHAINS
 from . import chew
 import base64
 import hashlib
@@ -343,6 +344,17 @@ class AgeModule(module.RuminantModule):
                         case "tlock":
                             stanza["arguments"]["round"] = int(args[0])
                             stanza["arguments"]["chain"] = args[1]
+
+                            if stanza["arguments"][
+                                    "chain"] in AGE_DRAND_CHAINS:
+                                chain = AGE_DRAND_CHAINS[stanza["arguments"]
+                                                         ["chain"]]
+                                stanza["parsed"] = {}
+                                stanza["parsed"]["chain-name"] = chain["name"]
+                                stanza["parsed"][
+                                    "decryption-time"] = utils.unix_to_date(
+                                        chain["genesis"] + chain["period"] *
+                                        (stanza["arguments"]["round"] - 1))
                         case _:
                             stanza["arguments"] = args
                             stanza["unknown"] = True

@@ -7574,3 +7574,11 @@ CPYTHON_MAGICS = {
     3654: "Python 3.15a1",
     3655: "Python 3.15a1"
 }
+
+AGE_DRAND_CHAINS = {
+    "52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971": {
+        "name": "quicknet",
+        "genesis": 1692803367,
+        "period": 3
+    }
+}
