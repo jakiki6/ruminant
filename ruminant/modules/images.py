@@ -536,6 +536,66 @@ class IRBModule(module.RuminantModule):
                             block["data"]["profile"] = chew(self.buf)
 
                         self.buf.skipunit()
+                    case 1025:
+                        block["data"]["paths"] = []
+
+                        little = False
+                        while self.buf.unit >= 26:
+                            path = {}
+
+                            selector = self.buf.ru16()
+                            if little or selector > 0xff:
+                                selector >>= 8
+                                little = True
+
+                            path["selector"] = utils.unraw(
+                                selector, 2, {
+                                    0x0000: "Closed subpath length record",
+                                    0x0001:
+                                    "Closed subpath Bezier knot, linked",
+                                    0x0002:
+                                    "Closed subpath Bezier knot, unlinked",
+                                    0x0003: "Open subpath length record",
+                                    0x0004: "Open subpath Bezier knot, linked",
+                                    0x0005:
+                                    "Open subpath Bezier knot, unlinked",
+                                    0x0006: "Path fill rule record",
+                                    0x0007: "Clipboard record",
+                                    0x0008: "Initial fill rule record"
+                                }, True)
+
+                            self.buf.pasunit(24)
+
+                            path["payload"] = {}
+                            match selector:
+                                case 0x0006:
+                                    pass
+                                case 0x0008:
+                                    path["payload"][
+                                        "start-with-all-pixels"] = bool(
+                                            self.buf.ru16())
+                                case 0x0000 | 0x0003:
+                                    path["payload"][
+                                        "point-count"] = self.buf.ru16l(
+                                        ) if little else self.buf.ru16()
+                                case 0x0001 | 0x0002 | 0x0004 | 0x0005:
+                                    path["payload"]["preceding"] = (
+                                        self.buf.ri32l() if little else
+                                        self.buf.ri32()) / 16777216
+                                    path["payload"]["anchor"] = (
+                                        self.buf.ri32l() if little else
+                                        self.buf.ri32()) / 16777216
+                                    path["payload"]["leaving"] = (
+                                        self.buf.ri32l() if little else
+                                        self.buf.ri32()) / 16777216
+                                case _:
+                                    path["payload"] = self.buf.rh(
+                                        self.buf.unit)
+                                    path["unknown"] = True
+
+                            self.buf.sapunit()
+
+                            block["data"]["paths"].append(path)
                     case 1013 | 1016 | 1026:
                         block["data"]["blob"] = self.buf.rh(self.buf.unit)
                     case 1082 | 1083:
