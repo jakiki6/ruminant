@@ -1,4 +1,4 @@
-from . import modules, module
+from . import modules, module, constants, utils
 from .buf import Buf
 import argparse
 import sys
@@ -6,6 +6,8 @@ import json
 import tempfile
 import os
 import re
+import urllib.request
+from urllib.parse import urlparse, urlunparse
 
 sys.set_int_max_str_digits(0)
 sys.setrecursionlimit(1000000)
@@ -155,6 +157,17 @@ def main(dev=False):
                         action="store_true",
                         help="Print list of registered modules and exit")
 
+    parser.add_argument("--url",
+                        action="store_true",
+                        help="Treat file as URL and fetch it")
+
+    parser.add_argument(
+        "--strip-url",
+        action="store_true",
+        help="Strip metadata-removing parameters from"
+             "known URLs like '?filetype=webp'"
+    )
+
     has_tqdm = True
     try:
         import tqdm
@@ -189,9 +202,6 @@ def main(dev=False):
         has_tqdm = args.progress
         print_filenames = args.progress_names
 
-    if args.file == "-":
-        args.file = "/dev/stdin"
-
     if args.extract_all:
         modules.extract_all = True
         if not os.path.isdir("blobs"):
@@ -204,6 +214,45 @@ def main(dev=False):
             except ValueError:
                 print(f"Cannot parse blob ID {k}", file=sys.stderr)
                 exit(1)
+
+    if args.url:
+        try:
+            url = urlparse(args.file)
+            assert url.scheme != ""
+        except (ValueError, AssertionError):
+            print(f"Invalid URL '{args.file}'", file=sys.stderr)
+            exit(1)
+
+        if args.strip_url:
+            url = utils.strip_url(url)
+
+        if "RUMINANT_USER_AGENT" in os.environ:
+            user_agent = os.environ["RUMINANT_USER_AGENT"]
+        else:
+            user_agent = constants.USER_AGENT
+
+        req = urllib.request.Request(urlunparse(url),
+                                     headers={"User-Agent": user_agent})
+
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+            try:
+                with urllib.request.urlopen(req) as response:
+                    chunk_size = 1 << 24
+                    while True:
+                        chunk = response.read(chunk_size)
+                        if not chunk:
+                            break
+                        tmp_file.write(chunk)
+            except urllib.error.HTTPError as http_err:
+                print(
+                    f"Encountered the following HTTP error while retrieving the file: {http_err}",
+                    file=sys.stderr)
+                exit(1)
+
+            args.file = tmp_file.name
+    else:
+        if args.file == "-":
+            args.file = "/dev/stdin"
 
     if args.file == "/dev/stdin":
         file = tempfile.TemporaryFile()

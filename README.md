@@ -115,6 +115,10 @@ This is a valid complex command: `ruminant -e 2 foo.jpeg - --extract 5 bar.bin -
 (Yes, you could abuse ruminant to copy files by running `function cp() { ruminant --extract 0 $2 $1 }` in bash and then using the function as `cp`.)
 
 You can also specify `--extract-all` in order to extract all blobs to the "blobs" directory.
+Specifying a directory as the file makes ruminant walk that directory recursively. Adding `--progress` shows a progress bar (this requires tqdm). Adding `--progress-names` adds file names to the progress bar.
+Specifying `--url` makes ruminant treat the file name as a URL and makes it try to fetch the file from it. It uses the user agent of a recent Chrome to not be blocked.
+Adding `--strip-url` makes ruminant change some parts of known URLs to preserve metadata. It can, for example, detect that a file is being hosted by Wordpress based on the "/wp-content/" start of the path and can then remove the "-<width>x<height>" part of the file name to preserve its original size and avoid reencoding of the file.
+The user agent can be overridden by setting the `RUMINANT_USER_AGENT` environment variable with the desired agent.
 
 # Ruminant can't parse xyz
 Feel free to send me a sample so I can add a parser for it :)

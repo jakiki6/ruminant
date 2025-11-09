@@ -11,6 +11,7 @@ import base64
 import struct
 import json
 import tempfile
+import re
 
 
 def _xml_to_dict(elem):
@@ -1365,3 +1366,11 @@ def read_marshal(buf, version):
 
 def tempfd():
     return tempfile.TemporaryFile()
+
+
+def strip_url(url):
+    if match := re.match(r"^(/wp-content/.+?/[^/]+)-\d+x\d+(\.[A-Za-z0-9]+)$",
+                         url.path):
+        url = url._replace(path="".join(match.groups()))
+
+    return url
