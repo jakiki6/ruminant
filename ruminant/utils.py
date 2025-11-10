@@ -1373,4 +1373,7 @@ def strip_url(url):
                          url.path):
         url = url._replace(path="".join(match.groups()))
 
+    if url.netloc == "static.wixstatic.com":
+        url = url._replace(path="/".join(url.path.split()[:3]))
+
     return url
