@@ -1690,6 +1690,17 @@ class NbtModule(module.RuminantModule):
     def identify(buf, ctx):
         return (not ctx["walk"]) and (buf.pu32() & 0xffffffc0 == 0x0a000000)
 
+    def clean(self, root):
+        if isinstance(root, dict):
+            for k, v in list(root.items()):
+                if k in ("sections", "Heightmaps"):
+                    root[k] = None
+                else:
+                    self.clean(v)
+        elif isinstance(root, list):
+            for elem in root:
+                self.clean(elem)
+
     def chew(self):
         meta = {}
         meta["type"] = "nbt"
@@ -1698,6 +1709,9 @@ class NbtModule(module.RuminantModule):
         while self.buf.available() > 0:
             key, value = utils.read_nbt(self.buf)
             meta["data"][key] = value
+
+        if self.extra_ctx.get("skip-chunk-data"):
+            self.clean(meta["data"])
 
         return meta
 
@@ -1791,7 +1805,8 @@ class McaModule(module.RuminantModule):
                             chunk["unknown"] = True
 
                     if data is not None:
-                        chunk["data"] = chew(data)
+                        chunk["data"] = chew(
+                            data, extra_ctx={"skip-chunk-data": True})
 
                     self.buf.sapunit()
 
