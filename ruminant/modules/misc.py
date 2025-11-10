@@ -2554,6 +2554,51 @@ class IntelMicrocodeModule(module.RuminantModule):
         self.buf.pasunit((meta["header"]["total-size"] if meta["header"]
                           ["total-size"] != 0 else 2048) - self.buf.tell())
 
+        with self.buf:
+            has_exponent = False
+            exponent_offset = 255
+
+            with self.buf:
+                self.buf.skip(255)
+
+                while self.buf.unit > 4:
+                    if self.buf.pu32l() == 17:
+                        has_exponent = True
+                        break
+
+                    self.buf.skip(1)
+                    exponent_offset += 1
+
+            if has_exponent:
+                meta["signature"] = {}
+                with self.buf:
+                    self.buf.skip(exponent_offset - 256)
+                    meta["signature"]["public-key-offset"] = self.buf.tell()
+                    meta["signature"]["modulus"] = self.buf.rh(256)
+                    meta["signature"]["exponent"] = self.buf.ru32l()
+
+                n = int.from_bytes(bytes.fromhex(meta["signature"]["modulus"]),
+                                   "little")
+                e = meta["signature"]["exponent"]
+
+                with self.buf:
+                    while self.buf.unit > 256:
+                        c = int.from_bytes(self.buf.peek(256), "little")
+                        m = pow(c, e, n)
+
+                        if (m >> 2024) == 0x01ff:
+                            meta["signature"][
+                                "signature-offset"] = self.buf.tell()
+                            meta["signature"][
+                                "signature-encrypted"] = self.buf.rh(256)
+                            meta["signature"]["signature-decrypted"] = hex(
+                                m)[2:].zfill(512)
+                            meta["signature"]["signature-hash"] = hex(
+                                m)[2:].zfill(512)[448:]
+                            break
+
+                        self.buf.skip(1)
+
         with self.buf.subunit():
             meta["payload"] = chew(self.buf, blob_mode=True)
 

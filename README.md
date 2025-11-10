@@ -95,6 +95,7 @@ Ruminant is still in early alpha but it can already process the following file t
 * SSH signatures
 * Git object files
 * Intel microcode files
+  * including public key detection and signature extraction
 
 # How do I install it?
 Run `pip3 install ruminant`.
