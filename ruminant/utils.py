@@ -1377,3 +1377,13 @@ def strip_url(url):
         url = url._replace(path="/".join(url.path.split()[:3]))
 
     return url
+
+
+def unpack_flags(val, names):
+    flags = {"raw": val, "names": []}
+
+    for k, v in names:
+        if flags["raw"] & (1 << k):
+            flags["names"].append(v)
+
+    return flags

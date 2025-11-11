@@ -316,6 +316,56 @@ class JavaClassModule(module.RuminantModule):
         else:
             return str(i)
 
+    def read_element(self):
+        tag = self.buf.read(1)
+        match tag:
+            case b"B" | b"C" | b"D" | b"F" | b"I" | b"J" | b"S" | b"Z" | b"s" | b"c":
+                return self.resolve(self.buf.ru16())
+            case b"[":
+                return [self.read_element() for i in range(0, self.buf.ru16())]
+            case b"@":
+                return self.read_annotation()
+            case b"e":
+                typ = self.resolve(self.buf.ru16())
+                return typ + self.resolve(self.buf.ru16())
+            case _:
+                raise ValueError(f"Unkown tag type '{tag.decode('latin-1')}'")
+
+    def read_annotation(self):
+        annotation = {}
+        annotation["type"] = self.resolve(self.buf.ru16())
+
+        annotation["elements"] = {}
+        for j in range(0, self.buf.ru16()):
+            key = self.resolve(self.buf.ru16())
+            annotation["elements"][key] = self.read_element()
+
+        return annotation
+
+    def read_verification_type(self):
+        tag = self.buf.ru8()
+        match tag:
+            case 0x00:
+                return "Top"
+            case 0x01:
+                return "Integer"
+            case 0x02:
+                return "Float"
+            case 0x05:
+                return "Null"
+            case 0x06:
+                return "UninitializedThis"
+            case 0x07:
+                return ("Object", self.resolve(self.buf.ru16()))
+            case 0x08:
+                return ("Uninitialized", self.buf.ru16())
+            case 0x04:
+                return "Long"
+            case 0x03:
+                return "Double"
+            case _:
+                raise ValueError(f"Unknown stack verification type '{tag}'")
+
     def read_attributes(self, target):
         target["attribute-count"] = self.buf.ru16()
         target["attributes"] = {}
@@ -448,8 +498,109 @@ class JavaClassModule(module.RuminantModule):
                             "descriptor": self.resolve(self.buf.ru16()),
                             "index": self.buf.ru16()
                         })
+                case "LocalVariableTypeTable":
+                    val = []
+                    for i in range(0, self.buf.ru16()):
+                        val.append({
+                            "start-pc": self.buf.ru16(),
+                            "length": self.buf.ru16(),
+                            "name": self.resolve(self.buf.ru16()),
+                            "signature": self.resolve(self.buf.ru16()),
+                            "index": self.buf.ru16()
+                        })
+                case "MethodParameters":
+                    val = []
+                    for i in range(0, self.buf.ru8()):
+                        param = {}
+                        param["name"] = self.resolve(self.buf.ru16())
+                        param["access-flags"] = utils.unpack_flags(
+                            self.buf.ru16(), ((4, "final"), (12, "synthetic"),
+                                              (15, "mandated")))
+
+                        val.append(param)
+                case "StackMapTable":
+                    val = []
+                    for i in range(0, self.buf.ru16()):
+                        tag = self.buf.ru8()
+                        if tag <= 63:
+                            val.append({
+                                "type": "same",
+                                "offset-delta": tag - 64
+                            })
+                        elif tag <= 127:
+                            val.append({
+                                "type": "same-locals-1-stack-item",
+                                "offset-delta": tag - 64,
+                                "stack": self.read_verification_type()
+                            })
+                        elif tag == 247:
+                            val.append({
+                                "type": "same-locals-1-stack-item-extended",
+                                "offset-delta": self.buf.ru16(),
+                                "stack": self.read_verification_type()
+                            })
+                        elif tag >= 248 and tag <= 250:
+                            val.append({
+                                "type": "CHOP",
+                                "offset-delta": self.buf.ru16()
+                            })
+                        elif tag == 251:
+                            val.append({
+                                "type": "same-frame-extended",
+                                "offset-delta": self.buf.ru16(),
+                            })
+                        elif tag >= 252 and tag <= 254:
+                            val.append({
+                                "type":
+                                "same-frame-extended",
+                                "offset-delta":
+                                self.buf.ru16(),
+                                "locals": [
+                                    self.read_verification_type()
+                                    for i in range(0, tag - 251)
+                                ]
+                            })
+                        elif tag == 255:
+                            frame = {}
+                            frame["type"] = "full"
+                            frame["offset-delta"] = self.buf.ru16()
+                            frame["locals"] = [
+                                self.read_verification_type()
+                                for i in range(0, self.buf.ru16())
+                            ]
+                            frame["stack"] = [
+                                self.read_verification_type()
+                                for i in range(0, self.buf.ru16())
+                            ]
+
+                            val.append(frame)
+                        else:
+                            raise ValueError(
+                                f"Unknown stack frame type '{tag}'")
+                case "InnerClasses":
+                    val = []
+                    for i in range(0, self.buf.ru16()):
+                        clazz = {}
+                        clazz["inner-info"] = self.resolve(self.buf.ru16())
+                        clazz["outer-info"] = self.resolve(self.buf.ru16())
+                        clazz["inner-name"] = self.resolve(self.buf.ru16())
+                        clazz["access-flags"] = utils.unpack_flags(
+                            self.buf.ru16(),
+                            ((0, "public"), (1, "private"), (2, "protected"),
+                             (3, "static"), (4, "final"), (9, "interface"),
+                             (10, "abstract"), (12, "synthetic"),
+                             (13, "annotation"), (14, "enum")))
+                case "RuntimeVisibleAnnotations" | "RuntimeInvisibleAnnotations":
+                    val = []
+                    for i in range(0, self.buf.ru16()):
+                        val.append(self.read_annotation())
+                case "SourceFile" | "Signature":
+                    val = self.resolve(self.buf.ru16())
                 case _:
-                    val = self.buf.rh(self.buf.unit)
+                    val = {
+                        "payload": self.buf.rh(self.buf.unit),
+                        "unknown": True
+                    }
 
             self.buf.skipunit()
             self.buf.popunit()
@@ -586,7 +737,7 @@ class JavaClassModule(module.RuminantModule):
                             case "class-ref":
                                 meta["constants"][k] = f"L{v[1]};"
                             case "method-ref":
-                                meta["constants"][k] = f"({v[1]}){v[2]}"
+                                meta["constants"][k] = f"{v[1]}{v[2]}"
                             case "name-and-type" | "field-ref":
                                 meta["constants"][k] = f"{v[1]}:{v[2]}"
                             case "string-ref":
@@ -601,16 +752,9 @@ class JavaClassModule(module.RuminantModule):
                                 raise ValueError(
                                     f"Cannot render type '{v[0]}' in {v}")
 
-        flags = self.buf.ru16()
-        meta["access-flags"] = {
-            "raw": flags,
-            "public": bool(flags & (1 << 0)),
-            "final": bool(flags & (1 << 4)),
-            "super": bool(flags & (1 << 5)),
-            "interface": bool(flags & (1 << 9)),
-            "abstract": bool(flags & (1 << 10))
-        }
-
+        meta["access-flags"] = utils.unpack_flags(
+            self.buf.ru16(), ((0, "public"), (4, "final"), (5, "super"),
+                              (9, "interface"), (10, "abstract")))
         meta["this-class"] = self.resolve(self.buf.ru16())
         meta["super-class"] = self.resolve(self.buf.ru16())
 
@@ -624,20 +768,11 @@ class JavaClassModule(module.RuminantModule):
         for i in range(0, meta["field-count"]):
             field = {}
 
-            flags = self.buf.ru16()
-            field["flags"] = {
-                "raw": flags,
-                "public": bool(flags & (1 << 0)),
-                "private": bool(flags & (1 << 1)),
-                "protected": bool(flags & (1 << 2)),
-                "static": bool(flags & (1 << 3)),
-                "final": bool(flags & (1 << 4)),
-                "volatile": bool(flags & (1 << 6)),
-                "transient": bool(flags & (1 << 7)),
-                "synthetic": bool(flags & (1 << 12)),
-                "enum": bool(flags & (1 << 14))
-            }
-
+            field["flags"] = utils.unpack_flags(
+                self.buf.ru16(),
+                ((0, "public"), (1, "private"), (2, "protected"),
+                 (3, "static"), (4, "final"), (6, "volatile"),
+                 (7, "transient"), (12, "synthetic"), (14, "enum")))
             field["name"] = self.resolve(self.buf.ru16())
             field["descriptor"] = self.resolve(self.buf.ru16())
 
@@ -650,23 +785,12 @@ class JavaClassModule(module.RuminantModule):
         for i in range(0, meta["method-count"]):
             method = {}
 
-            flags = self.buf.ru16()
-            method["flags"] = {
-                "raw": flags,
-                "public": bool(flags & (1 << 0)),
-                "private": bool(flags & (1 << 1)),
-                "protected": bool(flags & (1 << 2)),
-                "static": bool(flags & (1 << 3)),
-                "final": bool(flags & (1 << 4)),
-                "synchronized": bool(flags & (1 << 5)),
-                "bridge": bool(flags & (1 << 6)),
-                "varargs": bool(flags & (1 << 7)),
-                "native": bool(flags & (1 << 8)),
-                "abstract": bool(flags & (1 << 10)),
-                "strict": bool(flags & (1 << 11)),
-                "synthetic": bool(flags & (1 << 12))
-            }
-
+            method["flags"] = utils.unpack_flags(
+                self.buf.ru16(),
+                ((0, "public"), (1, "private"), (2, "protected"),
+                 (3, "static"), (4, "final"), (5, "synchronized"),
+                 (6, "bridge"), (7, "varargs"), (8, "native"),
+                 (10, "abstract"), (11, "strict"), (12, "synthetic")))
             method["name"] = self.resolve(self.buf.ru16())
             method["descriptor"] = self.resolve(self.buf.ru16())
 
@@ -907,14 +1031,9 @@ class ElfModule(module.RuminantModule):
                 ph["flags"] = self.buf.ru32l(
                 ) if self.little else self.buf.ru32()
 
-            ph["flags"] = {"raw": ph["flags"], "names": []}
-
-            if bool(ph["flags"]["raw"] & 0x01):
-                ph["flags"]["names"].append("PF_X")
-            if bool(ph["flags"]["raw"] & 0x02):
-                ph["flags"]["names"].append("PF_W")
-            if bool(ph["flags"]["raw"] & 0x04):
-                ph["flags"]["names"].append("PF_R")
+            ph["flags"] = utils.unpack_flags(ph["flags"],
+                                             ((0, "PF_X"), (1, "PF_W"),
+                                              (2, "PF_R")))
 
             ph["align"] = (
                 self.buf.ru64l()
@@ -971,28 +1090,12 @@ class ElfModule(module.RuminantModule):
             flags = (self.buf.ru64l()
                      if self.little else self.buf.ru64()) if self.wide else (
                          self.buf.ru32l() if self.little else self.buf.ru32())
-            sh["flags"] = {"raw": flags, "names": []}
-
-            if bool(flags & 0x0001):
-                sh["flags"]["names"].append("SHF_WRITE")
-            if bool(flags & 0x0002):
-                sh["flags"]["names"].append("SHF_ALLOC")
-            if bool(flags & 0x0004):
-                sh["flags"]["names"].append("SHF_EXECINSTR")
-            if bool(flags & 0x0010):
-                sh["flags"]["names"].append("SHF_MERGE")
-            if bool(flags & 0x0020):
-                sh["flags"]["names"].append("SHF_STRINGS")
-            if bool(flags & 0x0040):
-                sh["flags"]["names"].append("SHF_INFO_LINK")
-            if bool(flags & 0x0080):
-                sh["flags"]["names"].append("SHF_LINK_ORDER")
-            if bool(flags & 0x0100):
-                sh["flags"]["names"].append("SHF_OS_NONCONFORMING")
-            if bool(flags & 0x0200):
-                sh["flags"]["names"].append("SHF_GROUP")
-            if bool(flags & 0x0400):
-                sh["flags"]["names"].append("SHF_TLS")
+            sh["flags"] = utils.unpack_flags(
+                flags,
+                ((0, "SHF_WRITE"), (1, "SHF_ALLOC"), (2, "SHF_EXECINSTR"),
+                 (4, "SHF_MERGE"), (5, "SHF_STRINGS"), (6, "SHF_INFO_LINK"),
+                 (7, "SHF_LINK_ORDER"), (8, "SHF_OS_NONCONFORMING"),
+                 (9, "SHF_GROUP"), (10, "SHF_TLS")))
 
             sh["addr"] = self.hex((self.buf.ru64l(
             ) if self.little else self.buf.ru64()) if self.wide else (
@@ -1252,56 +1355,26 @@ class PeModule(module.RuminantModule):
         meta["pe-header"]["symbol-table-offset"] = self.buf.ru32l()
         meta["pe-header"]["symbol-count"] = self.buf.ru32l()
         meta["pe-header"]["optional-header-size"] = self.buf.ru16l()
-        meta["pe-header"]["characteristics"] = {
-            "raw": self.buf.ru16l(),
-            "names": []
-        }
 
-        if meta["pe-header"]["characteristics"]["raw"] & 0x0001:
-            meta["pe-header"]["characteristics"]["names"].append(
-                "RELOCS_STRIPPED")
-        if meta["pe-header"]["characteristics"]["raw"] & 0x0002:
-            meta["pe-header"]["characteristics"]["names"].append(
-                "EXECUTABLE_IMAGE")
-        if meta["pe-header"]["characteristics"]["raw"] & 0x0004:
-            meta["pe-header"]["characteristics"]["names"].append(
-                "LINE_NUMS_STRIPPED")
-        if meta["pe-header"]["characteristics"]["raw"] & 0x0008:
-            meta["pe-header"]["characteristics"]["names"].append(
-                "LOCAL_SYMS_STRIPPED")
-        if meta["pe-header"]["characteristics"]["raw"] & 0x0010:
-            meta["pe-header"]["characteristics"]["names"].append(
-                "AGGRESSIVE_WS_TRIM")
-        if meta["pe-header"]["characteristics"]["raw"] & 0x0020:
-            meta["pe-header"]["characteristics"]["names"].append(
-                "LARGE_ADDRESS_AWARE")
-        if meta["pe-header"]["characteristics"]["raw"] & 0x0040:
-            meta["pe-header"]["characteristics"]["names"].append("RESERVED")
-        if meta["pe-header"]["characteristics"]["raw"] & 0x0080:
-            meta["pe-header"]["characteristics"]["names"].append(
-                "BYTES_REVERSED_LO")
-        if meta["pe-header"]["characteristics"]["raw"] & 0x0100:
-            meta["pe-header"]["characteristics"]["names"].append(
-                "32BIT_MACHINE")
-        if meta["pe-header"]["characteristics"]["raw"] & 0x0200:
-            meta["pe-header"]["characteristics"]["names"].append(
-                "DEBUG_STRIPPED")
-        if meta["pe-header"]["characteristics"]["raw"] & 0x0400:
-            meta["pe-header"]["characteristics"]["names"].append(
-                "REMOVABLE_RUN_FROM_SWAP")
-        if meta["pe-header"]["characteristics"]["raw"] & 0x0800:
-            meta["pe-header"]["characteristics"]["names"].append(
-                "NET_RUN_FROM_SWAP")
-        if meta["pe-header"]["characteristics"]["raw"] & 0x1000:
-            meta["pe-header"]["characteristics"]["names"].append("SYSTEM")
-        if meta["pe-header"]["characteristics"]["raw"] & 0x2000:
-            meta["pe-header"]["characteristics"]["names"].append("DLL")
-        if meta["pe-header"]["characteristics"]["raw"] & 0x4000:
-            meta["pe-header"]["characteristics"]["names"].append(
-                "UP_SYSTEM_ONLY")
-        if meta["pe-header"]["characteristics"]["raw"] & 0x8000:
-            meta["pe-header"]["characteristics"]["names"].append(
-                "BYTES_REVERSED_HI")
+        meta["pe-header"]["characteristics"] = utils.unpack_flags(
+            self.buf.ru16l(), (
+                (0, "RELOCS_STRIPPED"),
+                (1, "EXECUTABLE_IMAGE"),
+                (2, "LINE_NUMS_STRIPPED"),
+                (3, "LOCAL_SYMS_STRIPPED"),
+                (4, "AGGRESSIVE_WS_TRIM"),
+                (5, "LARGE_ADDRESS_AWARE"),
+                (6, "RESERVED"),
+                (7, "BYTES_REVERSED_LO"),
+                (8, "32BIT_MACHINE"),
+                (9, "DEBUG_STRIPPED"),
+                (10, "REMOVABLE_RUN_FROM_SWAP"),
+                (11, "NET_RUN_FROM_SWAP"),
+                (12, "SYSTEM"),
+                (13, "DLL"),
+                (14, "UP_SYSTEM_ONLY"),
+                (15, "BYTES_REVERSED_HI"),
+            ))
 
         if meta["pe-header"]["optional-header-size"] > 0:
             meta["optional-header"] = {}
@@ -1383,54 +1456,21 @@ class PeModule(module.RuminantModule):
                             0x000e: "XBOX",
                             0x0010: "WINDOWS_BOOT_APPLICATION"
                         })
-                    meta["optional-header"]["dll-characteristics"] = {
-                        "raw": self.buf.ru16l(),
-                        "names": []
-                    }
-                    if meta["optional-header"]["dll-characteristics"][
-                            "raw"] & 0x0020:
-                        meta["optional-header"]["dll-characteristics"][
-                            "names"].append("HIGH_ENTROPY_VA")
-                    if meta["optional-header"]["dll-characteristics"][
-                            "raw"] & 0x0040:
-                        meta["optional-header"]["dll-characteristics"][
-                            "names"].append("DYNAMIC_BASE")
-                    if meta["optional-header"]["dll-characteristics"][
-                            "raw"] & 0x0080:
-                        meta["optional-header"]["dll-characteristics"][
-                            "names"].append("FORCE_INTEGRITY")
-                    if meta["optional-header"]["dll-characteristics"][
-                            "raw"] & 0x0100:
-                        meta["optional-header"]["dll-characteristics"][
-                            "names"].append("NX_COMPAT")
-                    if meta["optional-header"]["dll-characteristics"][
-                            "raw"] & 0x0200:
-                        meta["optional-header"]["dll-characteristics"][
-                            "names"].append("NO_ISOLATION")
-                    if meta["optional-header"]["dll-characteristics"][
-                            "raw"] & 0x0400:
-                        meta["optional-header"]["dll-characteristics"][
-                            "names"].append("NO_SEH")
-                    if meta["optional-header"]["dll-characteristics"][
-                            "raw"] & 0x0800:
-                        meta["optional-header"]["dll-characteristics"][
-                            "names"].append("NO_BIND")
-                    if meta["optional-header"]["dll-characteristics"][
-                            "raw"] & 0x1000:
-                        meta["optional-header"]["dll-characteristics"][
-                            "names"].append("APPCONTAINER")
-                    if meta["optional-header"]["dll-characteristics"][
-                            "raw"] & 0x2000:
-                        meta["optional-header"]["dll-characteristics"][
-                            "names"].append("WDM_DRIVER")
-                    if meta["optional-header"]["dll-characteristics"][
-                            "raw"] & 0x4000:
-                        meta["optional-header"]["dll-characteristics"][
-                            "names"].append("GUARD_CF")
-                    if meta["optional-header"]["dll-characteristics"][
-                            "raw"] & 0x8000:
-                        meta["optional-header"]["dll-characteristics"][
-                            "names"].append("TERMINAL_SERVER_AWARE")
+                    meta["optional-header"][
+                        "dll-characteristics"] = utils.unpack_flags(
+                            self.buf.ru16l(), (
+                                (5, "HIGH_ENTROPY_VA"),
+                                (6, "DYNAMIC_BASE"),
+                                (7, "FORCE_INTEGRITY"),
+                                (8, "NX_COMPAT"),
+                                (9, "NO_ISOLATION"),
+                                (10, "NO_SEH"),
+                                (11, "NO_BIND"),
+                                (12, "APPCONTAINER"),
+                                (13, "WDM_DRIVER"),
+                                (14, "GUARD_CF"),
+                                (15, "TERMINAL_SERVER_AWARE"),
+                            ))
                     meta["optional-header"][
                         "size-of-stack-reserve"] = self.buf.ru64l(
                         ) if self.plus else self.buf.ru32l()
@@ -1482,109 +1522,29 @@ class PeModule(module.RuminantModule):
                 section["linenums-paddr"] = self.buf.ru32l()
                 section["relocs-count"] = self.buf.ru16l()
                 section["linenums-count"] = self.buf.ru16l()
-                section["characteristics"] = {
-                    "raw": self.buf.ru32l(),
-                    "names": []
-                }
-
-                if section["characteristics"]["raw"] & 0x00000008:
-                    section["characteristics"]["names"].append(
-                        "SCN_TYPE_NO_PAD")
-                if section["characteristics"]["raw"] & 0x00000020:
-                    section["characteristics"]["names"].append("SCN_CNT_CODE")
-                if section["characteristics"]["raw"] & 0x00000040:
-                    section["characteristics"]["names"].append(
-                        "SCN_CNT_INITIALIZED_DATA")
-                if section["characteristics"]["raw"] & 0x00000080:
-                    section["characteristics"]["names"].append(
-                        "SCN_CNT_UNINITIALIZED_DATA")
-                if section["characteristics"]["raw"] & 0x00000100:
-                    section["characteristics"]["names"].append("SCN_LNK_OTHER")
-                if section["characteristics"]["raw"] & 0x00000200:
-                    section["characteristics"]["names"].append("SCN_LNK_INFO")
-                if section["characteristics"]["raw"] & 0x00000800:
-                    section["characteristics"]["names"].append(
-                        "SCN_LNK_REMOVE")
-                if section["characteristics"]["raw"] & 0x00001000:
-                    section["characteristics"]["names"].append(
-                        "SCN_LNK_COMDAT")
-                if section["characteristics"]["raw"] & 0x00008000:
-                    section["characteristics"]["names"].append("SCN_GPREL")
-                if section["characteristics"]["raw"] & 0x00020000:
-                    section["characteristics"]["names"].append(
-                        "SCN_MEM_PURGEABLE")
-                if section["characteristics"]["raw"] & 0x00020000:
-                    section["characteristics"]["names"].append("SCN_MEM_16BIT")
-                if section["characteristics"]["raw"] & 0x00040000:
-                    section["characteristics"]["names"].append(
-                        "SCN_MEM_LOCKED")
-                if section["characteristics"]["raw"] & 0x00080000:
-                    section["characteristics"]["names"].append(
-                        "SCN_MEM_PRELOAD")
-                if section["characteristics"]["raw"] & 0x00100000:
-                    section["characteristics"]["names"].append(
-                        "SCN_ALIGN_1BYTES")
-                if section["characteristics"]["raw"] & 0x00200000:
-                    section["characteristics"]["names"].append(
-                        "SCN_ALIGN_2BYTES")
-                if section["characteristics"]["raw"] & 0x00300000:
-                    section["characteristics"]["names"].append(
-                        "SCN_ALIGN_4BYTES")
-                if section["characteristics"]["raw"] & 0x00400000:
-                    section["characteristics"]["names"].append(
-                        "SCN_ALIGN_8BYTES")
-                if section["characteristics"]["raw"] & 0x00500000:
-                    section["characteristics"]["names"].append(
-                        "SCN_ALIGN_16BYTES")
-                if section["characteristics"]["raw"] & 0x00600000:
-                    section["characteristics"]["names"].append(
-                        "SCN_ALIGN_32BYTES")
-                if section["characteristics"]["raw"] & 0x00700000:
-                    section["characteristics"]["names"].append(
-                        "SCN_ALIGN_64BYTES")
-                if section["characteristics"]["raw"] & 0x00800000:
-                    section["characteristics"]["names"].append(
-                        "SCN_ALIGN_128BYTES")
-                if section["characteristics"]["raw"] & 0x00900000:
-                    section["characteristics"]["names"].append(
-                        "SCN_ALIGN_256BYTES")
-                if section["characteristics"]["raw"] & 0x00A00000:
-                    section["characteristics"]["names"].append(
-                        "SCN_ALIGN_512BYTES")
-                if section["characteristics"]["raw"] & 0x00B00000:
-                    section["characteristics"]["names"].append(
-                        "SCN_ALIGN_1024BYTES")
-                if section["characteristics"]["raw"] & 0x00C00000:
-                    section["characteristics"]["names"].append(
-                        "SCN_ALIGN_2048BYTES")
-                if section["characteristics"]["raw"] & 0x00D00000:
-                    section["characteristics"]["names"].append(
-                        "SCN_ALIGN_4096BYTES")
-                if section["characteristics"]["raw"] & 0x00E00000:
-                    section["characteristics"]["names"].append(
-                        "SCN_ALIGN_8192BYTES")
-                if section["characteristics"]["raw"] & 0x01000000:
-                    section["characteristics"]["names"].append(
-                        "SCN_LNK_NRELOC_OVFL")
-                if section["characteristics"]["raw"] & 0x02000000:
-                    section["characteristics"]["names"].append(
-                        "SCN_MEM_DISCARDABLE")
-                if section["characteristics"]["raw"] & 0x04000000:
-                    section["characteristics"]["names"].append(
-                        "SCN_MEM_NOT_CACHED")
-                if section["characteristics"]["raw"] & 0x08000000:
-                    section["characteristics"]["names"].append(
-                        "SCN_MEM_NOT_PAGED")
-                if section["characteristics"]["raw"] & 0x10000000:
-                    section["characteristics"]["names"].append(
-                        "SCN_MEM_SHARED")
-                if section["characteristics"]["raw"] & 0x20000000:
-                    section["characteristics"]["names"].append(
-                        "SCN_MEM_EXECUTE")
-                if section["characteristics"]["raw"] & 0x40000000:
-                    section["characteristics"]["names"].append("SCN_MEM_READ")
-                if section["characteristics"]["raw"] & 0x80000000:
-                    section["characteristics"]["names"].append("SCN_MEM_WRITE")
+                section["characteristics"] = utils.unpack_flags(
+                    self.buf.ru32l(), (
+                        (3, "SCN_TYPE_NO_PAD"),
+                        (5, "SCN_CNT_CODE"),
+                        (6, "SCN_CNT_INITIALIZED_DATA"),
+                        (7, "SCN_CNT_UNINITIALIZED_DATA"),
+                        (8, "SCN_LNK_OTHER"),
+                        (9, "SCN_LNK_INFO"),
+                        (11, "SCN_LNK_REMOVE"),
+                        (12, "SCN_LNK_COMDAT"),
+                        (15, "SCN_GPREL"),
+                        (17, "SCN_MEM_PURGEABLE"),
+                        (18, "SCN_MEM_LOCKED"),
+                        (19, "SCN_MEM_PRELOAD"),
+                        (24, "SCN_LNK_NRELOC_OVFL"),
+                        (25, "SCN_MEM_DISCARDABLE"),
+                        (26, "SCN_MEM_NOT_CACHED"),
+                        (27, "SCN_MEM_NOT_PAGED"),
+                        (28, "SCN_MEM_SHARED"),
+                        (29, "SCN_MEM_EXECUTE"),
+                        (30, "SCN_MEM_READ"),
+                        (31, "SCN_MEM_WRITE"),
+                    ))
 
                 if section["psize"] != 0:
                     with self.buf:
@@ -1910,24 +1870,12 @@ class SpirVModule(module.RuminantModule):
         return utils.decode(s).rstrip("\x00")
 
     def read_memory_operands(self):
-        val = {"raw": self.read(), "names": []}
-
-        if val["raw"] & 0x00000001:
-            val["names"].append("Volatile")
-        if val["raw"] & 0x00000002:
-            val["names"].append("Aligned")
-        if val["raw"] & 0x00000004:
-            val["names"].append("Nontemporal")
-        if val["raw"] & 0x00000008:
-            val["names"].append("MakePointerAvailable")
-        if val["raw"] & 0x00000010:
-            val["names"].append("MakePointerVisible")
-        if val["raw"] & 0x00000020:
-            val["names"].append("NonPrivatePointer")
-        if val["raw"] & 0x00010000:
-            val["names"].append("AliasScopeINTELMask")
-        if val["raw"] & 0x00020000:
-            val["names"].append("NoAliasINTELMask")
+        val = utils.unpack_flags(
+            self.read(),
+            ((0, "Volatile"), (1, "Aligned"), (2, "Nontemporal"),
+             (3, "MakePointerAvailable"), (4, "MakePointerVisible"),
+             (5, "NonPrivatePointer"), (16, "AliasScopeINTELMask"),
+             (17, "NoAliasINTELMask")))
 
         return val
 
@@ -2125,31 +2073,14 @@ class SpirVModule(module.RuminantModule):
                 case "Function":
                     inst["arguments"]["result-type-id"] = self.read()
                     inst["arguments"]["result-id"] = self.read()
-                    inst["arguments"]["function-control"] = {
-                        "raw": self.read(),
-                        "names": []
-                    }
-
-                    if inst["arguments"]["function-control"][
-                            "raw"] & 0x00000001:
-                        inst["arguments"]["function-control"]["names"].append(
-                            "Inline")
-                    if inst["arguments"]["function-control"][
-                            "raw"] & 0x00000002:
-                        inst["arguments"]["function-control"]["names"].append(
-                            "DontInline")
-                    if inst["arguments"]["function-control"][
-                            "raw"] & 0x00000004:
-                        inst["arguments"]["function-control"]["names"].append(
-                            "Pure")
-                    if inst["arguments"]["function-control"][
-                            "raw"] & 0x00000008:
-                        inst["arguments"]["function-control"]["names"].append(
-                            "Const")
-                    if inst["arguments"]["function-control"][
-                            "raw"] & 0x00010000:
-                        inst["arguments"]["function-control"]["names"].append(
-                            "OptNoneExt")
+                    inst["arguments"]["function-control"] = utils.unpack_flags(
+                        self.read(), (
+                            (0, "Inline"),
+                            (1, "DontInline"),
+                            (2, "Pure"),
+                            (3, "Const"),
+                            (16, "OptNoneExt"),
+                        ))
 
                     inst["arguments"]["function-type-id"] = self.read()
                 case "Label":

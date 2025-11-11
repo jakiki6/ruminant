@@ -2208,6 +2208,11 @@ class TIFFModule(module.RuminantModule):
                                                 "text"] = blob.decode(
                                                     "latin-1")
                                             del tag["values"]
+                                        case "UNICODE":
+                                            tag["parsed"][
+                                                "text"] = blob.decode(
+                                                    "utf-16be")
+                                            del tag["values"]
                                         case _:
                                             tag["parsed"]["unknown"] = True
                                 case 2 | 36864 | 40960 | 45056:
