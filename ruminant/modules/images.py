@@ -2864,3 +2864,119 @@ class DicomModule(module.RuminantModule):
         self.buf.skip(self.buf.available())
 
         return meta
+
+
+@module.register
+class ExrModule(module.RuminantModule):
+    desc = "OpenEXR files"
+
+    def identify(buf, ctx):
+        return buf.peek(4) == b"v/1\x01"
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "exr"
+
+        self.buf.skip(4)
+        temp = self.buf.ru32l()
+        meta["version"] = temp & 0xff
+        temp >>= 8
+        meta["flags"] = {"raw": temp, "names": []}
+        if temp & (1 << 0):
+            meta["flags"]["names"].append("TILED")
+        if temp & (1 << 1):
+            meta["flags"]["names"].append("LONG_NAMES")
+        if temp & (1 << 2):
+            meta["flags"]["names"].append("DEEP")
+        if temp & (1 << 3):
+            meta["flags"]["names"].append("MULTIPART")
+
+        meta["headers"] = []
+        while self.buf.pu8() != 0x00:
+            header = {}
+            header["name"] = self.buf.rzs()
+            header["type"] = self.buf.rzs()
+            header["size"] = self.buf.ru32l()
+
+            self.buf.pasunit(header["size"])
+
+            match header["type"]:
+                case "string":
+                    header["payload"] = self.buf.rs(self.buf.unit)
+                case "float":
+                    header["payload"] = self.buf.rf32l()
+                case "chlist":
+                    header["payload"] = []
+                    while self.buf.pu8() != 0:
+                        channel = {}
+                        channel["name"] = self.buf.rzs()
+                        channel["pixel-type"] = utils.unraw(
+                            self.buf.ru32l(), 4, {
+                                0x00000000: "16-bit float",
+                                0x00000001: "32-bit float",
+                                0x00000002: "32-bit unsigned integer"
+                            }, True)
+                        channel["is-linear"] = bool(self.buf.ru8())
+                        channel["reserved"] = self.buf.rh(3)
+                        channel["x-sampling"] = self.buf.ru32l()
+                        channel["y-sampling"] = self.buf.ru32l()
+
+                        header["payload"].append(channel)
+                case "compression":
+                    header["payload"] = utils.unraw(
+                        self.buf.ru8(), 1, {
+                            0x00: "NONE",
+                            0x01: "RLE",
+                            0x02: "ZIPS",
+                            0x03: "ZIP",
+                            0x04: "PIZ",
+                            0x05: "PXR24",
+                            0x06: "B44",
+                            0x07: "B44A",
+                            0x08: "DWAA",
+                            0x09: "DWAB"
+                        }, True)
+                case "box2i":
+                    header["payload"] = {
+                        "xmin": self.buf.ru32l(),
+                        "ymin": self.buf.ru32l(),
+                        "xmax": self.buf.ru32l(),
+                        "ymax": self.buf.ru32l()
+                    }
+                case "lineOrder":
+                    header["payload"] = utils.unraw(
+                        self.buf.ru8(), 1, {
+                            0x00: "INCREASING_Y",
+                            0x01: "DECREASING_Y",
+                            0x02: "RANDOM_Y"
+                        }, True)
+                case "stringvector":
+                    header["payload"] = []
+                    while self.buf.unit > 0:
+                        header["payload"].append(self.buf.rs(self.buf.ru32l()))
+                case "v2f":
+                    header["payload"] = [self.buf.rf32l(), self.buf.rf32l()]
+                case _:
+                    header["payload"] = self.buf.rh(self.buf.unit)
+                    header["unknown"] = True
+
+            self.buf.sapunit()
+
+            meta["headers"].append(header)
+
+        self.buf.skip(1)
+
+        m = 0
+        meta["chunk-count"] = 0
+        while True:
+            n = self.buf.ru64l()
+            if n <= m or (n + 8) > self.buf.size():
+                break
+
+            m = n
+            meta["chunk-count"] += 1
+
+        self.buf.skip(16 if "TILED" in meta["flags"]["names"] else 8)
+        self.buf.skip(self.buf.ru32l())
+
+        return meta

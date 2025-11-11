@@ -96,6 +96,7 @@ Ruminant is still in early alpha but it can already process the following file t
 * Git object files
 * Intel microcode files
   * including public key detection and signature extraction
+* EXR/OpenEXR files
 
 # How do I install it?
 Run `pip3 install ruminant`.
