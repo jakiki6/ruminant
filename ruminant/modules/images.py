@@ -763,10 +763,7 @@ class ICCProfileModule(module.RuminantModule):
                     tag["data"]["formula"] = {}
                     match function_type:
                         case 0:
-                            tag["data"]["formula"][
-                                f"X >= {-b / a}"] = f"Y = X ^ {g}"
-                            tag["data"]["formula"][
-                                f"X < {-b / a}"] = f"Y = X ^ {g}"
+                            tag["data"]["formula"]["X"] = f"Y = X ^ {g}"
                         case 1:
                             tag["data"]["formula"][
                                 f"X >= {-b / a}"] = f"Y = ({a} * X + {b}) ^ {g}"
