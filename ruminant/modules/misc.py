@@ -736,9 +736,9 @@ class JavaClassModule(module.RuminantModule):
                         match v[0]:
                             case "class-ref":
                                 meta["constants"][k] = f"L{v[1]};"
-                            case "method-ref":
+                            case "method-ref" | "field-ref":
                                 meta["constants"][k] = f"{v[1]}{v[2]}"
-                            case "name-and-type" | "field-ref":
+                            case "name-and-type":
                                 meta["constants"][k] = f"{v[1]}:{v[2]}"
                             case "string-ref":
                                 meta["constants"][k] = repr(v[1])
