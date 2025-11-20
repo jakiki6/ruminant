@@ -2,7 +2,6 @@
   * DjVu
   * INDD
   * WOFF2
-  * EXR
   * Intel BIOS flash dumps
 * expand file formats
   * Jpeg XL

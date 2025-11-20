@@ -75,7 +75,7 @@ This is a list of useful resources.
 * https://download.microsoft.com/download/7/9/0/790fecaa-f64a-4a5e-a430-0bccdab3f1b4/asf_specification.doc
 
 # Java
-* https://docs.oracle.com/javase/specs/jvms/se8/html
+* https://docs.oracle.com/javase/specs/jvms/se25/html
 
 # PE
 * https://learn.microsoft.com/en-us/windows/win32/debug/pe-format

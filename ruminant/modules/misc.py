@@ -7,6 +7,8 @@ import datetime
 import gzip
 import zlib
 import time
+import binascii
+import base64
 
 
 @module.register
@@ -323,24 +325,61 @@ class JavaClassModule(module.RuminantModule):
                 return self.resolve(self.buf.ru16())
             case b"[":
                 return [self.read_element() for i in range(0, self.buf.ru16())]
-            case b"@":
-                return self.read_annotation()
             case b"e":
                 typ = self.resolve(self.buf.ru16())
                 return typ + self.resolve(self.buf.ru16())
+            case b"@":
+                return self.read_annotation()
             case _:
                 raise ValueError(f"Unkown tag type '{tag.decode('latin-1')}'")
 
-    def read_annotation(self):
-        annotation = {}
-        annotation["type"] = self.resolve(self.buf.ru16())
+    def read_annotation(self, val=None):
+        if val is None:
+            val = {}
 
-        annotation["elements"] = {}
-        for j in range(0, self.buf.ru16()):
-            key = self.resolve(self.buf.ru16())
-            annotation["elements"][key] = self.read_element()
+        val["type"] = self.resolve(self.buf.ru16())
 
-        return annotation
+        val["values"] = []
+        for i in range(0, self.buf.ru16()):
+            pair = {}
+            pair["key"] = self.resolve(self.buf.ru16())
+            pair["value"] = self.read_element()
+
+            val["values"].append(pair)
+
+        return val
+
+    def read_type_annotation(self):
+        # https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-4.html#jvms-4.7.20
+
+        val = {}
+        val["data"] = {}
+
+        tag = self.buf.read(1)
+        match tag:
+            case b"\x11" | b"\x12":
+                val["data"]["type-parameter-index"] = self.buf.ru8()
+                val["data"]["bound-index"] = self.buf.ru8()
+            case b"\x13" | b"\x14" | b"\x15":
+                pass
+            case b"\x16":
+                val["data"]["formal-parameter-index"] = self.buf.ru8()
+            case b"\x40":
+                val["data"]["table"] = [{
+                    "start-pc": self.buf.ru16(),
+                    "length": self.buf.ru16(),
+                    "index": self.buf.ru16()
+                } for i in range(0, self.buf.ru16())]
+            case b"\x43" | b"\x44" | b"\x45" | b"\x46":
+                val["data"]["offset"] = self.buf.ru16()
+            case _:
+                raise ValueError(f"Unkown tag type '{tag.decode('latin-1')}'")
+
+        val["type-path"] = [[self.buf.ru8(), self.buf.ru8()]
+                            for i in range(0, self.buf.ru8())]
+        self.read_annotation(val)
+
+        return val
 
     def read_verification_type(self):
         tag = self.buf.ru8()
@@ -590,10 +629,56 @@ class JavaClassModule(module.RuminantModule):
                              (3, "static"), (4, "final"), (9, "interface"),
                              (10, "abstract"), (12, "synthetic"),
                              (13, "annotation"), (14, "enum")))
+                        val.append(clazz)
+                case "Record":
+                    val = []
+                    for i in range(0, self.buf.ru16()):
+                        comp = {}
+                        comp["name"] = self.resolve(self.buf.ru16())
+                        comp["descriptor"] = self.resolve(self.buf.ru16())
+                        self.read_attributes(comp)
+                        val.append(comp)
+                case "BootstrapMethods":
+                    val = []
+                    for i in range(0, self.buf.ru16()):
+                        bmth = {}
+                        bmth["method"] = self.resolve(self.buf.ru16())
+
+                        bmth["arguments"] = []
+                        for i in range(0, self.buf.ru16()):
+                            bmth["arguments"].append(
+                                self.resolve(self.buf.ru16()))
+
+                        val.append(bmth)
+                case "EnclosingMethod":
+                    val = {
+                        "class": self.resolve(self.buf.ru16()),
+                        "method": self.resolve(self.buf.ru16())
+                    }
+                case "Deprecated":
+                    val = True
                 case "RuntimeVisibleAnnotations" | "RuntimeInvisibleAnnotations":
                     val = []
                     for i in range(0, self.buf.ru16()):
                         val.append(self.read_annotation())
+                case "RuntimeVisibleTypeAnnotations" | "RuntimeInvisibleTypeAnnotations":
+                    val = []
+                    for i in range(0, self.buf.ru16()):
+                        val.append(self.read_type_annotation())
+                case "RuntimeVisibleParameterAnnotations" | "RuntimeInvisibleParameterAnnotations":
+                    val = []
+                    for i in range(0, self.buf.ru8()):
+                        val2 = []
+                        for i in range(0, self.buf.ru16()):
+                            val2.append(self.read_annotation())
+
+                        val.append(val2)
+                case "NestHost" | "ConstantValue":
+                    val = self.resolve(self.buf.ru16())
+                case "NestMembers" | "Exceptions" | "PermittedSubclasses":
+                    val = []
+                    for i in range(0, self.buf.ru16()):
+                        val.append(self.resolve(self.buf.ru16()))
                 case "SourceFile" | "Signature":
                     val = self.resolve(self.buf.ru16())
                 case _:
@@ -1661,6 +1746,23 @@ class NbtModule(module.RuminantModule):
             for elem in root:
                 self.clean(elem)
 
+    def parse(self, root):
+        if isinstance(root, dict):
+            for k, v in list(root.items()):
+                if k == "icon" and isinstance(v, str) and len(v) > 100:
+                    try:
+                        root[k] = {
+                            "raw": v,
+                            "parsed": chew(base64.b64decode(v))
+                        }
+                    except binascii.Error:
+                        pass
+                else:
+                    self.parse(v)
+        elif isinstance(root, list):
+            for elem in root:
+                self.parse(elem)
+
     def chew(self):
         meta = {}
         meta["type"] = "nbt"
@@ -1672,6 +1774,8 @@ class NbtModule(module.RuminantModule):
 
         if self.extra_ctx.get("skip-chunk-data"):
             self.clean(meta["data"])
+
+        self.parse(meta["data"])
 
         return meta
 

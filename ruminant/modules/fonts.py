@@ -593,3 +593,38 @@ class TrueTypeModule(module.RuminantModule):
             self.buf.skip(4 - (self.buf.tell() % 4))
 
         return meta
+
+
+@module.register
+class Woff2Module(module.RuminantModule):
+    dev = True
+    desc = "WOFF2 font files."
+
+    def identify(buf, ctx):
+        return buf.peek(4) == b"wOF2"
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "woff2"
+
+        self.buf.skip(4)
+        meta["header"] = {}
+        meta["header"]["sfnt-version"] = self.buf.ru32()
+        meta["header"]["length"] = self.buf.ru32()
+
+        self.buf.pasunit(meta["header"]["length"] - 12)
+
+        meta["header"]["table-count"] = self.buf.ru16()
+        meta["header"]["reserved"] = self.buf.ru16()
+        meta["header"]["sfnt-size"] = self.buf.ru32()
+        meta["header"]["compressed-size"] = self.buf.ru32()
+        temp = self.buf.ru16()
+        meta["header"]["version"] = f"{temp}.{self.buf.ru16()}"
+        meta["header"]["meta-offset"] = self.buf.ru32()
+        meta["header"]["meta-size"] = self.buf.ru32()
+        meta["header"]["priv-offset"] = self.buf.ru32()
+        meta["header"]["priv-size"] = self.buf.ru32()
+
+        self.buf.sapunit()
+
+        return meta

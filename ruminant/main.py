@@ -161,12 +161,10 @@ def main(dev=False):
                         action="store_true",
                         help="Treat file as URL and fetch it")
 
-    parser.add_argument(
-        "--strip-url",
-        action="store_true",
-        help="Strip metadata-removing parameters from"
-             "known URLs like '?filetype=webp'"
-    )
+    parser.add_argument("--strip-url",
+                        action="store_true",
+                        help="Strip metadata-removing parameters from"
+                        "known URLs like '?filetype=webp'")
 
     has_tqdm = True
     try:
