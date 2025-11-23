@@ -2655,3 +2655,52 @@ class IntelMicrocodeModule(module.RuminantModule):
         self.buf.sapunit()
 
         return meta
+
+
+@module.register
+class BtrfsModule(module.RuminantModule):
+    dev = True
+    desc = "BTRFS filesystems."
+
+    def identify(buf, ctx):
+        if buf.available() < 0x10000:
+            return False
+
+        with buf:
+            buf.seek(0x10040)
+            return buf.peek(8) == b"_BHRfS_M"
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "btrfs"
+
+        self.buf.seek(0x10000)
+        meta["header"] = {}
+        meta["header"]["checksum"] = self.buf.rh(32)
+        meta["header"]["uuid"] = self.buf.ruuid()
+        meta["header"]["header-paddr"] = self.buf.ru64l()
+        meta["header"]["flags"] = self.buf.ru64l()
+        self.buf.skip(8)
+        meta["header"]["generation"] = self.buf.ru64l()
+        meta["header"]["root-tree-laddr"] = self.buf.ru64l()
+        meta["header"]["chunk-tree-laddr"] = self.buf.ru64l()
+        meta["header"]["log-tree-laddr"] = self.buf.ru64l()
+        meta["header"]["log-root-transid"] = self.buf.ru64l()
+        meta["header"]["total-bytes"] = self.buf.ru64l()
+        meta["header"]["bytes-used"] = self.buf.ru64l()
+        meta["header"]["root-dir-object-id"] = self.buf.ru64l()
+        meta["header"]["device-count"] = self.buf.ru64l()
+        meta["header"]["sector-size"] = self.buf.ru32l()
+        meta["header"]["node-size"] = self.buf.ru32l()
+        meta["header"]["leaf-size"] = self.buf.ru32l()
+        meta["header"]["stripe-size"] = self.buf.ru32l()
+        meta["header"]["sys-chunk-array-size"] = self.buf.ru32l()
+        meta["header"]["chunk-root-generation"] = self.buf.ru64l()
+        meta["header"]["compat-flags"] = self.buf.ru64l()
+        meta["header"]["compat-flags-ro"] = self.buf.ru64l()
+        meta["header"]["incompat-flags"] = self.buf.ru64l()
+
+        self.buf.seek(0)
+        self.buf.skip(meta["header"]["total-bytes"])
+
+        return meta
