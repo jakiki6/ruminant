@@ -2696,11 +2696,17 @@ class BtrfsModule(module.RuminantModule):
         meta["header"]["stripe-size"] = self.buf.ru32l()
         meta["header"]["sys-chunk-array-size"] = self.buf.ru32l()
         meta["header"]["chunk-root-generation"] = self.buf.ru64l()
-        meta["header"]["compat-flags"] = self.buf.ru64l()
-        meta["header"]["compat-flags-ro"] = self.buf.ru64l()
-        meta["header"]["incompat-flags"] = self.buf.ru64l()
+        meta["header"]["compat-flags"] = utils.unpack_flags(
+            self.buf.ru64l(), constants.BTRFS_FLAGS)
+        meta["header"]["compat-flags-ro"] = utils.unpack_flags(
+            self.buf.ru64l(), constants.BTRFS_FLAGS)
+        meta["header"]["incompat-flags"] = utils.unpack_flags(
+            self.buf.ru64l(), constants.BTRFS_FLAGS)
 
         self.buf.seek(0)
-        self.buf.skip(meta["header"]["total-bytes"])
+        if meta["header"]["device-count"] == 1:
+            self.buf.skip(meta["header"]["total-bytes"])
+        else:
+            self.buf.skip(self.buf.available())
 
         return meta
