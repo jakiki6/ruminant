@@ -56,6 +56,16 @@ class FlacModule(module.RuminantModule):
                 case 2:
                     block["type"] = "Application"
                     block["data"]["application-id"] = self.buf.rs(4, "latin-1")
+                case 3:
+                    block["type"] = "Seek table"
+                    block["data"]["entries"] = []
+                    while self.buf.unit > 0:
+                        entry = {}
+                        entry["first-sample"] = self.buf.ri64()
+                        entry["offset"] = self.buf.ru64()
+                        entry["sample-count"] = self.buf.ru16()
+
+                        block["data"]["entries"].append(entry)
                 case 4:
                     block["type"] = "Vorbis comment"
                     block["data"]["vendor-string"] = self.buf.rs(
