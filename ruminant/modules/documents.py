@@ -626,43 +626,50 @@ class Ole2Module(module.RuminantModule):
     def identify(buf, ctx):
         return buf.peek(8) == b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
 
-    def read(self, sector):
-        data = b""
-        with self.buf:
-            while sector < 0xfffffffc:
-                self.buf.seek((sector + 1) * self.sector_size)
-                data += self.buf.read(self.sector_size)
-                sector = self.fat[sector]
+    def read(self, start, length):
+        blob = b""
+        while True:
+            if length <= 0:
+                break
 
-        return data
+            self.buf.seek(512 + self.sector_size * self.sector_fat[start])
+            blob += self.buf.read(min(length, self.sector_size))
+            length -= self.sector_size
 
-    def read_directory(self, sector):
-        buf = Buf(self.read(sector))
+            start = self.master_fat[start]
 
-        directory = []
-        while buf.available():
-            entry = {}
-            entry["name"] = buf.rs(64, "utf-16le")
-            entry["name-length"] = buf.ru16l()
-            entry["object-type"] = utils.unraw(buf.ru8(), 1, {
-                1: "Storage",
-                2: "Stream",
-                5: "Root"
-            })
-            entry["color-flag"] = buf.ru8()
-            entry["left"] = buf.ru32l()
-            entry["right"] = buf.ru32l()
-            entry["child"] = buf.ru32l()
-            entry["clsid"] = buf.rguid()
-            entry["state-bits"] = buf.ru32l()
-            entry["creation-time"] = buf.ru64l()
-            entry["modification-time"] = buf.ru64l()
-            entry["start-sector"] = buf.ru32l()
-            entry["stream-size"] = buf.ru64l()
+        return blob
 
-            directory.append(entry)
+    def read_direntry(self):
+        entry = {}
+        name = self.buf.read(64)
+        name = name[:self.buf.ru16l() - 2]
+        entry["name"] = name.decode("utf16")
+        entry["type"] = utils.unraw(
+            self.buf.ru8(), 1, {
+                0x00: "Empty",
+                0x01: "User storage",
+                0x02: "User stream",
+                0x03: "LockBytes",
+                0x04: "Property",
+                0x05: "Root storage"
+            }, True)
+        entry["color"] = utils.unraw(self.buf.ru8(), 1, {
+            0x00: "Black",
+            0x01: "Red"
+        }, True)
+        entry["left"] = self.buf.ri32l()
+        entry["right"] = self.buf.ri32l()
+        entry["root"] = self.buf.ri32l()
+        entry["guid"] = self.buf.rguid()
+        entry["user-flags"] = self.buf.ru32l()
+        entry["creation-timestamp"] = self.buf.ru64l()
+        entry["modification-timestamp"] = self.buf.ru64l()
+        entry["start"] = self.buf.ru32l()
+        entry["size"] = self.buf.ru32l()
+        entry["unused"] = self.buf.ru32l()
 
-        return directory
+        return entry
 
     def chew(self):
         meta = {}
@@ -677,28 +684,54 @@ class Ole2Module(module.RuminantModule):
                                                    {65534: "little"})
         meta["header"]["sector-size"] = 1 << self.buf.ru16l()
         self.sector_size = meta["header"]["sector-size"]
-        meta["header"]["mini-sector-size"] = 1 << self.buf.ru16l()
-        meta["header"]["reserved"] = self.buf.rh(6)
-        meta["header"]["directory-sector-count"] = self.buf.ru32l()
+        meta["header"]["short-sector-size"] = 1 << self.buf.ru16l()
+        meta["header"]["reserved1"] = self.buf.rh(10)
         meta["header"]["fat-sector-count"] = self.buf.ru32l()
         meta["header"]["directory-start"] = self.buf.ru32l()
-        meta["header"]["transaction-signature"] = self.buf.ru32l()
-        meta["header"]["mini-stream-cutoff"] = self.buf.ru32l()
-        meta["header"]["mini-fat-start"] = self.buf.ru32l()
-        meta["header"]["mini-fat-sector-count"] = self.buf.ru32l()
-        meta["header"]["difat-start"] = self.buf.ru32l()
-        meta["header"]["difat-sector-count"] = self.buf.ru32l()
+        meta["header"]["reserved2"] = self.buf.rh(4)
+        meta["header"]["minimum-standard-size"] = self.buf.ru32l()
+        meta["header"]["short-fat-start"] = self.buf.ri32l()
+        meta["header"]["short-fat-size"] = self.buf.ru32l()
+        meta["header"]["master-fat-start"] = self.buf.ri32l()
+        meta["header"]["master-fat-size"] = self.buf.ru32l()
 
-        self.buf.pasunit(meta["header"]["fat-sector-count"] *
-                         self.sector_size + 436)
+        self.master_fat = []
+        for i in range(0, 109):
+            self.master_fat.append(self.buf.ri32l())
 
-        self.fat = []
-        while self.buf.unit > 0:
-            self.fat.append(self.buf.ru32l())
+        msat = meta["header"]["master-fat-start"]
+        remaining = meta["header"]["master-fat-size"]
+        while remaining > 0:
+            for i in range(0, self.sector_size // 4):
+                self.master_fat.append(self.buf.ri32l())
 
-        self.buf.sapunit()
+            remaining -= 1
+            msat = self.master_fat[msat]
 
-        rootdir = self.read_directory(meta["header"]["directory-start"])
-        meta["files"] = rootdir
+        self.sector_fat = []
+        for i in range(0, meta["header"]["fat-sector-count"]):
+            self.buf.seek(self.master_fat[i] * self.sector_size + 512)
+
+            for j in range(0, self.sector_size // 4):
+                self.sector_fat.append(self.buf.ri32l())
+
+        self.short_sector_fat = []
+        ssat = meta["header"]["short-fat-start"]
+        remaining = meta["header"]["short-fat-size"]
+        while remaining > 0:
+            self.buf.seek(512 + ssat * self.sector_size)
+
+            for i in range(0, self.sector_size // 4):
+                self.short_sector_fat.append(self.buf.ri32l())
+
+            remaining -= 1
+            ssat = self.sector_fat[ssat]
+
+        self.buf.seek(512 +
+                      meta["header"]["directory-start"] * self.sector_size)
+        meta["root"] = self.read_direntry()
+
+        self.buf.seek(512 + max(max(self.master_fat), max(self.sector_fat),
+                                max(self.short_sector_fat)) * self.sector_size)
 
         return meta
