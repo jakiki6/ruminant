@@ -33,6 +33,9 @@ def _xml_to_dict(elem):
 
         if elem.tag == "{http://ns.adobe.com/xap/1.0/g/img/}image":
             res["text"] = chew(base64.b64decode(res["text"]))
+        elif elem.tag in ("PrivateKey", "Certificate") and res.get(
+                "attributes", {}).get("format") == "pem":
+            res["text"] = chew(res["text"].strip().encode("utf-8"))
 
     children = list(elem)
     if len(children):

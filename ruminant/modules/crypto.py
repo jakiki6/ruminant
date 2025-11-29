@@ -40,7 +40,8 @@ class PemModule(module.RuminantModule):
         return buf.peek(27) == b"-----BEGIN CERTIFICATE-----" or buf.peek(
             15) == b"-----BEGIN RSA " or buf.peek(
                 26) == b"-----BEGIN PUBLIC KEY-----" or buf.peek(
-                    27) == b"-----BEGIN PRIVATE KEY-----"
+                    27) == b"-----BEGIN PRIVATE KEY-----" or buf.peek(
+                        30) == b"-----BEGIN EC PRIVATE KEY-----"
 
     def chew(self):
         meta = {}
