@@ -541,7 +541,7 @@ class PdfModule(module.RuminantModule):
                 value = cls.parse_value(tokens)
                 result[key] = value
                 key = None
-        raise ValueError("Unterminated dictionary")
+        return result
 
     @classmethod
     def parse_array(cls, tokens):
@@ -551,7 +551,7 @@ class PdfModule(module.RuminantModule):
                 tokens.pop(0)
                 return result
             result.append(cls.parse_value(tokens))
-        raise ValueError("Unterminated array")
+        return result
 
     @classmethod
     def parse_value(cls, tokens):
