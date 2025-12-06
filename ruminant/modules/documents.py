@@ -310,7 +310,7 @@ class PdfModule(module.RuminantModule):
                                     base64.a85decode(
                                         buf.read().rstrip(b"\n").split(
                                             b">")[0].decode("latin-1")))
-                            case "/DCTDecode" | "/CCITTFaxDecode":
+                            case "/DCTDecode" | "/CCITTFaxDecode" | "/JPXDecode" | "/JBIG2Decode":
                                 pass
                             case _:
                                 raise ValueError(f"Unknown filter '{filt}'")

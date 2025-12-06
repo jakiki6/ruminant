@@ -451,6 +451,11 @@ class IRBModule(module.RuminantModule):
                         block["data"]["x"] = self.buf.rf32()
                         block["data"]["y"] = self.buf.rf32()
                         block["data"]["scale"] = self.buf.rf32()
+                    case 1006:
+                        block["data"]["name"] = self.buf.rs(self.buf.ru8())
+                    case 1045:
+                        block["data"]["name"] = self.buf.rs(
+                            self.buf.ru32() * 2, encoding="utf-16be")
                     case 10000:
                         block["data"]["version"] = self.buf.ru16()
                         block["data"]["center-crop-marks"] = self.buf.ru8()
@@ -2693,8 +2698,38 @@ class JpegXlModule(module.RuminantModule):
         meta = {}
         meta["type"] = "jpeg-xl"
 
-        # TODO
-        self.buf.skip(self.buf.available())
+        self.buf.skip(2)
+
+        meta["header"] = {}
+        meta["header"]["size"] = {}
+        meta["header"]["size"]["div8"] = bool(self.buf.rb(1))
+        if meta["header"]["size"]["div8"]:
+            meta["header"]["size"]["h_div8"] = self.buf.rb(5) + 1
+            meta["header"]["size"][
+                "height"] = meta["header"]["size"]["h_div8"] * 8
+        else:
+            meta["header"]["size"]["h_div8"] = 0
+            meta["header"]["size"]["height"] = self.buf.rb(
+                [9, 13, 18, 30][self.buf.rb(2)]) + 1
+        meta["header"]["size"]["ratio"] = self.buf.rb(3)
+
+        meta["header"]["size"]["w_div8"] = 0
+        meta["header"]["size"]["width"] = meta["header"]["size"]["height"] * [
+            0, 1, 6, 4, 3, 16, 5, 2
+        ][meta["header"]["size"]["ratio"]] // [
+            1, 1, 5, 3, 2, 9, 4, 1
+        ][meta["header"]["size"]["ratio"]]
+
+        if not meta["header"]["size"]["ratio"]:
+            if meta["header"]["size"]["div8"]:
+                meta["header"]["size"]["w_div8"] = self.buf.rb(5) + 1
+                meta["header"]["size"][
+                    "width"] = meta["header"]["size"]["w_div8"] * 8
+            else:
+                meta["header"]["size"]["width"] = self.buf.rb(
+                    [9, 13, 18, 30][self.buf.rb(2)]) + 1
+
+        self.buf.align()
 
         return meta
 

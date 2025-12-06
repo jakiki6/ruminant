@@ -29,6 +29,7 @@ class Buf(object):
         self._target = self._size
         self._stack = []
         self._backup = []
+        self._bits = 0
 
     @classmethod
     def of(cls, source):
@@ -53,6 +54,9 @@ class Buf(object):
         return data
 
     def skip(self, length):
+        if self._bits != 0:
+            raise ValueError("unaligned")
+
         if self.unit is not None:
             self.unit = max(self.unit - length, 0)
             assert (
@@ -81,6 +85,9 @@ class Buf(object):
         self.unit = None
 
     def read(self, count=None):
+        if self._bits != 0:
+            raise ValueError("unaligned")
+
         if count is None:
             self.unit = None
             return self._file.read(self.available())
@@ -114,10 +121,10 @@ class Buf(object):
 
     def backup(self):
         return (self.unit, self._target, self._stack, self.tell(),
-                self._offset, self._size)
+                self._offset, self._size, self._bits)
 
     def restore(self, bak):
-        self.unit, self._target, self._stack, offset, self._offset, self._size = bak
+        self.unit, self._target, self._stack, offset, self._offset, self._size, self._bits = bak
         self.seek(offset)
 
     def rl(self):
@@ -471,6 +478,33 @@ class Buf(object):
     def puleb(self):
         with self.buf:
             return self.ruleb()
+
+    def rb(self, count):
+        i = 0
+        j = 0
+
+        c = self.pu8()
+        while count:
+            if self._bits >= 8:
+                self._bits = 0
+                self.skip(1)
+                c = self.pu8()
+
+            i |= ((c >> (7 - self._bits)) & 0x01) << j
+            j += 1
+            self._bits += 1
+            count -= 1
+
+        return i
+
+    def pb(self, count):
+        with self:
+            return self.rb(count)
+
+    def align(self):
+        if self._bits != 0:
+            self._bits = 0
+            self.skip(1)
 
     def __getattr__(self, name):
         # Delegate everything else to the underlying file
