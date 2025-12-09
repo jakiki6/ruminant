@@ -70,7 +70,8 @@ class PgpModule(module.RuminantModule):
     desc = "Binary or armored PGP files."
 
     def identify(buf, ctx):
-        if buf.pu8() in (0x85, 0x89) and buf.peek(4)[3] in (0x03, 0x04):
+        if buf.available() > 4 and buf.pu8() in (
+                0x85, 0x89) and buf.peek(4)[3] in (0x03, 0x04):
             return True
 
         return buf.peek(15) == b"-----BEGIN PGP "

@@ -173,19 +173,22 @@ class TorrentModule(module.RuminantModule):
 
     def identify(buf, ctx):
         with buf:
-            if buf.read(1) != b"d":
-                return False
-
-            for i in range(0, 3):
-                c = buf.read(1)
-                if c in b"0123456789":
-                    pass
-                elif c == b":":
-                    return True
-                else:
+            try:
+                if buf.read(1) != b"d":
                     return False
 
-            return False
+                for i in range(0, 3):
+                    c = buf.read(1)
+                    if c in b"0123456789":
+                        pass
+                    elif c == b":":
+                        return True
+                    else:
+                        return False
+
+                return False
+            except Exception:
+                return False
 
     def chew(self):
         meta = {}

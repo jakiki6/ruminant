@@ -611,7 +611,14 @@ class PdfModule(module.RuminantModule):
 
             return token.replace("\\(", "(").replace("\\)", ")")
         elif token.startswith("<"):
-            return bytes.fromhex(token[1:-1].replace(" ", "")).hex()
+            val = bytes.fromhex(token[1:-1].replace(" ", ""))
+            if len(val) >= 2 and val[0] == 0xfe and val[1] == 0xff and len(
+                    val) % 2 == 0:
+                val = val.decode("utf16")
+            else:
+                val = val.hex()
+
+            return val
         elif token.startswith("/"):
             return token
         else:

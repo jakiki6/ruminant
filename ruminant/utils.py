@@ -420,6 +420,14 @@ def read_der(buf):
         while buf.unit > 0:
             data["value"].append(read_der(buf))
 
+    if data["type"] == "SEQUENCE" and len(
+            data["value"]
+    ) == 2 and data["value"][0]["type"] == "OBJECT IDENTIFIER" and data[
+            "value"][1]["type"] == "OCTET STRING" and data["value"][0][
+                "value"]["raw"] == "1.3.6.1.4.1.11129.2.1.30":
+        data["value"][1]["parsed"] = read_cbor(
+            Buf(bytes.fromhex(data["value"][1]["value"])))
+
     buf.skipunit()
     buf.popunit()
 
