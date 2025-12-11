@@ -585,3 +585,20 @@ class CpioModule(module.RuminantModule):
             meta["files"].append(file)
 
         return meta
+
+
+@module.register
+class HttpFramedModule(module.RuminantModule):
+    desc = "HTTP framed streams like mjpeg."
+
+    def identify(buf, ctx):
+        return buf.peek(7) == b"--FRAME"
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "http-frame"
+        self.buf.rl()
+        self.buf.rl()
+        self.buf.rl()
+
+        return meta
