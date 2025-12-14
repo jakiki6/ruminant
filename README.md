@@ -97,6 +97,7 @@ Ruminant is still in early alpha but it can already process the following file t
 * Intel microcode files
   * including public key detection and signature extraction
 * EXR/OpenEXR files
+* Android vbmeta partitions
 
 # How do I install it?
 Run `pip3 install ruminant`.

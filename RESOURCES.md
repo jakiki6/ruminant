@@ -91,3 +91,6 @@ This is a list of useful resources.
 # Intel flash
 * https://github.com/LongSoft/UEFITool/blob/c8553184fa61deb1165c3b20f694da9a30aa26ea/common/descriptor.h#L30
 * https://github.com/LongSoft/UEFITool/blob/c8553184fa61deb1165c3b20f694da9a30aa26ea/common/ffsparser.cpp#L301
+
+# vbmeta
+* https://android.googlesource.com/platform/external/avb
