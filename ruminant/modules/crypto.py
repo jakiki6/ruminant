@@ -582,6 +582,27 @@ class VbmetaModule(module.RuminantModule):
     def identify(buf, ctx):
         return buf.peek(4) == b"AVB0"
 
+    def read_pubkey(self, algo):
+        key = {}
+
+        match algo:
+            case "SHA256_RSA2048" | "SHA256_RSA4096" | "SHA256_RSA8192" | "SHA512_RSA2048" | "SHA512_RSA4096" | "SHA512_RSA8192":
+                bits = self.buf.ru32()
+                key["bits"] = bits
+                key["n0inv"] = self.buf.ru32()
+                key["modulus"] = int.from_bytes(self.buf.read(
+                    (bits + 7) // 8)) & ((1 << bits) - 1)
+                key["rrmodn"] = int.from_bytes(self.buf.read(
+                    (bits + 7) // 8)) & ((1 << bits) - 1)
+
+                n = key["modulus"]
+                key["n0inv-correct"] = key["n0inv"] == 2**32 - pow(
+                    n, -1, 2**32)
+                key["rrmodn-correct"] = key["rrmodn"] == 2**(key["bits"] *
+                                                             2) % n
+
+        return key
+
     def chew(self):
         meta = {}
         meta["type"] = "vbmeta"
@@ -669,8 +690,16 @@ class VbmetaModule(module.RuminantModule):
                     tag["payload"]["partition-name-length"] = self.buf.ru32()
                     tag["payload"]["salt-length"] = self.buf.ru32()
                     tag["payload"]["root-digest-length"] = self.buf.ru32()
+                    tag["payload"]["flags"] = utils.unpack_flags(
+                        self.buf.ru32(), [])
                     tag["payload"]["reserved"] = chew(self.buf.read(60),
                                                       blob_mode=True)
+                    tag["payload"]["partition-name"] = self.buf.rs(
+                        tag["payload"]["partition-name-length"])
+                    tag["payload"]["salt"] = self.buf.rh(
+                        tag["payload"]["salt-length"])
+                    tag["payload"]["root-digest"] = self.buf.rh(
+                        tag["payload"]["root-digest-length"])
                 case 0x02:
                     tag["type"] = "HASH"
                     tag["payload"]["image-size"] = self.buf.ru64()
@@ -680,6 +709,30 @@ class VbmetaModule(module.RuminantModule):
                     tag["payload"]["root-digest-length"] = self.buf.ru32()
                     tag["payload"]["reserved"] = chew(self.buf.read(64),
                                                       blob_mode=True)
+                    tag["payload"]["partition-name"] = self.buf.rs(
+                        tag["payload"]["partition-name-length"])
+                    tag["payload"]["salt"] = self.buf.rh(
+                        tag["payload"]["salt-length"])
+                    tag["payload"]["root-digest"] = self.buf.rh(
+                        tag["payload"]["root-digest-length"])
+                case 0x03:
+                    tag["type"] = "KERNEL_CMDLINE"
+                    tag["payload"]["flags"] = utils.unpack_flags(
+                        self.buf.ru32(), [])
+                    tag["payload"]["cmdline"] = self.buf.rs(self.buf.ru32())
+                case 0x04:
+                    tag["type"] = "CHAIN_PARTITION"
+                    tag["payload"]["rollback-index-location"] = self.buf.ru32()
+                    tag["payload"]["parition-name-length"] = self.buf.ru32()
+                    tag["payload"]["public-key-length"] = self.buf.ru32()
+                    tag["payload"]["flags"] = utils.unpack_flags(
+                        self.buf.ru32(), [])
+                    tag["payload"]["reserved"] = chew(self.buf.read(60),
+                                                      blob_mode=True)
+                    tag["payload"]["partition-name"] = self.buf.rs(
+                        tag["payload"]["parition-name-length"])
+                    tag["payload"]["public-key"] = self.read_pubkey(
+                        meta["header"]["algorithm-type"]["name"])
                 case _:
                     tag["type"] = f"UNKNOWN (0x{hex(typ)[2:].zfill(16)})"
                     tag["payload"]["blob"] = chew(self.buf.readunit())
@@ -699,44 +752,18 @@ class VbmetaModule(module.RuminantModule):
                           meta["header"]["public-key-offset"])
             self.buf.pasunit(meta["header"]["public-key-size"])
 
-            meta["auxiliary-data-block"]["public-key"] = {}
-            match meta["header"]["algorithm-type"]["name"]:
-                case "SHA256_RSA2048" | "SHA256_RSA4096" | "SHA256_RSA8192" | "SHA512_RSA2048" | "SHA512_RSA4096" | "SHA512_RSA8192":
-                    bits = self.buf.ru32()
-                    meta["auxiliary-data-block"]["public-key"]["bits"] = bits
-                    meta["auxiliary-data-block"]["public-key"][
-                        "n0inv"] = self.buf.ru32()
-                    meta["auxiliary-data-block"]["public-key"][
-                        "modulus"] = int.from_bytes(
-                            self.buf.read((bits + 7) // 8)) & ((1 << bits) - 1)
-                    meta["auxiliary-data-block"]["public-key"][
-                        "rrmodn"] = int.from_bytes(
-                            self.buf.read((bits + 7) // 8)) & ((1 << bits) - 1)
-
-                    n = meta["auxiliary-data-block"]["public-key"]["modulus"]
-                    meta["auxiliary-data-block"]["public-key"][
-                        "n0inv-correct"] = meta["auxiliary-data-block"][
-                            "public-key"]["n0inv"] == 2**32 - pow(
-                                n, -1, 2**32)
-
-                    meta["auxiliary-data-block"]["public-key"][
-                        "rrmodn-correct"] = meta["auxiliary-data-block"][
-                            "public-key"]["rrmodn"] == 2**(
-                                meta["auxiliary-data-block"]["public-key"]
-                                ["bits"] * 2) % n
-
-                    sig = pow(
-                        int(meta["authentication-data-block"]["signature"],
-                            16), 65537,
-                        n).to_bytes(
-                            len(meta["authentication-data-block"]["signature"])
-                            // 2, "big")
-                    sig = sig[2:].lstrip(b"\xff")[1:]
-                    meta["auxiliary-data-block"]["public-key"][
-                        "signature"] = utils.read_der(Buf(sig))
-                case _:
-                    meta["auxiliary-data-block"]["public-key"][
-                        "unknown"] = True
+            meta["auxiliary-data-block"]["public-key"] = self.read_pubkey(
+                meta["header"]["algorithm-type"]["name"])
+            if "RSA" in meta["header"]["algorithm-type"]["name"]:
+                sig = pow(
+                    int(meta["authentication-data-block"]["signature"],
+                        16), 65537, meta["auxiliary-data-block"]["public-key"]
+                    ["modulus"]).to_bytes(
+                        len(meta["authentication-data-block"]["signature"]) //
+                        2, "big")
+                sig = sig[2:].lstrip(b"\xff")[1:]
+                meta["auxiliary-data-block"]["public-key"][
+                    "signature"] = utils.read_der(Buf(sig))
 
             self.buf.sapunit()
 
