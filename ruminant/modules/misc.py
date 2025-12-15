@@ -1432,11 +1432,13 @@ class PeModule(module.RuminantModule):
             return meta
 
         meta["pe-header"] = {}
-        meta["pe-header"]["machine"] = utils.unraw(self.buf.ru16l(), 2, {
-            0x0000: "Unknown",
-            0x014c: "i386",
-            0x8664: "x64"
-        })
+        meta["pe-header"]["machine"] = utils.unraw(
+            self.buf.ru16l(), 2, {
+                0x0000: "Unknown",
+                0x014c: "i386",
+                0x8664: "x64",
+                0xaa64: "ARM64 little endian"
+            })
         meta["pe-header"]["section-count"] = self.buf.ru16l()
         meta["pe-header"]["timestamp"] = datetime.datetime.fromtimestamp(
             self.buf.ru32l(), datetime.timezone.utc).isoformat()
