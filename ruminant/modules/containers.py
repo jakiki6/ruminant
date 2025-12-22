@@ -1,5 +1,6 @@
 from . import chew
 from .. import module, utils, constants
+from ..buf import Buf
 
 import tempfile
 
@@ -79,6 +80,175 @@ class ZipModule(module.RuminantModule):
                                 file["data"] = chew(fd)
 
             meta["files"].append(file)
+
+        if meta["eocd"]["central-directory-offset"] > 16:
+            self.buf.seek(meta["eocd"]["central-directory-offset"] - 16)
+            if self.buf.read(16) == b"APK Sig Block 42":
+                meta["apk-signature"] = {}
+
+                self.buf.seek(meta["eocd"]["central-directory-offset"] - 24)
+                meta["apk-signature"]["trailer-length"] = self.buf.ru64l()
+                self.buf.seek(meta["eocd"]["central-directory-offset"] - 8 -
+                              meta["apk-signature"]["trailer-length"])
+
+                self.buf.pasunit(meta["apk-signature"]["trailer-length"] - 16)
+
+                meta["apk-signature"]["header-length"] = self.buf.ru64l()
+
+                meta["apk-signature"]["entries"] = []
+                while self.buf.unit > 0:
+                    entry = {}
+                    entry["length"] = self.buf.ru64l()
+                    entry["type"] = None
+                    entry["payload"] = {}
+
+                    self.buf.pasunit(entry["length"])
+
+                    typ = self.buf.ru32l()
+                    match typ:
+                        case 0x7109871a | 0xf05368c0:
+                            v3 = typ == 0xf05368c0
+                            entry[
+                                "type"] = f"APK signature scheme {'v3' if v3 else 'v2'}"
+
+                            entry["payload"]["signers"] = []
+                            self.buf.pasunit(self.buf.ru32l())
+
+                            while self.buf.unit > 0:
+                                signer = {}
+                                self.buf.pasunit(self.buf.ru32l())
+
+                                signer["signed-data"] = {}
+                                self.buf.pasunit(self.buf.ru32l())
+
+                                signer["signed-data"]["digests"] = []
+                                self.buf.pasunit(self.buf.ru32l())
+
+                                while self.buf.unit > 0:
+                                    digest = {}
+                                    self.buf.pasunit(self.buf.ru32l())
+
+                                    digest["algorithm"] = utils.unraw(
+                                        self.buf.ru32l(), 4,
+                                        constants.APK_SIGNATURE_ALGORITHMS,
+                                        True)
+
+                                    digest["digest"] = self.buf.rh(
+                                        self.buf.ru32l())
+
+                                    self.buf.sapunit()
+                                    signer["signed-data"]["digests"].append(
+                                        digest)
+
+                                # digests
+                                self.buf.sapunit()
+
+                                signer["signed-data"]["certificates"] = []
+                                self.buf.pasunit(self.buf.ru32l())
+                                while self.buf.unit > 0:
+                                    signer["signed-data"][
+                                        "certificates"].append(
+                                            utils.read_der(
+                                                Buf(
+                                                    self.buf.read(
+                                                        self.buf.ru32l()))))
+
+                                # certificates
+                                self.buf.sapunit()
+
+                                if v3:
+                                    signer["signed-data"][
+                                        "min-sdk"] = self.buf.ru32l()
+                                    signer["signed-data"][
+                                        "max-sdk"] = self.buf.ru32l()
+
+                                signer["signed-data"][
+                                    "additional-attributes"] = []
+                                self.buf.pasunit(self.buf.ru32l())
+
+                                while self.buf.unit > 0:
+                                    attribute = {}
+                                    self.buf.pasunit(self.buf.ru32l())
+
+                                    key = self.buf.ru32l()
+                                    attribute["key"] = None
+                                    attribute["value"] = {}
+
+                                    match key:
+                                        case 0xbeeff00d:
+                                            attribute[
+                                                "key"] = "Stripping Protection"
+                                            attribute["value"][
+                                                "signed-with-version"] = self.buf.ru32l(
+                                                )
+                                        case _:
+                                            attribute[
+                                                "key"] = f"Unknown (0x{hex(key)[2:].zfill(8)})"
+                                            attribute["value"][
+                                                "hex"] = self.buf.rh(
+                                                    self.buf.unit)
+
+                                    self.buf.sapunit()
+                                    signer["signed-data"][
+                                        "additional-attributes"].append(
+                                            attribute)
+
+                                # additional attributes
+                                self.buf.sapunit()
+
+                                # signed data
+                                self.buf.sapunit()
+
+                                if v3:
+                                    signer["min-sdk"] = self.buf.ru32l()
+                                    signer["max-sdk"] = self.buf.ru32l()
+
+                                signer["signatures"] = []
+                                self.buf.pasunit(self.buf.ru32l())
+
+                                while self.buf.unit > 0:
+                                    signature = {}
+
+                                    self.buf.pasunit(self.buf.ru32l())
+
+                                    signature["algorithm"] = utils.unraw(
+                                        self.buf.ru32l(), 4,
+                                        constants.APK_SIGNATURE_ALGORITHMS,
+                                        True)
+                                    signature["signature"] = self.buf.rh(
+                                        self.buf.ru32l())
+
+                                    self.buf.sapunit()
+                                    signer["signatures"].append(signature)
+
+                                # signatures
+                                self.buf.sapunit()
+
+                                signer["public-key"] = utils.read_der(
+                                    Buf(self.buf.read(self.buf.ru32l())))
+
+                                # signer
+                                self.buf.sapunit()
+                                entry["payload"]["signers"].append(signer)
+
+                            self.buf.sapunit()
+                        case 0x42726577:
+                            entry["type"] = "Padding"
+                            with self.buf.subunit():
+                                entry["payload"]["blob"] = chew(self.buf)
+                        case _:
+                            entry[
+                                "type"] = f"Unknown (0x{hex(typ)[2:].zfill(8)})"
+
+                            with self.buf.subunit():
+                                entry["payload"]["blob"] = chew(self.buf,
+                                                                blob_mode=True)
+
+                    self.buf.sapunit()
+
+                    meta["apk-signature"]["entries"].append(entry)
+
+                self.buf.sapunit()
 
         self.buf.seek(eof)
         return meta

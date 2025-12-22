@@ -94,3 +94,6 @@ This is a list of useful resources.
 
 # vbmeta
 * https://android.googlesource.com/platform/external/avb
+
+# APK signature block
+* https://source.android.com/docs/security/features/apksigning

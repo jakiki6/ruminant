@@ -7604,3 +7604,15 @@ BTRFS_FLAGS = [
 ]
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+
+APK_SIGNATURE_ALGORITHMS = {
+    0x0101:
+    "RSASSA-PSS with SHA2-256 digest, SHA2-256 MGF1, 32 bytes of salt, trailer: 0xbc",
+    0x0102:
+    "RSASSA-PSS with SHA2-512 digest, SHA2-512 MGF1, 64 bytes of salt, trailer: 0xbc",
+    0x0103: "RSASSA-PKCS1-v1_5 with SHA2-256 digest",
+    0x0104: "RSASSA-PKCS1-v1_5 with SHA2-512 digest",
+    0x0201: "ECDSA with SHA2-256 digest",
+    0x0202: "ECDSA with SHA2-512 digest",
+    0x0301: "DSA with SHA2-256 digest",
+}
