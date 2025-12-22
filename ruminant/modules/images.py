@@ -1098,7 +1098,8 @@ class JPEGModule(module.RuminantModule):
                 if len(slack) == 0:
                     self.buf.rzs()
                     chunk["data"]["xmp"] = utils.read_xml(self.buf)
-                    while self.buf.peek(1) != b">":
+                    while self.buf.available() > 0 and self.buf.peek(
+                            1) != b">":
                         self.buf.skip(1)
 
                     if self.buf.peek(1) == b">":
