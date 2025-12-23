@@ -157,6 +157,10 @@ def main(dev=False):
                         action="store_true",
                         help="Print list of registered modules and exit")
 
+    parser.add_argument("--self-test",
+                        action="store_true",
+                        help="Run self-tests")
+
     parser.add_argument("--url",
                         action="store_true",
                         help="Treat file as URL and fetch it")
@@ -183,6 +187,10 @@ def main(dev=False):
                             help="Print filenames in the progress bar")
 
     args = parser.parse_args()
+
+    if args.self_test:
+        from . import test_core
+        test_core.main()
 
     if args.print_modules:
         print(
