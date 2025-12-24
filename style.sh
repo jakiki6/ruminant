@@ -1,9 +1,7 @@
 #!/bin/sh
 
-for i in $(git diff --name-only | grep \\.py$); do
-    echo Formatting $i
-    yapf --in-place $i
-done
+export LD_LIBRARY_PATH=/run/current-system/profile/lib:/home/laura/.guix-home/profile/lib
+~/ruff/target/release/ruff format
 
 echo Checking with Flake8
 flake8 .

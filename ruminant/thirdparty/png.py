@@ -2,12 +2,13 @@
 # licensed under BSD-3
 # see https://github.com/py-pdf/pypdf/blob/47a7f8fae02aa06585f8c8338dcab647e2547917/LICENSE for attribution
 
+
 def png_decode(data, columns, rowlength):
     output = b""
     prev_rowdata = bytes(rowlength)
     bpp = (rowlength - 1) // columns
     for row in range(0, len(data), rowlength):
-        rowdata = bytearray(data[row:row + rowlength])
+        rowdata = bytearray(data[row : row + rowlength])
         cmd = rowdata[0]
 
         match cmd:

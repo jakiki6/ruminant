@@ -10,7 +10,6 @@ blob_id = 0
 
 
 class EntryModule(module.RuminantModule):
-
     def __init__(self, walk_mode, blob_mode, flat, extra_ctx, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -38,8 +37,7 @@ class EntryModule(module.RuminantModule):
             self.buf.skip(self.buf.size())
         else:
             for m in module.modules:
-                if m.identify(self.buf,
-                              {"walk": self.walk_mode} | self.extra_ctx):
+                if m.identify(self.buf, {"walk": self.walk_mode} | self.extra_ctx):
                     old_offset = self.buf.tell()
 
                     try:
@@ -54,19 +52,21 @@ class EntryModule(module.RuminantModule):
 
                         stack_list = []
                         for frame in traceback.extract_tb(e.__traceback__):
-                            stack_list.append({
-                                "filename": frame.filename,
-                                "lineno": frame.lineno,
-                                "name": frame.name,
-                                "line": frame.line
-                            })
+                            stack_list.append(
+                                {
+                                    "filename": frame.filename,
+                                    "lineno": frame.lineno,
+                                    "name": frame.name,
+                                    "line": frame.line,
+                                }
+                            )
 
                         rest = {
                             "type": "error",
                             "module": m.__name__,
                             "error-type": type(e).__name__,
                             "error-message": str(e),
-                            "stack": stack_list
+                            "stack": stack_list,
                         }
 
                     meta["length"] = self.buf.tell()
@@ -75,8 +75,11 @@ class EntryModule(module.RuminantModule):
                     matched = True
 
                     new_offset = self.buf.tell()
-                    if self.buf.available(
-                    ) > 0 and not self.walk_mode and not self.flat:
+                    if (
+                        self.buf.available() > 0
+                        and not self.walk_mode
+                        and not self.flat
+                    ):
                         with self.buf.cut():
                             meta = {"type": "nested", "segments": [meta]}
 
@@ -98,8 +101,8 @@ class EntryModule(module.RuminantModule):
 
         if extract_all and my_blob_id > 0:
             to_extract.append(
-                (my_blob_id,
-                 os.path.join("blobs", f"{str(my_blob_id).zfill(8)}.bin")))
+                (my_blob_id, os.path.join("blobs", f"{str(my_blob_id).zfill(8)}.bin"))
+            )
 
         for entry in to_extract[:]:
             k, v = entry
@@ -112,9 +115,11 @@ class EntryModule(module.RuminantModule):
                     self.buf.seek(offset)
 
                     with open(v, "wb") as file:
-                        length = meta["length"] if meta[
-                            "type"] != "nested" else meta["segments"][0][
-                                "length"]
+                        length = (
+                            meta["length"]
+                            if meta["type"] != "nested"
+                            else meta["segments"][0]["length"]
+                        )
 
                         while length:
                             blob = self.buf.read(min(1 << 24, length))
@@ -128,8 +133,19 @@ class EntryModule(module.RuminantModule):
 
 
 def chew(blob, walk_mode=False, blob_mode=False, flat=False, extra_ctx={}):
-    return EntryModule(walk_mode, blob_mode, flat, extra_ctx,
-                       Buf.of(blob)).chew()
+    return EntryModule(walk_mode, blob_mode, flat, extra_ctx, Buf.of(blob)).chew()
 
 
-from . import containers, images, videos, documents, fonts, audio, crypto, compression, text, misc, android  # noqa: F401,E402
+from . import (
+    containers,
+    images,
+    videos,
+    documents,
+    fonts,
+    audio,
+    crypto,
+    compression,
+    text,
+    misc,
+    android,
+)  # noqa: F401,E402

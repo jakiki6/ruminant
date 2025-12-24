@@ -28,8 +28,7 @@ class TrueTypeModule(module.RuminantModule):
             sig["length"] = self.buf.ru32()
             sig["offset"] = self.buf.ru32()
 
-            most_offset = max(most_offset,
-                              sig["offset"] + sig["length"] + base)
+            most_offset = max(most_offset, sig["offset"] + sig["length"] + base)
 
             with self.buf:
                 self.buf.seek(sig["offset"] + base)
@@ -94,10 +93,8 @@ class TrueTypeModule(module.RuminantModule):
                         table["data"]["y-subscript-y-offset"] = self.buf.ri16()
                         table["data"]["y-superscript-x-size"] = self.buf.ri16()
                         table["data"]["y-superscript-y-size"] = self.buf.ri16()
-                        table["data"][
-                            "y-superscript-x-offset"] = self.buf.ri16()
-                        table["data"][
-                            "y-superscript-y-offset"] = self.buf.ri16()
+                        table["data"]["y-superscript-x-offset"] = self.buf.ri16()
+                        table["data"]["y-superscript-y-offset"] = self.buf.ri16()
                         table["data"]["y-strikeout-size"] = self.buf.ri16()
                         table["data"]["y-strikeout-position"] = self.buf.ri16()
                         table["data"]["s-family-class"] = self.buf.ri16()
@@ -125,13 +122,11 @@ class TrueTypeModule(module.RuminantModule):
                         else:
                             self.buf.skipunit()
                         if self.buf.unit >= 4:
-                            table["data"][
-                                "ul-code-page-range1"] = self.buf.ru32()
+                            table["data"]["ul-code-page-range1"] = self.buf.ru32()
                         else:
                             self.buf.skipunit()
                         if self.buf.unit >= 4:
-                            table["data"][
-                                "ul-code-page-range2"] = self.buf.ru32()
+                            table["data"]["ul-code-page-range2"] = self.buf.ru32()
                         else:
                             self.buf.skipunit()
                         if self.buf.unit >= 2:
@@ -155,13 +150,11 @@ class TrueTypeModule(module.RuminantModule):
                         else:
                             self.buf.skipunit()
                         if self.buf.unit >= 2:
-                            table["data"][
-                                "us-lower-point-size"] = self.buf.ru16()
+                            table["data"]["us-lower-point-size"] = self.buf.ru16()
                         else:
                             self.buf.skipunit()
                         if self.buf.unit >= 2:
-                            table["data"][
-                                "us-upper-point-size"] = self.buf.ru16()
+                            table["data"]["us-upper-point-size"] = self.buf.ru16()
                         else:
                             self.buf.skipunit()
                     case "cvt ":
@@ -169,19 +162,24 @@ class TrueTypeModule(module.RuminantModule):
                     case "fpgm" | "prep":
                         table["data"]["instruction-count"] = self.buf.unit
                     case "head":
-                        table["data"]["version"] = str(
-                            self.buf.ru16()) + "." + str(self.buf.ru16())
+                        table["data"]["version"] = (
+                            str(self.buf.ru16()) + "." + str(self.buf.ru16())
+                        )
                         table["data"]["revision"] = self.buf.ru32()
                         table["data"]["checksum-adjustment"] = self.buf.ru32()
                         table["data"]["magic"] = self.buf.rh(4)
                         table["data"]["flags"] = self.buf.rh(2)
                         table["data"]["units-per-em"] = self.buf.ru16()
                         table["data"]["created"] = utils.mp4_time_to_iso(
-                            self.buf.ri64() if self.buf.pu32() ==
-                            0 else self.buf.ri64l())
+                            self.buf.ri64()
+                            if self.buf.pu32() == 0
+                            else self.buf.ri64l()
+                        )
                         table["data"]["modified"] = utils.mp4_time_to_iso(
-                            self.buf.ri64() if self.buf.pu32() ==
-                            0 else self.buf.ri64l())
+                            self.buf.ri64()
+                            if self.buf.pu32() == 0
+                            else self.buf.ri64l()
+                        )
                         table["data"]["x-min"] = self.buf.ri16()
                         table["data"]["y-min"] = self.buf.ri16()
                         table["data"]["x-max"] = self.buf.ri16()
@@ -196,7 +194,7 @@ class TrueTypeModule(module.RuminantModule):
                             "outline": bool(mac_style & 0x08),
                             "shadow": bool(mac_style & 0x10),
                             "condensed": bool(mac_style & 0x20),
-                            "extended": bool(mac_style & 0x40)
+                            "extended": bool(mac_style & 0x40),
                         }
 
                         table["data"]["lowest-rec-ppem"] = self.buf.ru16()
@@ -204,16 +202,15 @@ class TrueTypeModule(module.RuminantModule):
                         table["data"]["index-to-loc-format"] = self.buf.ri16()
                         table["data"]["glyph-data-format"] = self.buf.ri16()
                     case "hhea":
-                        table["data"]["version"] = str(
-                            self.buf.ru16()) + "." + str(self.buf.ru16())
+                        table["data"]["version"] = (
+                            str(self.buf.ru16()) + "." + str(self.buf.ru16())
+                        )
                         table["data"]["ascent"] = self.buf.ri16()
                         table["data"]["descent"] = self.buf.ri16()
                         table["data"]["line-gap"] = self.buf.ri16()
                         table["data"]["advance-width-max"] = self.buf.ru16()
-                        table["data"]["min-left-side-bearing"] = self.buf.ri16(
-                        )
-                        table["data"][
-                            "min-right-side-bearing"] = self.buf.ri16()
+                        table["data"]["min-left-side-bearing"] = self.buf.ri16()
+                        table["data"]["min-right-side-bearing"] = self.buf.ri16()
                         table["data"]["x-max-extent"] = self.buf.ri16()
                         table["data"]["caret-slope-rise"] = self.buf.ri16()
                         table["data"]["caret-slope-run"] = self.buf.ri16()
@@ -223,35 +220,26 @@ class TrueTypeModule(module.RuminantModule):
                         table["data"]["reserved"] = self.buf.ri16()
                         table["data"]["reserved"] = self.buf.ri16()
                         table["data"]["metric-data-format"] = self.buf.ri16()
-                        table["data"][
-                            "num-of-long-hor-metrics"] = self.buf.ru16()
+                        table["data"]["num-of-long-hor-metrics"] = self.buf.ru16()
                     case "maxp":
-                        table["data"]["version"] = str(
-                            self.buf.ru16()) + "." + str(self.buf.ru16())
+                        table["data"]["version"] = (
+                            str(self.buf.ru16()) + "." + str(self.buf.ru16())
+                        )
                         table["data"]["num-glyphs"] = self.buf.ru16()
                         if table["data"]["version"] != "0.5":
                             table["data"]["max-points"] = self.buf.ru16()
                             table["data"]["max-contours"] = self.buf.ru16()
-                            table["data"][
-                                "max-component-points"] = self.buf.ru16()
-                            table["data"][
-                                "max-component-contours"] = self.buf.ru16()
+                            table["data"]["max-component-points"] = self.buf.ru16()
+                            table["data"]["max-component-contours"] = self.buf.ru16()
                             table["data"]["max-zones"] = self.buf.ru16()
-                            table["data"][
-                                "max-twilight-points"] = self.buf.ru16()
+                            table["data"]["max-twilight-points"] = self.buf.ru16()
                             table["data"]["max-storage"] = self.buf.ru16()
-                            table["data"]["max-function-defs"] = self.buf.ru16(
-                            )
-                            table["data"][
-                                "max-instruction-defs"] = self.buf.ru16()
-                            table["data"][
-                                "max-stack-elements"] = self.buf.ru16()
-                            table["data"][
-                                "max-size-of-instructions"] = self.buf.ru16()
-                            table["data"][
-                                "max-component-elements"] = self.buf.ru16()
-                            table["data"][
-                                "max-component-depth"] = self.buf.ru16()
+                            table["data"]["max-function-defs"] = self.buf.ru16()
+                            table["data"]["max-instruction-defs"] = self.buf.ru16()
+                            table["data"]["max-stack-elements"] = self.buf.ru16()
+                            table["data"]["max-size-of-instructions"] = self.buf.ru16()
+                            table["data"]["max-component-elements"] = self.buf.ru16()
+                            table["data"]["max-component-depth"] = self.buf.ru16()
                     case "name":
                         offset = self.buf.tell()
                         table["data"]["format"] = self.buf.ru16()
@@ -268,23 +256,19 @@ class TrueTypeModule(module.RuminantModule):
                                 0: "Unicode",
                                 1: "Macintosh",
                                 2: "Reserved",
-                                3: "Microsoft"
-                            }.get(platform_id, "Unknown"
-                                  ) + f" (0x{hex(platform_id)[2:].zfill(4)})"
+                                3: "Microsoft",
+                            }.get(
+                                platform_id, "Unknown"
+                            ) + f" (0x{hex(platform_id)[2:].zfill(4)})"
 
                             platform_specific_id = self.buf.ru16()
                             entry["platform-specific"] = {
                                 0: {
-                                    0:
-                                    "Version 1.0 semantics",
-                                    1:
-                                    "Version 1.1 semantics",
-                                    2:
-                                    "ISO 10646 1993 semantics (deprecated)",
-                                    3:
-                                    "Unicode 2.0 or later semantics (BMP only)",
-                                    4:
-                                    "Unicode 2.0 or later semantics (non-BMP characters allowed)"
+                                    0: "Version 1.0 semantics",
+                                    1: "Version 1.1 semantics",
+                                    2: "ISO 10646 1993 semantics (deprecated)",
+                                    3: "Unicode 2.0 or later semantics (BMP only)",
+                                    4: "Unicode 2.0 or later semantics (non-BMP characters allowed)",
                                 },
                                 1: {
                                     0: "Roman",
@@ -319,7 +303,7 @@ class TrueTypeModule(module.RuminantModule):
                                     29: "Slavic",
                                     30: "Vietnamese",
                                     31: "Sindhi",
-                                    32: "(Uninterpreted)"
+                                    32: "(Uninterpreted)",
                                 },
                                 3: {
                                     0: "Symbol",
@@ -332,8 +316,8 @@ class TrueTypeModule(module.RuminantModule):
                                     7: "Reserved",
                                     8: "Reserved",
                                     9: "Reserved",
-                                    10: "Unicode full repertoire"
-                                }
+                                    10: "Unicode full repertoire",
+                                },
                             }.get(platform_id, {}).get(
                                 platform_specific_id, "Unknown"
                             ) + f" (0x{hex(platform_specific_id)[2:].zfill(4)})"
@@ -458,9 +442,9 @@ class TrueTypeModule(module.RuminantModule):
                                     147: "Tongan",
                                     148: "Greek (polytonic)",
                                     149: "Greenlandic",
-                                    150: "Azerbaijani (Roman script)"
+                                    150: "Azerbaijani (Roman script)",
                                 },
-                                3: constants.MICROSOFT_LCIDS
+                                3: constants.MICROSOFT_LCIDS,
                             }.get(platform_id, {}).get(
                                 language_id, "Unknown"
                             ) + f" (0x{hex(language_id)[2:].zfill(4)})"
@@ -476,8 +460,7 @@ class TrueTypeModule(module.RuminantModule):
                                 6: "PostScript name of the font",
                                 7: "Trademark notice",
                                 8: "Manufacturer name",
-                                9:
-                                "Designer; name of the designer of the typeface",
+                                9: "Designer; name of the designer of the typeface",
                                 10: "Description of the typeface",
                                 11: "URL of the font vendor",
                                 12: "URL of the font designer",
@@ -493,9 +476,10 @@ class TrueTypeModule(module.RuminantModule):
                                 22: "Defined by OpenType",
                                 23: "Defined by OpenType",
                                 24: "Defined by OpenType",
-                                25: "Variations PostScript Name Prefix"
-                            }.get(name_id, "Unknown"
-                                  ) + f" (0x{hex(name_id)[2:].zfill(4)})"
+                                25: "Variations PostScript Name Prefix",
+                            }.get(
+                                name_id, "Unknown"
+                            ) + f" (0x{hex(name_id)[2:].zfill(4)})"
 
                             text_length = self.buf.ru16()
                             entry["length"] = text_length
@@ -503,19 +487,23 @@ class TrueTypeModule(module.RuminantModule):
                             entry["offset"] = text_offset
 
                             with self.buf:
-                                self.buf.seek(offset + string_offset +
-                                              text_offset)
+                                self.buf.seek(offset + string_offset + text_offset)
                                 text_length = ((text_length + 1) >> 1) << 1
                                 entry["text"] = self.buf.rs(
-                                    text_length, "utf-16be" if
-                                    (platform_id in (0, 3)) else "latin-1")
+                                    text_length,
+                                    "utf-16be"
+                                    if (platform_id in (0, 3))
+                                    else "latin-1",
+                                )
 
                             table["data"]["entries"].append(entry)
                     case "post":
-                        table["data"]["format"] = str(
-                            self.buf.ru16()) + "." + str(self.buf.ru16())
-                        table["data"]["italic-angle"] = str(
-                            self.buf.ru16()) + "." + str(self.buf.ru16())
+                        table["data"]["format"] = (
+                            str(self.buf.ru16()) + "." + str(self.buf.ru16())
+                        )
+                        table["data"]["italic-angle"] = (
+                            str(self.buf.ru16()) + "." + str(self.buf.ru16())
+                        )
                         table["data"]["underline-position"] = self.buf.ri16()
                         table["data"]["underline-thickness"] = self.buf.ri16()
                         table["data"]["is-fixed-pitch"] = self.buf.ru32()
@@ -546,8 +534,7 @@ class TrueTypeModule(module.RuminantModule):
 
                             with self.buf:
                                 self.buf.seek(tag["offset"] + base)
-                                tag["data"] = utils.decode(
-                                    self.buf.read(tag["length"]))
+                                tag["data"] = utils.decode(self.buf.read(tag["length"]))
 
                             table["data"]["tags"].append(tag)
                     case "PCLT":
@@ -572,7 +559,18 @@ class TrueTypeModule(module.RuminantModule):
                         table["data"] = self.read_dsig()
                     case "Wasm":
                         table["data"] = chew(self.buf.readunit())
-                    case "glyf" | "hmtx" | "loca" | "GDEF" | "GPOS" | "GSUB" | "hdmx" | "VDMX" | "JSTF" | "LTSH":
+                    case (
+                        "glyf"
+                        | "hmtx"
+                        | "loca"
+                        | "GDEF"
+                        | "GPOS"
+                        | "GSUB"
+                        | "hdmx"
+                        | "VDMX"
+                        | "JSTF"
+                        | "LTSH"
+                    ):
                         # not really parsable as it's the raw glyph data
                         pass
                     case _:
@@ -585,8 +583,10 @@ class TrueTypeModule(module.RuminantModule):
                 self.buf.seek(table["offset"])
                 self.buf.skip(table["length"])
 
-        if self.buf.available(
-        ) > 4 and self.buf.pu64() & 0xffffffffff00fffe == 0x0000000100000000:
+        if (
+            self.buf.available() > 4
+            and self.buf.pu64() & 0xffffffffff00fffe == 0x0000000100000000
+        ):
             meta["tables"].append({"tag": "DSIG", "data": self.read_dsig()})
 
         if self.buf.tell() % 4 != 0:

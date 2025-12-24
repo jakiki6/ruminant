@@ -11,7 +11,6 @@ def _decode(content, encoding="utf-8"):
 
 
 class Buf(object):
-
     def __init__(self, source):
         if isinstance(source, io.IOBase):
             self._file = source
@@ -59,19 +58,18 @@ class Buf(object):
 
         if self.unit is not None:
             self.unit = max(self.unit - length, 0)
-            assert (
-                self.unit >= 0
-            ), f"unit overread by {-self.unit} byte{'s' if self.unit != -1 else ''}"
+            assert self.unit >= 0, (
+                f"unit overread by {-self.unit} byte{'s' if self.unit != -1 else ''}"
+            )
         self.seek(length, 1)
 
     def _checkunit(self):
-        assert (
-            self.unit >= 0
-        ), f"unit overread by {-self.unit} byte{'s' if self.unit != -1 else ''}"
+        assert self.unit >= 0, (
+            f"unit overread by {-self.unit} byte{'s' if self.unit != -1 else ''}"
+        )
 
     def setunit(self, length):
-        if length > self.available() or (self.unit is not None
-                                         and length > self.unit):
+        if length > self.available() or (self.unit is not None and length > self.unit):
             raise ValueError("Oversized unit")
 
         self.unit = length
@@ -124,11 +122,26 @@ class Buf(object):
         self.popunit()
 
     def backup(self):
-        return (self.unit, self._target, self._stack, self.tell(),
-                self._offset, self._size, self._bits)
+        return (
+            self.unit,
+            self._target,
+            self._stack,
+            self.tell(),
+            self._offset,
+            self._size,
+            self._bits,
+        )
 
     def restore(self, bak):
-        self.unit, self._target, self._stack, offset, self._offset, self._size, self._bits = bak
+        (
+            self.unit,
+            self._target,
+            self._stack,
+            offset,
+            self._offset,
+            self._size,
+            self._bits,
+        ) = bak
         self.seek(offset)
 
     def rl(self):
@@ -139,8 +152,11 @@ class Buf(object):
                 break
 
             if c[0] in (0x0a, 0x0d):
-                if self.peek(1) != b"" and self.peek(1)[0] in (
-                        0x0a, 0x0d) and self.peek(1) != c:
+                if (
+                    self.peek(1) != b""
+                    and self.peek(1)[0] in (0x0a, 0x0d)
+                    and self.peek(1) != c
+                ):
                     self.skip(1)
                 break
 
@@ -162,11 +178,9 @@ class Buf(object):
         self._file.seek(pos, whence)
 
     def sub(self, size):
-        assert size <= self.available(
-        ), "sub buffer is bigger than host buffer"
+        assert size <= self.available(), "sub buffer is bigger than host buffer"
 
         class SubWrapper(object):
-
             def __enter__(self2):
                 self2._offset = self._offset
                 self2._size = self._size
@@ -189,14 +203,15 @@ class Buf(object):
         buf = b""
         while True:
             chunk = self.read(
-                min(buf_length, self.unit if self.unit else self.available()))
+                min(buf_length, self.unit if self.unit else self.available())
+            )
             buf += chunk
 
             if (self.unit is not None and self.unit <= 0) or len(chunk) == 0:
                 raise ValueError(f"pattern {s.hex()} not found")
 
             if s not in buf:
-                buf = buf[-len(s):]
+                buf = buf[-len(s) :]
             else:
                 index = buf.index(s)
                 overread = len(buf) - index

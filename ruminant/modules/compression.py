@@ -22,9 +22,10 @@ class GzipModule(module.RuminantModule):
         self.buf.skip(2)
 
         compression_method = self.buf.ru8()
-        assert compression_method == 8, f"Unknown gzip compression method {compression_method}"
-        meta["compression-method"] = utils.unraw(compression_method, 2,
-                                                 {8: "Deflate"})
+        assert compression_method == 8, (
+            f"Unknown gzip compression method {compression_method}"
+        )
+        meta["compression-method"] = utils.unraw(compression_method, 2, {8: "Deflate"})
 
         flags = self.buf.ru8()
         meta["flags"] = {
@@ -34,19 +35,23 @@ class GzipModule(module.RuminantModule):
             "has-extra": bool(flags & 0x04),
             "has-name": bool(flags & 0x08),
             "has-comment": bool(flags & 0x10),
-            "reserved": flags >> 5
+            "reserved": flags >> 5,
         }
 
-        meta["time"] = datetime.datetime.utcfromtimestamp(
-            self.buf.ru32l()).isoformat()
+        meta["time"] = datetime.datetime.utcfromtimestamp(self.buf.ru32l()).isoformat()
         meta["extra-flags"] = utils.unraw(
-            self.buf.ru8(), 2, {
+            self.buf.ru8(),
+            2,
+            {
                 0: "None",
                 2: "Best compression (level 9)",
-                4: "Fastest compression (level 1)"
-            })
+                4: "Fastest compression (level 1)",
+            },
+        )
         meta["filesystem"] = utils.unraw(
-            self.buf.ru8(), 2, {
+            self.buf.ru8(),
+            2,
+            {
                 0: "FAT",
                 1: "Amiga",
                 2: "OpenVMS",
@@ -61,8 +66,9 @@ class GzipModule(module.RuminantModule):
                 11: "NTFS",
                 12: "QDOS",
                 13: "RISCOS",
-                255: "None"
-            })
+                255: "None",
+            },
+        )
 
         if flags & 0x04:
             self.buf.pushunit()
@@ -72,8 +78,7 @@ class GzipModule(module.RuminantModule):
             while self.buf.unit > 0:
                 extra = {}
                 extra["type"] = self.buf.rs(2, "latin-1")
-                extra["content"] = utils.decode(self.buf.read(
-                    self.buf.ru16l()))
+                extra["content"] = utils.decode(self.buf.read(self.buf.ru16l()))
                 meta["extra"].append(extra)
 
             self.buf.skipunit()
@@ -98,7 +103,9 @@ class GzipModule(module.RuminantModule):
             while not decompressor.eof:
                 fd.write(
                     decompressor.decompress(
-                        self.buf.read(min(1 << 24, self.buf.available()))))
+                        self.buf.read(min(1 << 24, self.buf.available()))
+                    )
+                )
 
             self.buf.seek(-len(decompressor.unused_data), 1)
 
@@ -170,8 +177,10 @@ class ZstdModule(module.RuminantModule):
             meta["header"]["flags"] = {"raw": self.buf.ru8(), "names": []}
 
             meta["header"]["flags"]["names"].append(
-                ["FCS_1", "FCS_2", "FCS_4",
-                 "FCS_8"][meta["header"]["flags"]["raw"] >> 6])
+                ["FCS_1", "FCS_2", "FCS_4", "FCS_8"][
+                    meta["header"]["flags"]["raw"] >> 6
+                ]
+            )
             if meta["header"]["flags"]["raw"] & (1 << 5):
                 meta["header"]["flags"]["names"].append("SINGLE_SEGMENT")
                 if "FCS_1" in meta["header"]["flags"]["names"]:
@@ -180,16 +189,18 @@ class ZstdModule(module.RuminantModule):
                 meta["header"]["flags"]["names"].append("CONTENT_CHECKSUM")
             if meta["header"]["flags"]["raw"] & 0x03:
                 meta["header"]["flags"]["names"].append(
-                    [None, "DID_1", "DID_2",
-                     "DID_4"][meta["header"]["flags"]["raw"] & 0x03])
+                    [None, "DID_1", "DID_2", "DID_4"][
+                        meta["header"]["flags"]["raw"] & 0x03
+                    ]
+                )
 
             if "SINGLE_SEGMENT" not in meta["header"]["flags"]["names"]:
                 temp = self.buf.ru8()
                 exponent = temp >> 3
                 mantissa = temp & 0x03
                 meta["header"]["window-size"] = math.ceil(
-                    ((1 << (exponent + 10)) / 8) * mantissa +
-                    (1 << (exponent + 10)))
+                    ((1 << (exponent + 10)) / 8) * mantissa + (1 << (exponent + 10))
+                )
 
             if "DID_1" in meta["header"]["flags"]["names"]:
                 meta["header"]["dictionary-id"] = self.buf.ru8()

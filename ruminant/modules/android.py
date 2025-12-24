@@ -14,20 +14,27 @@ class VbmetaModule(module.RuminantModule):
         key = {}
 
         match algo:
-            case "SHA256_RSA2048" | "SHA256_RSA4096" | "SHA256_RSA8192" | "SHA512_RSA2048" | "SHA512_RSA4096" | "SHA512_RSA8192":
+            case (
+                "SHA256_RSA2048"
+                | "SHA256_RSA4096"
+                | "SHA256_RSA8192"
+                | "SHA512_RSA2048"
+                | "SHA512_RSA4096"
+                | "SHA512_RSA8192"
+            ):
                 bits = self.buf.ru32()
                 key["bits"] = bits
                 key["n0inv"] = self.buf.ru32()
-                key["modulus"] = int.from_bytes(self.buf.read(
-                    (bits + 7) // 8)) & ((1 << bits) - 1)
-                key["rrmodn"] = int.from_bytes(self.buf.read(
-                    (bits + 7) // 8)) & ((1 << bits) - 1)
+                key["modulus"] = int.from_bytes(self.buf.read((bits + 7) // 8)) & (
+                    (1 << bits) - 1
+                )
+                key["rrmodn"] = int.from_bytes(self.buf.read((bits + 7) // 8)) & (
+                    (1 << bits) - 1
+                )
 
                 n = key["modulus"]
-                key["n0inv-correct"] = key["n0inv"] == 2**32 - pow(
-                    n, -1, 2**32)
-                key["rrmodn-correct"] = key["rrmodn"] == 2**(key["bits"] *
-                                                             2) % n
+                key["n0inv-correct"] = key["n0inv"] == 2**32 - pow(n, -1, 2**32)
+                key["rrmodn-correct"] = key["rrmodn"] == 2 ** (key["bits"] * 2) % n
 
         return key
 
@@ -37,20 +44,22 @@ class VbmetaModule(module.RuminantModule):
 
         self.buf.skip(4)
         meta["header"] = {}
-        meta["header"][
-            "libavb-version"] = f"{self.buf.ru32()}.{self.buf.ru32()}"
+        meta["header"]["libavb-version"] = f"{self.buf.ru32()}.{self.buf.ru32()}"
         meta["header"]["authentication-data-block-size"] = self.buf.ru64()
         meta["header"]["auxiliary-data-block-size"] = self.buf.ru64()
         meta["header"]["algorithm-type"] = utils.unraw(
-            self.buf.ru32(), 4, {
+            self.buf.ru32(),
+            4,
+            {
                 0x00: "NONE",
                 0x01: "SHA256_RSA2048",
                 0x02: "SHA256_RSA4096",
                 0x03: "SHA256_RSA8192",
                 0x04: "SHA512_RSA2048",
                 0x05: "SHA512_RSA4096",
-                0x06: "SHA512_RSA8192"
-            })
+                0x06: "SHA512_RSA8192",
+            },
+        )
         meta["header"]["hash-offset"] = self.buf.ru64()
         meta["header"]["hash-size"] = self.buf.ru64()
         meta["header"]["signature-offset"] = self.buf.ru64()
@@ -64,7 +73,7 @@ class VbmetaModule(module.RuminantModule):
         temp = self.buf.ru64()
         meta["header"]["rollback-index"] = {
             "raw": temp,
-            "date": utils.unix_to_date(temp)
+            "date": utils.unix_to_date(temp),
         }
         meta["header"]["flags"] = utils.unpack_flags(self.buf.ru32(), [])
         meta["header"]["rollback-index-location"] = self.buf.ru32()
@@ -74,15 +83,20 @@ class VbmetaModule(module.RuminantModule):
         meta["authentication-data-block"] = {}
         self.buf.seek(256 + meta["header"]["hash-offset"])
         meta["authentication-data-block"]["hash"] = self.buf.rh(
-            meta["header"]["hash-size"])
+            meta["header"]["hash-size"]
+        )
         self.buf.seek(256 + meta["header"]["signature-offset"])
         meta["authentication-data-block"]["signature"] = self.buf.rh(
-            meta["header"]["signature-size"])
+            meta["header"]["signature-size"]
+        )
 
         meta["auxiliary-data-block"] = {}
 
-        self.buf.seek(256 + meta["header"]["authentication-data-block-size"] +
-                      meta["header"]["descriptors-offset"])
+        self.buf.seek(
+            256
+            + meta["header"]["authentication-data-block-size"]
+            + meta["header"]["descriptors-offset"]
+        )
         self.buf.pasunit(meta["header"]["descriptors-size"])
 
         meta["auxiliary-data-block"]["descriptors"] = []
@@ -118,16 +132,15 @@ class VbmetaModule(module.RuminantModule):
                     tag["payload"]["partition-name-length"] = self.buf.ru32()
                     tag["payload"]["salt-length"] = self.buf.ru32()
                     tag["payload"]["root-digest-length"] = self.buf.ru32()
-                    tag["payload"]["flags"] = utils.unpack_flags(
-                        self.buf.ru32(), [])
-                    tag["payload"]["reserved"] = chew(self.buf.read(60),
-                                                      blob_mode=True)
+                    tag["payload"]["flags"] = utils.unpack_flags(self.buf.ru32(), [])
+                    tag["payload"]["reserved"] = chew(self.buf.read(60), blob_mode=True)
                     tag["payload"]["partition-name"] = self.buf.rs(
-                        tag["payload"]["partition-name-length"])
-                    tag["payload"]["salt"] = self.buf.rh(
-                        tag["payload"]["salt-length"])
+                        tag["payload"]["partition-name-length"]
+                    )
+                    tag["payload"]["salt"] = self.buf.rh(tag["payload"]["salt-length"])
                     tag["payload"]["root-digest"] = self.buf.rh(
-                        tag["payload"]["root-digest-length"])
+                        tag["payload"]["root-digest-length"]
+                    )
                 case 0x02:
                     tag["type"] = "HASH"
                     tag["payload"]["image-size"] = self.buf.ru64()
@@ -135,32 +148,31 @@ class VbmetaModule(module.RuminantModule):
                     tag["payload"]["partition-name-length"] = self.buf.ru32()
                     tag["payload"]["salt-length"] = self.buf.ru32()
                     tag["payload"]["root-digest-length"] = self.buf.ru32()
-                    tag["payload"]["reserved"] = chew(self.buf.read(64),
-                                                      blob_mode=True)
+                    tag["payload"]["reserved"] = chew(self.buf.read(64), blob_mode=True)
                     tag["payload"]["partition-name"] = self.buf.rs(
-                        tag["payload"]["partition-name-length"])
-                    tag["payload"]["salt"] = self.buf.rh(
-                        tag["payload"]["salt-length"])
+                        tag["payload"]["partition-name-length"]
+                    )
+                    tag["payload"]["salt"] = self.buf.rh(tag["payload"]["salt-length"])
                     tag["payload"]["root-digest"] = self.buf.rh(
-                        tag["payload"]["root-digest-length"])
+                        tag["payload"]["root-digest-length"]
+                    )
                 case 0x03:
                     tag["type"] = "KERNEL_CMDLINE"
-                    tag["payload"]["flags"] = utils.unpack_flags(
-                        self.buf.ru32(), [])
+                    tag["payload"]["flags"] = utils.unpack_flags(self.buf.ru32(), [])
                     tag["payload"]["cmdline"] = self.buf.rs(self.buf.ru32())
                 case 0x04:
                     tag["type"] = "CHAIN_PARTITION"
                     tag["payload"]["rollback-index-location"] = self.buf.ru32()
                     tag["payload"]["parition-name-length"] = self.buf.ru32()
                     tag["payload"]["public-key-length"] = self.buf.ru32()
-                    tag["payload"]["flags"] = utils.unpack_flags(
-                        self.buf.ru32(), [])
-                    tag["payload"]["reserved"] = chew(self.buf.read(60),
-                                                      blob_mode=True)
+                    tag["payload"]["flags"] = utils.unpack_flags(self.buf.ru32(), [])
+                    tag["payload"]["reserved"] = chew(self.buf.read(60), blob_mode=True)
                     tag["payload"]["partition-name"] = self.buf.rs(
-                        tag["payload"]["parition-name-length"])
+                        tag["payload"]["parition-name-length"]
+                    )
                     tag["payload"]["public-key"] = self.read_pubkey(
-                        meta["header"]["algorithm-type"]["name"])
+                        meta["header"]["algorithm-type"]["name"]
+                    )
                 case _:
                     tag["type"] = f"UNKNOWN (0x{hex(typ)[2:].zfill(16)})"
                     tag["payload"]["blob"] = chew(self.buf.readunit())
@@ -175,35 +187,41 @@ class VbmetaModule(module.RuminantModule):
         self.buf.sapunit()
 
         if meta["header"]["public-key-size"]:
-            self.buf.seek(256 +
-                          meta["header"]["authentication-data-block-size"] +
-                          meta["header"]["public-key-offset"])
+            self.buf.seek(
+                256
+                + meta["header"]["authentication-data-block-size"]
+                + meta["header"]["public-key-offset"]
+            )
             self.buf.pasunit(meta["header"]["public-key-size"])
 
             meta["auxiliary-data-block"]["public-key"] = self.read_pubkey(
-                meta["header"]["algorithm-type"]["name"])
+                meta["header"]["algorithm-type"]["name"]
+            )
             if "RSA" in meta["header"]["algorithm-type"]["name"]:
                 sig = pow(
-                    int(meta["authentication-data-block"]["signature"],
-                        16), 65537, meta["auxiliary-data-block"]["public-key"]
-                    ["modulus"]).to_bytes(
-                        len(meta["authentication-data-block"]["signature"]) //
-                        2, "big")
+                    int(meta["authentication-data-block"]["signature"], 16),
+                    65537,
+                    meta["auxiliary-data-block"]["public-key"]["modulus"],
+                ).to_bytes(
+                    len(meta["authentication-data-block"]["signature"]) // 2, "big"
+                )
                 sig = sig[2:].lstrip(b"\xff")[1:]
-                meta["auxiliary-data-block"]["public-key"][
-                    "signature"] = utils.read_der(Buf(sig))
+                meta["auxiliary-data-block"]["public-key"]["signature"] = (
+                    utils.read_der(Buf(sig))
+                )
 
             self.buf.sapunit()
 
         if meta["header"]["public-key-metadata-size"]:
-            self.buf.seek(256 +
-                          meta["header"]["authentication-data-block-size"] +
-                          meta["header"]["public-key-metadata-offset"])
+            self.buf.seek(
+                256
+                + meta["header"]["authentication-data-block-size"]
+                + meta["header"]["public-key-metadata-offset"]
+            )
             self.buf.pasunit(meta["header"]["public-key-metadata-size"])
 
             with self.buf.subunit():
-                meta["auxiliary-data-block"]["public-key-metadata"] = chew(
-                    self.buf)
+                meta["auxiliary-data-block"]["public-key-metadata"] = chew(self.buf)
 
             self.buf.sapunit()
 
@@ -222,10 +240,7 @@ class AndroidBootImgModule(module.RuminantModule):
         return buf.peek(8) == b"ANDROID!"
 
     def hex(self, v):
-        return {
-            "raw": v,
-            "hex": hex(v)
-        }
+        return {"raw": v, "hex": hex(v)}
 
     def chew(self):
         meta = {}
@@ -240,7 +255,9 @@ class AndroidBootImgModule(module.RuminantModule):
                 meta["header"]["kernel-size"] = self.buf.ru32l()
                 meta["header"]["ramdisk-size"] = self.buf.ru32l()
                 temp = self.buf.ru32l()
-                meta["header"]["os-version"] = f"{(temp >> 25) & 0x7f}.{(temp >> 18) & 0x7f}.{(temp >> 11) & 0x7f} {((temp >> 4) & 0x7f) + 2000}-{str(temp & 0x0f).zfill(2)}"
+                meta["header"]["os-version"] = (
+                    f"{(temp >> 25) & 0x7f}.{(temp >> 18) & 0x7f}.{(temp >> 11) & 0x7f} {((temp >> 4) & 0x7f) + 2000}-{str(temp & 0x0f).zfill(2)}"
+                )
                 meta["header"]["header-size"] = self.buf.ru32l()
                 meta["header"]["reserved"] = self.buf.rh(16)
                 self.buf.skip(4)

@@ -48,12 +48,14 @@ def process(file, walk):
 
         if entry is not None:
             if unknown > 0:
-                data.append({
-                    "type": "unknown",
-                    "length": unknown,
-                    "offset": buf.tell() - unknown,
-                    "blob-id": modules.blob_id
-                })
+                data.append(
+                    {
+                        "type": "unknown",
+                        "length": unknown,
+                        "offset": buf.tell() - unknown,
+                        "blob-id": modules.blob_id,
+                    }
+                )
                 modules.blob_id += 1
                 unknown = 0
 
@@ -64,12 +66,14 @@ def process(file, walk):
             buf.skip(1)
 
     if unknown > 0:
-        data.append({
-            "type": "unknown",
-            "length": unknown,
-            "offset": buf.tell() - unknown,
-            "blob-id": modules.blob_id
-        })
+        data.append(
+            {
+                "type": "unknown",
+                "length": unknown,
+                "offset": buf.tell() - unknown,
+                "blob-id": modules.blob_id,
+            }
+        )
 
     for entry in data:
         for k, v in modules.to_extract:
@@ -83,13 +87,11 @@ def process(file, walk):
                         file.write(blob)
                         length -= len(blob)
 
-    return json.dumps({
-        "type": "walk",
-        "length": buf.size(),
-        "entries": data
-    },
-                      indent=2,
-                      ensure_ascii=False)
+    return json.dumps(
+        {"type": "walk", "length": buf.size(), "entries": data},
+        indent=2,
+        ensure_ascii=False,
+    )
 
 
 def main(dev=False):
@@ -100,9 +102,10 @@ def main(dev=False):
         import signal
 
         def print_stacktrace(sig, frame):
-            print("Current stacktrace:\n" +
-                  "".join(traceback.format_stack(frame)),
-                  file=sys.stderr)
+            print(
+                "Current stacktrace:\n" + "".join(traceback.format_stack(frame)),
+                file=sys.stderr,
+            )
 
         signal.signal(signal.SIGUSR1, print_stacktrace)
 
@@ -117,7 +120,7 @@ def main(dev=False):
 
             with open(os.path.expanduser("~/.local/bin/ruminant"), "w") as f:
                 f.write(
-                    "#!/usr/bin/env python3\nimport sys,os;sys.path.insert(0,os.path.expanduser(\"~/ruminant\"));from ruminant.main import main;sys.exit(main(True))"
+                    '#!/usr/bin/env python3\nimport sys,os;sys.path.insert(0,os.path.expanduser("~/ruminant"));from ruminant.main import main;sys.exit(main(True))'
                 )
 
             print("Installed dev version of ruminant.")
@@ -125,10 +128,9 @@ def main(dev=False):
 
     parser = argparse.ArgumentParser(description="Ruminant parser")
 
-    parser.add_argument("file",
-                        default="-",
-                        nargs="?",
-                        help="File to parse (default: -)")
+    parser.add_argument(
+        "file", default="-", nargs="?", help="File to parse (default: -)"
+    )
 
     parser.add_argument(
         "--extract",
@@ -136,39 +138,44 @@ def main(dev=False):
         nargs=2,
         metavar=("ID", "FILE"),
         action="append",
-        help="Extract blob with given ID to FILE (can be repeated)")
+        help="Extract blob with given ID to FILE (can be repeated)",
+    )
 
     parser.add_argument(
         "--walk",
         "-w",
         action="store_true",
-        help="Walk the file binwalk-style and look for parsable data")
+        help="Walk the file binwalk-style and look for parsable data",
+    )
 
-    parser.add_argument("--extract-all",
-                        action="store_true",
-                        help="Extract all blobs to blobs/{id}.bin")
+    parser.add_argument(
+        "--extract-all", action="store_true", help="Extract all blobs to blobs/{id}.bin"
+    )
 
-    parser.add_argument("--filename-regex",
-                        default=".*",
-                        nargs="?",
-                        help="Filename regex for directory mode")
+    parser.add_argument(
+        "--filename-regex",
+        default=".*",
+        nargs="?",
+        help="Filename regex for directory mode",
+    )
 
-    parser.add_argument("--print-modules",
-                        action="store_true",
-                        help="Print list of registered modules and exit")
+    parser.add_argument(
+        "--print-modules",
+        action="store_true",
+        help="Print list of registered modules and exit",
+    )
 
-    parser.add_argument("--self-test",
-                        action="store_true",
-                        help="Run self-tests")
+    parser.add_argument("--self-test", action="store_true", help="Run self-tests")
 
-    parser.add_argument("--url",
-                        action="store_true",
-                        help="Treat file as URL and fetch it")
+    parser.add_argument(
+        "--url", action="store_true", help="Treat file as URL and fetch it"
+    )
 
-    parser.add_argument("--strip-url",
-                        action="store_true",
-                        help="Strip metadata-removing parameters from"
-                        "known URLs like '?filetype=webp'")
+    parser.add_argument(
+        "--strip-url",
+        action="store_true",
+        help="Strip metadata-removing parameters fromknown URLs like '?filetype=webp'",
+    )
 
     has_tqdm = True
     try:
@@ -177,19 +184,21 @@ def main(dev=False):
         has_tqdm = False
 
     if has_tqdm:
-        parser.add_argument("--progress",
-                            "-p",
-                            action="store_true",
-                            help="Print progress")
+        parser.add_argument(
+            "--progress", "-p", action="store_true", help="Print progress"
+        )
 
-        parser.add_argument("--progress-names",
-                            action="store_true",
-                            help="Print filenames in the progress bar")
+        parser.add_argument(
+            "--progress-names",
+            action="store_true",
+            help="Print filenames in the progress bar",
+        )
 
     args = parser.parse_args()
 
     if args.self_test:
         from . import test_core
+
         test_core.main()
 
     if args.print_modules:
@@ -237,8 +246,9 @@ def main(dev=False):
         else:
             user_agent = constants.USER_AGENT
 
-        req = urllib.request.Request(urlunparse(url),
-                                     headers={"User-Agent": user_agent})
+        req = urllib.request.Request(
+            urlunparse(url), headers={"User-Agent": user_agent}
+        )
 
         with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
             try:
@@ -252,7 +262,8 @@ def main(dev=False):
             except urllib.error.HTTPError as http_err:
                 print(
                     f"Encountered the following HTTP error while retrieving the file: {http_err}",
-                    file=sys.stderr)
+                    file=sys.stderr,
+                )
                 exit(1)
 
             args.file = tmp_file.name
@@ -281,7 +292,7 @@ def main(dev=False):
             print(process(file, args.walk))
     else:
         if os.path.isdir(args.file):
-            print("{\n  \"type\": \"directory\",\n  \"files\": [")
+            print('{\n  "type": "directory",\n  "files": [')
 
             filename_regex = re.compile(args.filename_regex)
 
@@ -313,13 +324,17 @@ def main(dev=False):
                             print(",")
 
                         print(
-                            f"    {{\n      \"path\": {json.dumps(file)},\n      \"data\": {{"
+                            f'    {{\n      "path": {json.dumps(file)},\n      "data": {{'
                         )
 
-                        print("\n".join([
-                            "      " + x
-                            for x in process(fd, args.walk).split("\n")[1:-1]
-                        ]))
+                        print(
+                            "\n".join(
+                                [
+                                    "      " + x
+                                    for x in process(fd, args.walk).split("\n")[1:-1]
+                                ]
+                            )
+                        )
 
                         print("      }\n    }", end="")
                 except Exception:

@@ -4,7 +4,6 @@ tests = {}
 
 
 def test(group, name):
-
     def inner(func):
         if group not in tests:
             tests[group] = {}
@@ -16,7 +15,6 @@ def test(group, name):
 
 
 def inv(func):
-
     def f():
         try:
             func()

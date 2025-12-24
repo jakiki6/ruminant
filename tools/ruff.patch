@@ -1,0 +1,28 @@
+From 7c67dca928f54917105121bc3525633e37d9c2ed Mon Sep 17 00:00:00 2001
+From: Laura Kirsch <laurakirsch240406@gmail.com>
+Date: Wed, 24 Dec 2025 03:57:36 +0100
+Subject: [PATCH] Change hex to lowercase
+
+---
+ .../src/expression/expr_number_literal.rs                     | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/crates/ruff_python_formatter/src/expression/expr_number_literal.rs b/crates/ruff_python_formatter/src/expression/expr_number_literal.rs
+index 8be83f106e..bfd0ab2446 100644
+--- a/crates/ruff_python_formatter/src/expression/expr_number_literal.rs
++++ b/crates/ruff_python_formatter/src/expression/expr_number_literal.rs
+@@ -90,9 +90,9 @@ fn normalize_integer(input: &str) -> Cow<'_, str> {
+     if is_hex {
+         for (index, c) in chars {
+             if matches!(c, 'a'..='f') {
+-                // Uppercase hexdigits.
++                // Lowercase hexdigits.
+                 output.push_str(&input[last_index..index]);
+-                output.push(c.to_ascii_uppercase());
++                output.push(c.to_ascii_lowercase());
+                 last_index = index + c.len_utf8();
+             }
+         }
+-- 
+2.52.0
+

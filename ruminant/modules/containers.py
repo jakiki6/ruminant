@@ -54,8 +54,7 @@ class ZipModule(module.RuminantModule):
             file["meta"]["external-attributes"] = self.buf.rh(4)
             file["offset"] = self.buf.ru32l()
             file["filename"] = self.buf.rs(filename_length)
-            file["meta"]["extra-field"] = self.buf.rs(extra_field_length,
-                                                      "latin-1")
+            file["meta"]["extra-field"] = self.buf.rs(extra_field_length, "latin-1")
             file["meta"]["comment"] = self.buf.rs(comment_length)
 
             if file["uncompressed-size"] > 0:
@@ -73,8 +72,7 @@ class ZipModule(module.RuminantModule):
                         case 8:
                             with self.buf.sub(file["meta"]["compressed-size"]):
                                 fd = tempfile.TemporaryFile()
-                                utils.stream_deflate(self.buf, fd,
-                                                     self.buf.available())
+                                utils.stream_deflate(self.buf, fd, self.buf.available())
                                 fd.seek(0)
 
                                 file["data"] = chew(fd)
@@ -88,8 +86,11 @@ class ZipModule(module.RuminantModule):
 
                 self.buf.seek(meta["eocd"]["central-directory-offset"] - 24)
                 meta["apk-signature"]["trailer-length"] = self.buf.ru64l()
-                self.buf.seek(meta["eocd"]["central-directory-offset"] - 8 -
-                              meta["apk-signature"]["trailer-length"])
+                self.buf.seek(
+                    meta["eocd"]["central-directory-offset"]
+                    - 8
+                    - meta["apk-signature"]["trailer-length"]
+                )
 
                 self.buf.pasunit(meta["apk-signature"]["trailer-length"] - 16)
 
@@ -108,8 +109,9 @@ class ZipModule(module.RuminantModule):
                     match typ:
                         case 0x7109871a | 0xf05368c0:
                             v3 = typ == 0xf05368c0
-                            entry[
-                                "type"] = f"APK signature scheme {'v3' if v3 else 'v2'}"
+                            entry["type"] = (
+                                f"APK signature scheme {'v3' if v3 else 'v2'}"
+                            )
 
                             entry["payload"]["signers"] = []
                             self.buf.pasunit(self.buf.ru32l())
@@ -129,16 +131,16 @@ class ZipModule(module.RuminantModule):
                                     self.buf.pasunit(self.buf.ru32l())
 
                                     digest["algorithm"] = utils.unraw(
-                                        self.buf.ru32l(), 4,
+                                        self.buf.ru32l(),
+                                        4,
                                         constants.APK_SIGNATURE_ALGORITHMS,
-                                        True)
+                                        True,
+                                    )
 
-                                    digest["digest"] = self.buf.rh(
-                                        self.buf.ru32l())
+                                    digest["digest"] = self.buf.rh(self.buf.ru32l())
 
                                     self.buf.sapunit()
-                                    signer["signed-data"]["digests"].append(
-                                        digest)
+                                    signer["signed-data"]["digests"].append(digest)
 
                                 # digests
                                 self.buf.sapunit()
@@ -146,24 +148,20 @@ class ZipModule(module.RuminantModule):
                                 signer["signed-data"]["certificates"] = []
                                 self.buf.pasunit(self.buf.ru32l())
                                 while self.buf.unit > 0:
-                                    signer["signed-data"][
-                                        "certificates"].append(
-                                            utils.read_der(
-                                                Buf(
-                                                    self.buf.read(
-                                                        self.buf.ru32l()))))
+                                    signer["signed-data"]["certificates"].append(
+                                        utils.read_der(
+                                            Buf(self.buf.read(self.buf.ru32l()))
+                                        )
+                                    )
 
                                 # certificates
                                 self.buf.sapunit()
 
                                 if v3:
-                                    signer["signed-data"][
-                                        "min-sdk"] = self.buf.ru32l()
-                                    signer["signed-data"][
-                                        "max-sdk"] = self.buf.ru32l()
+                                    signer["signed-data"]["min-sdk"] = self.buf.ru32l()
+                                    signer["signed-data"]["max-sdk"] = self.buf.ru32l()
 
-                                signer["signed-data"][
-                                    "additional-attributes"] = []
+                                signer["signed-data"]["additional-attributes"] = []
                                 self.buf.pasunit(self.buf.ru32l())
 
                                 while self.buf.unit > 0:
@@ -176,22 +174,22 @@ class ZipModule(module.RuminantModule):
 
                                     match key:
                                         case 0xbeeff00d:
-                                            attribute[
-                                                "key"] = "Stripping Protection"
+                                            attribute["key"] = "Stripping Protection"
                                             attribute["value"][
-                                                "signed-with-version"] = self.buf.ru32l(
-                                                )
+                                                "signed-with-version"
+                                            ] = self.buf.ru32l()
                                         case _:
-                                            attribute[
-                                                "key"] = f"Unknown (0x{hex(key)[2:].zfill(8)})"
-                                            attribute["value"][
-                                                "hex"] = self.buf.rh(
-                                                    self.buf.unit)
+                                            attribute["key"] = (
+                                                f"Unknown (0x{hex(key)[2:].zfill(8)})"
+                                            )
+                                            attribute["value"]["hex"] = self.buf.rh(
+                                                self.buf.unit
+                                            )
 
                                     self.buf.sapunit()
                                     signer["signed-data"][
-                                        "additional-attributes"].append(
-                                            attribute)
+                                        "additional-attributes"
+                                    ].append(attribute)
 
                                 # additional attributes
                                 self.buf.sapunit()
@@ -212,11 +210,14 @@ class ZipModule(module.RuminantModule):
                                     self.buf.pasunit(self.buf.ru32l())
 
                                     signature["algorithm"] = utils.unraw(
-                                        self.buf.ru32l(), 4,
+                                        self.buf.ru32l(),
+                                        4,
                                         constants.APK_SIGNATURE_ALGORITHMS,
-                                        True)
+                                        True,
+                                    )
                                     signature["signature"] = self.buf.rh(
-                                        self.buf.ru32l())
+                                        self.buf.ru32l()
+                                    )
 
                                     self.buf.sapunit()
                                     signer["signatures"].append(signature)
@@ -225,7 +226,8 @@ class ZipModule(module.RuminantModule):
                                 self.buf.sapunit()
 
                                 signer["public-key"] = utils.read_der(
-                                    Buf(self.buf.read(self.buf.ru32l())))
+                                    Buf(self.buf.read(self.buf.ru32l()))
+                                )
 
                                 # signer
                                 self.buf.sapunit()
@@ -237,12 +239,12 @@ class ZipModule(module.RuminantModule):
                             with self.buf.subunit():
                                 entry["payload"]["blob"] = chew(self.buf)
                         case _:
-                            entry[
-                                "type"] = f"Unknown (0x{hex(typ)[2:].zfill(8)})"
+                            entry["type"] = f"Unknown (0x{hex(typ)[2:].zfill(8)})"
 
                             with self.buf.subunit():
-                                entry["payload"]["blob"] = chew(self.buf,
-                                                                blob_mode=True)
+                                entry["payload"]["blob"] = chew(
+                                    self.buf, blob_mode=True
+                                )
 
                     self.buf.sapunit()
 
@@ -311,14 +313,15 @@ class RIFFModule(module.RuminantModule):
                     chunk["data"][field] = i
 
                 chunk["data"]["has-alpha"] = bool(tag & 1)
-                chunk["data"]["version"] = ((tag >> 1) & 1) | ((
-                    (tag >> 2) & 1) << 1) | (((tag >> 3) & 1) << 2)
+                chunk["data"]["version"] = (
+                    ((tag >> 1) & 1) | (((tag >> 2) & 1) << 1) | (((tag >> 3) & 1) << 2)
+                )
             case "ANIM":
                 chunk["data"]["background-color"] = {
                     "red": self.buf.ru8(),
                     "green": self.buf.ru8(),
                     "blue": self.buf.ru8(),
-                    "alpha": self.buf.ru8()
+                    "alpha": self.buf.ru8(),
                 }
                 chunk["data"]["loop-count"] = self.buf.ru16l()
             case "ANMF":
@@ -373,11 +376,14 @@ class RIFFModule(module.RuminantModule):
                 chunk["data"]["reserved"] = self.buf.rh(16)
 
                 chunk["data"]["derived"] = {}
-                chunk["data"]["derived"][
-                    "fps"] = 1000000 / chunk["data"]["microseconds-per-frame"]
-                chunk["data"]["derived"]["duration-in-seconds"] = chunk[
-                    "data"]["frame-count"] * chunk["data"][
-                        "microseconds-per-frame"] / 1000000
+                chunk["data"]["derived"]["fps"] = (
+                    1000000 / chunk["data"]["microseconds-per-frame"]
+                )
+                chunk["data"]["derived"]["duration-in-seconds"] = (
+                    chunk["data"]["frame-count"]
+                    * chunk["data"]["microseconds-per-frame"]
+                    / 1000000
+                )
             case "strh":
                 self.strh_type = self.buf.rs(4)
                 chunk["data"]["type"] = self.strh_type
@@ -388,7 +394,7 @@ class RIFFModule(module.RuminantModule):
                 language = self.buf.ru16l()
                 chunk["data"]["language"] = {
                     "raw": language,
-                    "name": constants.MICROSOFT_LCIDS.get(language, "Unknown")
+                    "name": constants.MICROSOFT_LCIDS.get(language, "Unknown"),
                 }
 
                 chunk["data"]["initial-frames"] = self.buf.ru32l()
@@ -413,12 +419,10 @@ class RIFFModule(module.RuminantModule):
                         chunk["data"]["bits-per-pixel"] = self.buf.ru16l()
                         chunk["data"]["compression-method"] = self.buf.rs(4)
                         chunk["data"]["image-size"] = self.buf.ru32l()
-                        chunk["data"][
-                            "horizontal-resolution"] = self.buf.ru32l()
+                        chunk["data"]["horizontal-resolution"] = self.buf.ru32l()
                         chunk["data"]["vertical-resolution"] = self.buf.ru32l()
                         chunk["data"]["used-color-count"] = self.buf.ru32l()
-                        chunk["data"][
-                            "important-color-count"] = self.buf.ru32l()
+                        chunk["data"]["important-color-count"] = self.buf.ru32l()
                     case "auds":
                         format_tag = self.buf.ru16l()
                         chunk["data"]["format"] = {
@@ -430,14 +434,13 @@ class RIFFModule(module.RuminantModule):
                                 0x00ff: "AAC",
                                 0x0161: "WMA",
                                 0x2001: "DTS",
-                                0xf1ac: "FLAC"
-                            }.get(format_tag, "Unknown")
+                                0xf1ac: "FLAC",
+                            }.get(format_tag, "Unknown"),
                         }
 
                         chunk["data"]["channel-count"] = self.buf.ru16l()
                         chunk["data"]["sample-rate"] = self.buf.ru32l()
-                        chunk["data"][
-                            "average-bytes-per-second"] = self.buf.ru32l()
+                        chunk["data"]["average-bytes-per-second"] = self.buf.ru32l()
                         chunk["data"]["block-alignment"] = self.buf.ru16l()
                         chunk["data"]["bits-per-sample"] = self.buf.ru16l()
 
@@ -453,11 +456,7 @@ class RIFFModule(module.RuminantModule):
                 standard = self.buf.ru32l()
                 chunk["data"]["standard"] = {
                     "raw": standard,
-                    "name": {
-                        0: "NTSC",
-                        1: "PAL",
-                        2: "SECAM"
-                    }.get(standard, "Unknown")
+                    "name": {0: "NTSC", 1: "PAL", 2: "SECAM"}.get(standard, "Unknown"),
                 }
 
                 chunk["data"]["vertical-refresh-rate"] = self.buf.ru32l()
@@ -499,12 +498,11 @@ class RIFFModule(module.RuminantModule):
                         1: "0 degrees",
                         6: "90 degrees counter clockwise",
                         2: "180 degrees",
-                        5: "90 degrees clockwise"
-                    }.get(flags & 0x07, f"Unknown ({flags & 0x07})")
+                        5: "90 degrees clockwise",
+                    }.get(flags & 0x07, f"Unknown ({flags & 0x07})"),
                 }
             case "INCL":
-                chunk["data"]["id"] = utils.decode(
-                    self.buf.readunit()).rstrip("\x00")
+                chunk["data"]["id"] = utils.decode(self.buf.readunit()).rstrip("\x00")
             case "fact":
                 chunk["data"]["sample-count"] = self.buf.ru32l()
             case "cue ":
@@ -543,7 +541,8 @@ class RIFFModule(module.RuminantModule):
                     self.buf.skip(190)
 
                 chunk["data"]["coding-history"] = utils.decode(
-                    self.buf.readunit()).rstrip("\x00")
+                    self.buf.readunit()
+                ).rstrip("\x00")
             case "iXML":
                 chunk["data"]["xml"] = utils.xml_to_dict(self.buf.readunit())
             case "ID3 ":
@@ -572,11 +571,22 @@ class RIFFModule(module.RuminantModule):
                     chunk["data"]["exif"] = chew(self.buf)
             case "XMP ":
                 with self.buf.subunit():
-                    chunk["data"]["xmp"] = utils.xml_to_dict(
-                        self.buf.readunit())
-            case "ICMT" | "ISFT" | "INAM" | "IART" | "ICRD" | "IARL" | "ILNG" | "IMED" | "ISRC" | "ISRF" | "ITCH" | "strn":
-                chunk["data"]["text"] = utils.decode(
-                    self.buf.readunit()).rstrip("\x00")
+                    chunk["data"]["xmp"] = utils.xml_to_dict(self.buf.readunit())
+            case (
+                "ICMT"
+                | "ISFT"
+                | "INAM"
+                | "IART"
+                | "ICRD"
+                | "IARL"
+                | "ILNG"
+                | "IMED"
+                | "ISRC"
+                | "ISRF"
+                | "ITCH"
+                | "strn"
+            ):
+                chunk["data"]["text"] = utils.decode(self.buf.readunit()).rstrip("\x00")
             case "RIFF" | "LIST" | "FORM":
                 chunk["data"]["type"] = self.buf.rs(4)
 
@@ -620,10 +630,13 @@ class TarModule(module.RuminantModule):
         meta["size"] = file_length
 
         meta["modification-date"] = utils.unix_to_date(
-            int(self.buf.rs(12).rstrip(" ").rstrip("\x00"), 8))
+            int(self.buf.rs(12).rstrip(" ").rstrip("\x00"), 8)
+        )
         meta["checksum"] = self.buf.rs(8).rstrip(" ").rstrip("\x00")
         meta["file-type"] = utils.unraw(
-            self.buf.ru8(), 1, {
+            self.buf.ru8(),
+            1,
+            {
                 0: "Normal file",
                 ord("0"): "Normal file",
                 ord("1"): "Hard link",
@@ -634,8 +647,9 @@ class TarModule(module.RuminantModule):
                 ord("6"): "FIFO",
                 ord("7"): "Contiguous file",
                 ord("g"): "Global pax header",
-                ord("x"): "Local pax header"
-            })
+                ord("x"): "Local pax header",
+            },
+        )
 
         meta["link-name"] = self.buf.rs(100).rstrip(" ").rstrip("\x00")
 
@@ -646,8 +660,7 @@ class TarModule(module.RuminantModule):
         meta["owner-group-name"] = self.buf.rs(32).rstrip(" ").rstrip("\x00")
         meta["device-major"] = self.buf.rs(8).rstrip(" ").rstrip("\x00")
         meta["device-minor"] = self.buf.rs(8).rstrip(" ").rstrip("\x00")
-        meta["name"] = self.buf.rs(155).rstrip(" ").rstrip(
-            "\x00") + meta["name"]
+        meta["name"] = self.buf.rs(155).rstrip(" ").rstrip("\x00") + meta["name"]
 
         self.buf.skip(12)
 
@@ -689,7 +702,8 @@ class ArModule(module.RuminantModule):
             file = {}
             file["name"] = self.buf.rs(16).rstrip(" ")
             file["modification-time"] = utils.unix_to_date(
-                int("0" + self.buf.rs(12).rstrip(" ")))
+                int("0" + self.buf.rs(12).rstrip(" "))
+            )
             file["owner-id"] = int("0" + self.buf.rs(6).rstrip(" "))
             file["group-id"] = int("0" + self.buf.rs(6).rstrip(" "))
             file["mode"] = self.buf.rs(8).rstrip(" ")
@@ -729,8 +743,7 @@ class CpioModule(module.RuminantModule):
             file["user-id"] = int(self.buf.rs(8), 16)
             file["group-id"] = int(self.buf.rs(8), 16)
             file["link-count"] = int(self.buf.rs(8), 16)
-            file["modification-time"] = utils.unix_to_date(
-                int(self.buf.rs(8), 16))
+            file["modification-time"] = utils.unix_to_date(int(self.buf.rs(8), 16))
             file["size"] = int(self.buf.rs(8), 16)
             file["device-major"] = int(self.buf.rs(8), 16)
             file["device-minor"] = int(self.buf.rs(8), 16)

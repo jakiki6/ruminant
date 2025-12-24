@@ -56,8 +56,8 @@ class Utf8Module(module.RuminantModule):
                         for i in range(0, 4):
                             try:
                                 blob = chew(
-                                    base64.b64decode(content + "=" * i,
-                                                     validate=True))
+                                    base64.b64decode(content + "=" * i, validate=True)
+                                )
                                 break
                             except base64.binascii.Error:
                                 pass
@@ -112,13 +112,14 @@ class AndroidXmlModule(module.RuminantModule):
     desc = "Android binary XML files."
 
     def identify(buf, ctx):
-        return buf.pu32l(
-        ) == 0x00080003 and buf.pu64l() >> 32 <= buf.available()
+        return buf.pu32l() == 0x00080003 and buf.pu64l() >> 32 <= buf.available()
 
     def read_chunk(self):
         chunk = {}
         chunk["type"] = utils.unraw(
-            self.buf.ru16l(), 2, {
+            self.buf.ru16l(),
+            2,
+            {
                 0x0000: "RES_NULL_TYPE",
                 0x0001: "RES_STRING_POOL_TYPE",
                 0x0002: "RES_TABLE_TYPE",
@@ -136,8 +137,10 @@ class AndroidXmlModule(module.RuminantModule):
                 0x0203: "RES_TABLE_LIBRARY_TYPE",
                 0x0204: "RES_TABLE_OVERLAYABLE_TYPE",
                 0x0205: "RES_TABLE_OVERLAYABLE_POLICY_TYPE",
-                0x0206: "RES_TABLE_STAGED_ALIAS_TYPE"
-            }, True)
+                0x0206: "RES_TABLE_STAGED_ALIAS_TYPE",
+            },
+            True,
+        )
         chunk["header-length"] = self.buf.ru16l()
         chunk["payload-length"] = self.buf.ru32l()
 
@@ -164,18 +167,19 @@ class AndroidXmlModule(module.RuminantModule):
 
                 chunk["data"]["strings"] = []
                 self.buf.skip(chunk["data"]["strings-start"] - 28)
-                encoding = "utf8" if "UTF8" in chunk["data"]["flags"][
-                    "names"] else "utf16"
+                encoding = (
+                    "utf8" if "UTF8" in chunk["data"]["flags"]["names"] else "utf16"
+                )
                 while self.buf.unit > 0:
                     chunk["data"]["strings"].append(
                         self.buf.rs(
-                            self.buf.ru16l() *
-                            (2 if encoding == "utf16" else 1), encoding))
+                            self.buf.ru16l() * (2 if encoding == "utf16" else 1),
+                            encoding,
+                        )
+                    )
                     self.buf.skip(2)
             case "RES_XML_RESOURCE_MAP_TYPE":
-                chunk["data"] = [
-                    self.buf.ru32l() for i in range(0, self.buf.unit // 4)
-                ]
+                chunk["data"] = [self.buf.ru32l() for i in range(0, self.buf.unit // 4)]
             case "RES_XML_START_NAMESPACE_TYPE" | "RES_XML_START_ELEMENT_TYPE":
                 chunk["data"] = {}
                 chunk["data"]["line-number"] = self.buf.ru32l()

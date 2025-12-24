@@ -18,14 +18,11 @@ def decompress(compressed_bytes):
 
 
 class ByteDecoder(object):
-
     def __init__(self):
-        """
-       """
+        """ """
 
         self._decoder = Decoder()
-        self._unpacker = BitUnpacker(
-            initial_code_size=self._decoder.code_size())
+        self._unpacker = BitUnpacker(initial_code_size=self._decoder.code_size())
         self.remaining = []
 
     def decodefrombytes(self, bytesource):
@@ -36,7 +33,6 @@ class ByteDecoder(object):
 
 
 class BitUnpacker(object):
-
     def __init__(self, initial_code_size):
         self._initial_code_size = initial_code_size
 
@@ -53,7 +49,6 @@ class BitUnpacker(object):
         pointwidth = minwidth
 
         for nextbit in bytestobits(bytesource):
-
             offset = (offset + 1) % 8
             if ignore > 0:
                 ignore = ignore - 1
@@ -81,7 +76,6 @@ class BitUnpacker(object):
 
 
 class Decoder(object):
-
     def __init__(self):
         self._clear_codes()
         self.remainder = []
@@ -110,8 +104,7 @@ class Decoder(object):
             if codepoint in self._codepoints:
                 ret = self._codepoints[codepoint]
                 if self._prefix is not None:
-                    self._codepoints[len(
-                        self._codepoints)] = self._prefix + ret[0:1]
+                    self._codepoints[len(self._codepoints)] = self._prefix + ret[0:1]
 
             else:
                 ret = self._prefix + self._prefix[0:1]
@@ -122,8 +115,7 @@ class Decoder(object):
         return ret
 
     def _clear_codes(self):
-        self._codepoints = dict(
-            (pt, struct.pack("B", pt)) for pt in range(256))
+        self._codepoints = dict((pt, struct.pack("B", pt)) for pt in range(256))
         self._codepoints[CLEAR_CODE] = CLEAR_CODE
         self._codepoints[END_OF_INFO_CODE] = END_OF_INFO_CODE
         self._prefix = None

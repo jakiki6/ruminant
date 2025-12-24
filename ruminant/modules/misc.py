@@ -38,17 +38,18 @@ class WasmModule(module.RuminantModule):
                 value["result"] = self.read_list(short)
 
                 if short:
-                    value = "(" + ", ".join(
-                        value["param"]) + ") -> (" + ", ".join(
-                            value["result"]) + ")"
+                    value = (
+                        "("
+                        + ", ".join(value["param"])
+                        + ") -> ("
+                        + ", ".join(value["result"])
+                        + ")"
+                    )
             case 0x7c | 0x7d | 0x7e | 0x7f:
                 value["type"] = "type"
-                value["name"] = {
-                    0x7c: "f64",
-                    0x7d: "f32",
-                    0x7e: "i64",
-                    0x7f: "i32"
-                }[typ]
+                value["name"] = {0x7c: "f64", 0x7d: "f32", 0x7e: "i64", 0x7f: "i32"}[
+                    typ
+                ]
 
                 if short:
                     value = value["name"]
@@ -89,8 +90,7 @@ class WasmModule(module.RuminantModule):
 
                     match section["data"]["name"]:
                         case "target_features":
-                            section["data"]["features"] = self.read_list(
-                                short=True)
+                            section["data"]["features"] = self.read_list(short=True)
                         case "producers":
                             section["data"]["fields"] = {}
                             for i in range(0, self.buf.ruleb()):
@@ -99,8 +99,9 @@ class WasmModule(module.RuminantModule):
                                 section["data"]["fields"][key] = {}
                                 for j in range(0, self.buf.ruleb()):
                                     key2 = self.read_name()
-                                    section["data"]["fields"][key][
-                                        key2] = self.read_name()
+                                    section["data"]["fields"][key][key2] = (
+                                        self.read_name()
+                                    )
                         case "linking":
                             section["data"]["version"] = self.buf.ruleb()
 
@@ -117,36 +118,34 @@ class WasmModule(module.RuminantModule):
 
                                         match typ2:
                                             case 0x08:
-                                                subsection[
-                                                    "type"] = "WASM_SYMBOL_TABLE"
+                                                subsection["type"] = "WASM_SYMBOL_TABLE"
                                             case _:
-                                                subsection[
-                                                    "type"] = f"UNKNOWN (0x{hex(typ2)[2:].zfill(2)})"
+                                                subsection["type"] = (
+                                                    f"UNKNOWN (0x{hex(typ2)[2:].zfill(2)})"
+                                                )
                                                 subsection["unknown"] = True
 
                                         self.buf.skipunit()
                                         self.buf.popunit()
 
                                         section["data"]["subsections"].append(
-                                            subsection)
+                                            subsection
+                                        )
 
                                 case _:
                                     section["unknown"] = True
                         case ".debug_str":
                             section["data"]["strings"] = []
                             while self.buf.unit > 0:
-                                section["data"]["strings"].append(
-                                    self.buf.rzs())
+                                section["data"]["strings"].append(self.buf.rzs())
 
                             for i in range(0, len(section["data"]["strings"])):
-                                if section["data"]["strings"][i].startswith(
-                                        "_Z"):
+                                if section["data"]["strings"][i].startswith("_Z"):
                                     section["data"]["strings"][i] = {
-                                        "raw":
-                                        section["data"]["strings"][i],
-                                        "demangled":
-                                        utils.demangle(
-                                            section["data"]["strings"][i])
+                                        "raw": section["data"]["strings"][i],
+                                        "demangled": utils.demangle(
+                                            section["data"]["strings"][i]
+                                        ),
                                     }
                         case _:
                             with self.buf.subunit():
@@ -155,8 +154,7 @@ class WasmModule(module.RuminantModule):
                     section["id"] = "Type"
                     section["data"]["types"] = self.read_list(True)
                 case _:
-                    section[
-                        "id"] = f"Unknown (0x{hex(section_id)[2:].zfill(2)})"
+                    section["id"] = f"Unknown (0x{hex(section_id)[2:].zfill(2)})"
                     section["unknown"] = True
 
             self.buf.skipunit()
@@ -230,11 +228,9 @@ class Sqlite3Module(module.RuminantModule):
         meta["header"]["schema-format"] = self.buf.ru32()
         meta["header"]["default-page-cache-size"] = self.buf.ru32()
         meta["header"]["largest-broot-page"] = self.buf.ru32()
-        meta["header"]["encoding"] = utils.unraw(self.buf.ru32(), 4, {
-            1: "UTF-8",
-            2: "UTF-16le",
-            3: "UTF-16be"
-        })
+        meta["header"]["encoding"] = utils.unraw(
+            self.buf.ru32(), 4, {1: "UTF-8", 2: "UTF-16le", 3: "UTF-16be"}
+        )
         meta["header"]["user-version"] = self.buf.ru32()
         meta["header"]["incremental-vaccum-mode"] = self.buf.ru32()
         meta["header"]["application-id"] = self.buf.ru32()
@@ -252,9 +248,7 @@ class Sqlite3Module(module.RuminantModule):
         db = sqlite3.connect(fd.name)
         cur = db.cursor()
 
-        meta["schema"] = [
-            x[0] for x in cur.execute("SELECT sql FROM sqlite_master")
-        ]
+        meta["schema"] = [x[0] for x in cur.execute("SELECT sql FROM sqlite_master")]
 
         db.close()
         fd.close()
@@ -267,46 +261,262 @@ class JavaClassModule(module.RuminantModule):
     desc = "Java class files including a disassembler."
 
     NAMES = [
-        "nop", "aconst_null", "iconst_m1", "iconst_0", "iconst_1", "iconst_2",
-        "iconst_3", "iconst_4", "iconst_5", "lconst_0", "lconst_1", "fconst_0",
-        "fconst_1", "fconst_2", "dconst_0", "dconst_1", "bipush", "sipush",
-        "ldc", "ldc_w", "ldc2_w", "iload", "lload", "fload", "dload", "aload",
-        "iload_0", "iload_1", "iload_2", "iload_3", "lload_0", "lload_1",
-        "lload_2", "lload_3", "fload_0", "fload_1", "fload_2", "fload_3",
-        "dload_0", "dload_1", "dload_2", "dload_3", "aload_0", "aload_1",
-        "aload_2", "aload_3", "iaload", "laload", "faload", "daload", "aaload",
-        "baload", "caload", "saload", "istore", "lstore", "fstore", "dstore",
-        "astore", "istore_0", "istore_1", "istore_2", "istore_3", "lstore_0",
-        "lstore_1", "lstore_2", "lstore_3", "fstore_0", "fstore_1", "fstore_2",
-        "fstore_3", "dstore_0", "dstore_1", "dstore_2", "dstore_3", "astore_0",
-        "astore_1", "astore_2", "astore_3", "iastore", "lastore", "fastore",
-        "dastore", "aastore", "bastore", "castore", "sastore", "pop", "pop2",
-        "dup", "dup_x1", "dup_x2", "dup2", "dup2_x1", "dup2_x2", "swap",
-        "iadd", "ladd", "fadd", "dadd", "isub", "lsub", "fsub", "dsub", "imul",
-        "lmul", "fmul", "dmul", "idiv", "ldiv", "fdiv", "ddiv", "irem", "lrem",
-        "frem", "drem", "ineg", "lneg", "fneg", "dneg", "ishl", "lshl", "ishr",
-        "lshr", "iushr", "lushr", "iand", "land", "ior", "lor", "ixor", "lxor",
-        "iinc", "i2l", "i2f", "i2d", "l2i", "l2f", "l2d", "f2i", "f2l", "f2d",
-        "d2i", "d2l", "d2f", "i2b", "i2c", "i2s", "lcmp", "fcmpl", "fcmpg",
-        "dcmpl", "dcmpg", "ifeq", "ifne", "iflt", "ifge", "ifgt", "ifle",
-        "if_icmpeq", "if_icmpne", "if_icmplt", "if_icmpge", "if_icmpgt",
-        "if_icmple", "if_acmpeq", "if_acmpne", "goto", "jsr", "ret",
-        "tableswitch", "lookupswitch", "ireturn", "lreturn", "freturn",
-        "dreturn", "areturn", "return", "getstatic", "putstatic", "getfield",
-        "putfield", "invokevirtual", "invokespecial", "invokestatic",
-        "invokeinterface", "invokedynamic", "new", "newarray", "anewarray",
-        "arraylength", "athrow", "checkcast", "instanceof", "monitorenter",
-        "monitorexit", "wide", "multianewarray", "ifnull", "ifnonnull",
-        "goto_w", "jsr_w", "breakpoint", "reserved", "reserved", "reserved",
-        "reserved", "reserved", "reserved", "reserved", "reserved", "reserved",
-        "reserved", "reserved", "reserved", "reserved", "reserved", "reserved",
-        "reserved", "reserved", "reserved", "reserved", "reserved", "reserved",
-        "reserved", "reserved", "reserved", "reserved", "reserved", "reserved",
-        "reserved", "reserved", "reserved", "reserved", "reserved", "reserved",
-        "reserved", "reserved", "reserved", "reserved", "reserved", "reserved",
-        "reserved", "reserved", "reserved", "reserved", "reserved", "reserved",
-        "reserved", "reserved", "reserved", "reserved", "reserved", "reserved",
-        "impdep1", "impdep2"
+        "nop",
+        "aconst_null",
+        "iconst_m1",
+        "iconst_0",
+        "iconst_1",
+        "iconst_2",
+        "iconst_3",
+        "iconst_4",
+        "iconst_5",
+        "lconst_0",
+        "lconst_1",
+        "fconst_0",
+        "fconst_1",
+        "fconst_2",
+        "dconst_0",
+        "dconst_1",
+        "bipush",
+        "sipush",
+        "ldc",
+        "ldc_w",
+        "ldc2_w",
+        "iload",
+        "lload",
+        "fload",
+        "dload",
+        "aload",
+        "iload_0",
+        "iload_1",
+        "iload_2",
+        "iload_3",
+        "lload_0",
+        "lload_1",
+        "lload_2",
+        "lload_3",
+        "fload_0",
+        "fload_1",
+        "fload_2",
+        "fload_3",
+        "dload_0",
+        "dload_1",
+        "dload_2",
+        "dload_3",
+        "aload_0",
+        "aload_1",
+        "aload_2",
+        "aload_3",
+        "iaload",
+        "laload",
+        "faload",
+        "daload",
+        "aaload",
+        "baload",
+        "caload",
+        "saload",
+        "istore",
+        "lstore",
+        "fstore",
+        "dstore",
+        "astore",
+        "istore_0",
+        "istore_1",
+        "istore_2",
+        "istore_3",
+        "lstore_0",
+        "lstore_1",
+        "lstore_2",
+        "lstore_3",
+        "fstore_0",
+        "fstore_1",
+        "fstore_2",
+        "fstore_3",
+        "dstore_0",
+        "dstore_1",
+        "dstore_2",
+        "dstore_3",
+        "astore_0",
+        "astore_1",
+        "astore_2",
+        "astore_3",
+        "iastore",
+        "lastore",
+        "fastore",
+        "dastore",
+        "aastore",
+        "bastore",
+        "castore",
+        "sastore",
+        "pop",
+        "pop2",
+        "dup",
+        "dup_x1",
+        "dup_x2",
+        "dup2",
+        "dup2_x1",
+        "dup2_x2",
+        "swap",
+        "iadd",
+        "ladd",
+        "fadd",
+        "dadd",
+        "isub",
+        "lsub",
+        "fsub",
+        "dsub",
+        "imul",
+        "lmul",
+        "fmul",
+        "dmul",
+        "idiv",
+        "ldiv",
+        "fdiv",
+        "ddiv",
+        "irem",
+        "lrem",
+        "frem",
+        "drem",
+        "ineg",
+        "lneg",
+        "fneg",
+        "dneg",
+        "ishl",
+        "lshl",
+        "ishr",
+        "lshr",
+        "iushr",
+        "lushr",
+        "iand",
+        "land",
+        "ior",
+        "lor",
+        "ixor",
+        "lxor",
+        "iinc",
+        "i2l",
+        "i2f",
+        "i2d",
+        "l2i",
+        "l2f",
+        "l2d",
+        "f2i",
+        "f2l",
+        "f2d",
+        "d2i",
+        "d2l",
+        "d2f",
+        "i2b",
+        "i2c",
+        "i2s",
+        "lcmp",
+        "fcmpl",
+        "fcmpg",
+        "dcmpl",
+        "dcmpg",
+        "ifeq",
+        "ifne",
+        "iflt",
+        "ifge",
+        "ifgt",
+        "ifle",
+        "if_icmpeq",
+        "if_icmpne",
+        "if_icmplt",
+        "if_icmpge",
+        "if_icmpgt",
+        "if_icmple",
+        "if_acmpeq",
+        "if_acmpne",
+        "goto",
+        "jsr",
+        "ret",
+        "tableswitch",
+        "lookupswitch",
+        "ireturn",
+        "lreturn",
+        "freturn",
+        "dreturn",
+        "areturn",
+        "return",
+        "getstatic",
+        "putstatic",
+        "getfield",
+        "putfield",
+        "invokevirtual",
+        "invokespecial",
+        "invokestatic",
+        "invokeinterface",
+        "invokedynamic",
+        "new",
+        "newarray",
+        "anewarray",
+        "arraylength",
+        "athrow",
+        "checkcast",
+        "instanceof",
+        "monitorenter",
+        "monitorexit",
+        "wide",
+        "multianewarray",
+        "ifnull",
+        "ifnonnull",
+        "goto_w",
+        "jsr_w",
+        "breakpoint",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "reserved",
+        "impdep1",
+        "impdep2",
     ]
 
     def identify(buf, ctx):
@@ -368,18 +578,22 @@ class JavaClassModule(module.RuminantModule):
             case b"\x16":
                 val["data"]["formal-parameter-index"] = self.buf.ru8()
             case b"\x40":
-                val["data"]["table"] = [{
-                    "start-pc": self.buf.ru16(),
-                    "length": self.buf.ru16(),
-                    "index": self.buf.ru16()
-                } for i in range(0, self.buf.ru16())]
+                val["data"]["table"] = [
+                    {
+                        "start-pc": self.buf.ru16(),
+                        "length": self.buf.ru16(),
+                        "index": self.buf.ru16(),
+                    }
+                    for i in range(0, self.buf.ru16())
+                ]
             case b"\x43" | b"\x44" | b"\x45" | b"\x46":
                 val["data"]["offset"] = self.buf.ru16()
             case _:
                 raise ValueError(f"Unkown tag type '{tag.decode('latin-1')}'")
 
-        val["type-path"] = [[self.buf.ru8(), self.buf.ru8()]
-                            for i in range(0, self.buf.ru8())]
+        val["type-path"] = [
+            [self.buf.ru8(), self.buf.ru8()] for i in range(0, self.buf.ru8())
+        ]
         self.read_annotation(val)
 
         return val
@@ -438,17 +652,63 @@ class JavaClassModule(module.RuminantModule):
                         name = self.NAMES[op]
 
                         match op:
-                            case 0x15 | 0x16 | 0x17 | 0x18 | 0x19 | 0x36 | 0x37 | 0x38 | 0x39 | 0x3a:
+                            case (
+                                0x15
+                                | 0x16
+                                | 0x17
+                                | 0x18
+                                | 0x19
+                                | 0x36
+                                | 0x37
+                                | 0x38
+                                | 0x39
+                                | 0x3a
+                            ):
                                 name = [
                                     name,
-                                    self.sign(self.buf.ri16(
-                                    ) if wide else self.buf.ri8())
+                                    self.sign(
+                                        self.buf.ri16() if wide else self.buf.ri8()
+                                    ),
                                 ]
                             case 0x10 | 0xbc:
                                 name = [name, self.sign(self.buf.ri8())]
-                            case 0x11 | 0x99 | 0x9a | 0x9b | 0x9c | 0x9d | 0x9e | 0x9f | 0xa0 | 0xa1 | 0xa2 | 0xa3 | 0xa4 | 0xa5 | 0xa6 | 0xa7 | 0xa8 | 0xc6 | 0xc7:
+                            case (
+                                0x11
+                                | 0x99
+                                | 0x9a
+                                | 0x9b
+                                | 0x9c
+                                | 0x9d
+                                | 0x9e
+                                | 0x9f
+                                | 0xa0
+                                | 0xa1
+                                | 0xa2
+                                | 0xa3
+                                | 0xa4
+                                | 0xa5
+                                | 0xa6
+                                | 0xa7
+                                | 0xa8
+                                | 0xc6
+                                | 0xc7
+                            ):
                                 name = [name, self.sign(self.buf.ri16())]
-                            case 0x13 | 0x14 | 0xb2 | 0xb3 | 0xb4 | 0xb5 | 0xb6 | 0xb7 | 0xb8 | 0xbb | 0xbd | 0xc0 | 0xc1:
+                            case (
+                                0x13
+                                | 0x14
+                                | 0xb2
+                                | 0xb3
+                                | 0xb4
+                                | 0xb5
+                                | 0xb6
+                                | 0xb7
+                                | 0xb8
+                                | 0xbb
+                                | 0xbd
+                                | 0xc0
+                                | 0xc1
+                            ):
                                 name = [name, self.buf.ru16()]
                             case 0xc8 | 0xc9:
                                 name = [name, self.sign(self.buf.ri32())]
@@ -459,7 +719,7 @@ class JavaClassModule(module.RuminantModule):
                                     name,
                                     self.buf.ru16(),
                                     self.buf.ru8(),
-                                    self.buf.ru8()
+                                    self.buf.ru8(),
                                 ]
                             case 0xc5:
                                 name = [name, self.buf.ru16(), self.buf.ru8()]
@@ -467,8 +727,9 @@ class JavaClassModule(module.RuminantModule):
                                 name = [
                                     name,
                                     self.buf.ru8(),
-                                    self.sign(self.buf.ri16(
-                                    ) if wide else self.buf.ri8())
+                                    self.sign(
+                                        self.buf.ri16() if wide else self.buf.ri8()
+                                    ),
                                 ]
                             case 0x12:
                                 name = [name, self.buf.ru8()]
@@ -480,31 +741,53 @@ class JavaClassModule(module.RuminantModule):
                                     name,
                                     self.buf.ru32(),
                                     self.buf.ru32(),
-                                    self.buf.ru32()
+                                    self.buf.ru32(),
                                 ]
 
-                                name.append([
-                                    self.buf.ru32()
-                                    for i in range(0, name[3] - name[2] + 1)
-                                ])
+                                name.append(
+                                    [
+                                        self.buf.ru32()
+                                        for i in range(0, name[3] - name[2] + 1)
+                                    ]
+                                )
                             case 0xab:
                                 while (self.buf.tell() - start) % 4 != 0:
                                     self.buf.skip(1)
 
                                 name = [name, self.buf.ru32(), self.buf.ru32()]
 
-                                name.append([(self.buf.ru32(), self.buf.ru32())
-                                             for i in range(0, name[2])])
+                                name.append(
+                                    [
+                                        (self.buf.ru32(), self.buf.ru32())
+                                        for i in range(0, name[2])
+                                    ]
+                                )
                             case 0xc4:
                                 wide = 2
 
                         match op:
-                            case 0x12 | 0x13 | 0x14 | 0xb2 | 0xb3 | 0xb4 | 0xb5 | 0xb6 | 0xb7 | 0xb8 | 0xb9 | 0xba | 0xbb | 0xbd | 0xc0 | 0xc1:
+                            case (
+                                0x12
+                                | 0x13
+                                | 0x14
+                                | 0xb2
+                                | 0xb3
+                                | 0xb4
+                                | 0xb5
+                                | 0xb6
+                                | 0xb7
+                                | 0xb8
+                                | 0xb9
+                                | 0xba
+                                | 0xbb
+                                | 0xbd
+                                | 0xc0
+                                | 0xc1
+                            ):
                                 name[1] = self.resolve(name[1])
 
                         if isinstance(name, list):
-                            name = name[0] + " " + ", ".join(
-                                [str(x) for x in name[1:]])
+                            name = name[0] + " " + ", ".join([str(x) for x in name[1:]])
 
                         val["code"][pc] = name
 
@@ -533,31 +816,36 @@ class JavaClassModule(module.RuminantModule):
                 case "LocalVariableTable":
                     val = []
                     for i in range(0, self.buf.ru16()):
-                        val.append({
-                            "start-pc": self.buf.ru16(),
-                            "length": self.buf.ru16(),
-                            "name": self.resolve(self.buf.ru16()),
-                            "descriptor": self.resolve(self.buf.ru16()),
-                            "index": self.buf.ru16()
-                        })
+                        val.append(
+                            {
+                                "start-pc": self.buf.ru16(),
+                                "length": self.buf.ru16(),
+                                "name": self.resolve(self.buf.ru16()),
+                                "descriptor": self.resolve(self.buf.ru16()),
+                                "index": self.buf.ru16(),
+                            }
+                        )
                 case "LocalVariableTypeTable":
                     val = []
                     for i in range(0, self.buf.ru16()):
-                        val.append({
-                            "start-pc": self.buf.ru16(),
-                            "length": self.buf.ru16(),
-                            "name": self.resolve(self.buf.ru16()),
-                            "signature": self.resolve(self.buf.ru16()),
-                            "index": self.buf.ru16()
-                        })
+                        val.append(
+                            {
+                                "start-pc": self.buf.ru16(),
+                                "length": self.buf.ru16(),
+                                "name": self.resolve(self.buf.ru16()),
+                                "signature": self.resolve(self.buf.ru16()),
+                                "index": self.buf.ru16(),
+                            }
+                        )
                 case "MethodParameters":
                     val = []
                     for i in range(0, self.buf.ru8()):
                         param = {}
                         param["name"] = self.resolve(self.buf.ru16())
                         param["access-flags"] = utils.unpack_flags(
-                            self.buf.ru16(), ((4, "final"), (12, "synthetic"),
-                                              (15, "mandated")))
+                            self.buf.ru16(),
+                            ((4, "final"), (12, "synthetic"), (15, "mandated")),
+                        )
 
                         val.append(param)
                 case "StackMapTable":
@@ -565,43 +853,45 @@ class JavaClassModule(module.RuminantModule):
                     for i in range(0, self.buf.ru16()):
                         tag = self.buf.ru8()
                         if tag <= 63:
-                            val.append({
-                                "type": "same",
-                                "offset-delta": tag - 64
-                            })
+                            val.append({"type": "same", "offset-delta": tag - 64})
                         elif tag <= 127:
-                            val.append({
-                                "type": "same-locals-1-stack-item",
-                                "offset-delta": tag - 64,
-                                "stack": self.read_verification_type()
-                            })
+                            val.append(
+                                {
+                                    "type": "same-locals-1-stack-item",
+                                    "offset-delta": tag - 64,
+                                    "stack": self.read_verification_type(),
+                                }
+                            )
                         elif tag == 247:
-                            val.append({
-                                "type": "same-locals-1-stack-item-extended",
-                                "offset-delta": self.buf.ru16(),
-                                "stack": self.read_verification_type()
-                            })
+                            val.append(
+                                {
+                                    "type": "same-locals-1-stack-item-extended",
+                                    "offset-delta": self.buf.ru16(),
+                                    "stack": self.read_verification_type(),
+                                }
+                            )
                         elif tag >= 248 and tag <= 250:
-                            val.append({
-                                "type": "CHOP",
-                                "offset-delta": self.buf.ru16()
-                            })
+                            val.append(
+                                {"type": "CHOP", "offset-delta": self.buf.ru16()}
+                            )
                         elif tag == 251:
-                            val.append({
-                                "type": "same-frame-extended",
-                                "offset-delta": self.buf.ru16(),
-                            })
+                            val.append(
+                                {
+                                    "type": "same-frame-extended",
+                                    "offset-delta": self.buf.ru16(),
+                                }
+                            )
                         elif tag >= 252 and tag <= 254:
-                            val.append({
-                                "type":
-                                "same-frame-extended",
-                                "offset-delta":
-                                self.buf.ru16(),
-                                "locals": [
-                                    self.read_verification_type()
-                                    for i in range(0, tag - 251)
-                                ]
-                            })
+                            val.append(
+                                {
+                                    "type": "same-frame-extended",
+                                    "offset-delta": self.buf.ru16(),
+                                    "locals": [
+                                        self.read_verification_type()
+                                        for i in range(0, tag - 251)
+                                    ],
+                                }
+                            )
                         elif tag == 255:
                             frame = {}
                             frame["type"] = "full"
@@ -617,8 +907,7 @@ class JavaClassModule(module.RuminantModule):
 
                             val.append(frame)
                         else:
-                            raise ValueError(
-                                f"Unknown stack frame type '{tag}'")
+                            raise ValueError(f"Unknown stack frame type '{tag}'")
                 case "InnerClasses":
                     val = []
                     for i in range(0, self.buf.ru16()):
@@ -628,10 +917,19 @@ class JavaClassModule(module.RuminantModule):
                         clazz["inner-name"] = self.resolve(self.buf.ru16())
                         clazz["access-flags"] = utils.unpack_flags(
                             self.buf.ru16(),
-                            ((0, "public"), (1, "private"), (2, "protected"),
-                             (3, "static"), (4, "final"), (9, "interface"),
-                             (10, "abstract"), (12, "synthetic"),
-                             (13, "annotation"), (14, "enum")))
+                            (
+                                (0, "public"),
+                                (1, "private"),
+                                (2, "protected"),
+                                (3, "static"),
+                                (4, "final"),
+                                (9, "interface"),
+                                (10, "abstract"),
+                                (12, "synthetic"),
+                                (13, "annotation"),
+                                (14, "enum"),
+                            ),
+                        )
                         val.append(clazz)
                 case "Record":
                     val = []
@@ -649,14 +947,13 @@ class JavaClassModule(module.RuminantModule):
 
                         bmth["arguments"] = []
                         for i in range(0, self.buf.ru16()):
-                            bmth["arguments"].append(
-                                self.resolve(self.buf.ru16()))
+                            bmth["arguments"].append(self.resolve(self.buf.ru16()))
 
                         val.append(bmth)
                 case "EnclosingMethod":
                     val = {
                         "class": self.resolve(self.buf.ru16()),
-                        "method": self.resolve(self.buf.ru16())
+                        "method": self.resolve(self.buf.ru16()),
                     }
                 case "Deprecated":
                     val = True
@@ -664,11 +961,16 @@ class JavaClassModule(module.RuminantModule):
                     val = []
                     for i in range(0, self.buf.ru16()):
                         val.append(self.read_annotation())
-                case "RuntimeVisibleTypeAnnotations" | "RuntimeInvisibleTypeAnnotations":
+                case (
+                    "RuntimeVisibleTypeAnnotations" | "RuntimeInvisibleTypeAnnotations"
+                ):
                     val = []
                     for i in range(0, self.buf.ru16()):
                         val.append(self.read_type_annotation())
-                case "RuntimeVisibleParameterAnnotations" | "RuntimeInvisibleParameterAnnotations":
+                case (
+                    "RuntimeVisibleParameterAnnotations"
+                    | "RuntimeInvisibleParameterAnnotations"
+                ):
                     val = []
                     for i in range(0, self.buf.ru8()):
                         val2 = []
@@ -685,10 +987,7 @@ class JavaClassModule(module.RuminantModule):
                 case "SourceFile" | "Signature":
                     val = self.resolve(self.buf.ru16())
                 case _:
-                    val = {
-                        "payload": self.buf.rh(self.buf.unit),
-                        "unknown": True
-                    }
+                    val = {"payload": self.buf.rh(self.buf.unit), "unknown": True}
 
             self.buf.skipunit()
             self.buf.popunit()
@@ -706,7 +1005,9 @@ class JavaClassModule(module.RuminantModule):
         meta["version"] = {}
         meta["version"]["minor"] = self.buf.ru16()
         meta["version"]["major"] = utils.unraw(
-            self.buf.ru16(), 2, {
+            self.buf.ru16(),
+            2,
+            {
                 45: "JDK 1.1",
                 46: "JDK 1.2",
                 47: "JDK 1.3",
@@ -731,8 +1032,9 @@ class JavaClassModule(module.RuminantModule):
                 66: "Java SE 22",
                 67: "Java SE 23",
                 68: "Java SE 24",
-                69: "Java SE 25"
-            })
+                69: "Java SE 25",
+            },
+        )
 
         meta["constant-count"] = self.buf.ru16() - 1
 
@@ -767,11 +1069,7 @@ class JavaClassModule(module.RuminantModule):
                 case 10:
                     const = ["method-ref", self.buf.ru16(), self.buf.ru16()]
                 case 11:
-                    const = [
-                        "interface-method-ref",
-                        self.buf.ru16(),
-                        self.buf.ru16()
-                    ]
+                    const = ["interface-method-ref", self.buf.ru16(), self.buf.ru16()]
                 case 12:
                     const = ["name-and-type", self.buf.ru16(), self.buf.ru16()]
                 case 15:
@@ -779,10 +1077,7 @@ class JavaClassModule(module.RuminantModule):
                 case 16:
                     const = ["method-type", self.buf.ru16()]
                 case 18:
-                    const = [
-                        "invokedynamic", -self.buf.ru16(),
-                        self.buf.ru16()
-                    ]
+                    const = ["invokedynamic", -self.buf.ru16(), self.buf.ru16()]
                 case _:
                     raise ValueError(f"Unknown constant type {tag}")
 
@@ -808,7 +1103,7 @@ class JavaClassModule(module.RuminantModule):
                                     6: "REF_invokeStatic",
                                     7: "REF_invokeSpecial",
                                     8: "REF_newInvokeSpecial",
-                                    9: "REF_invokeInterface"
+                                    9: "REF_invokeInterface",
                                 }.get(-v[i])
                             elif v[0] == "invokedynamic" and v[i] < 0:
                                 v[i] = f"#{-v[i]}"
@@ -837,12 +1132,18 @@ class JavaClassModule(module.RuminantModule):
                             case "method-type":
                                 meta["constants"][k] = v[1]
                             case _:
-                                raise ValueError(
-                                    f"Cannot render type '{v[0]}' in {v}")
+                                raise ValueError(f"Cannot render type '{v[0]}' in {v}")
 
         meta["access-flags"] = utils.unpack_flags(
-            self.buf.ru16(), ((0, "public"), (4, "final"), (5, "super"),
-                              (9, "interface"), (10, "abstract")))
+            self.buf.ru16(),
+            (
+                (0, "public"),
+                (4, "final"),
+                (5, "super"),
+                (9, "interface"),
+                (10, "abstract"),
+            ),
+        )
         meta["this-class"] = self.resolve(self.buf.ru16())
         meta["super-class"] = self.resolve(self.buf.ru16())
 
@@ -858,9 +1159,18 @@ class JavaClassModule(module.RuminantModule):
 
             field["flags"] = utils.unpack_flags(
                 self.buf.ru16(),
-                ((0, "public"), (1, "private"), (2, "protected"),
-                 (3, "static"), (4, "final"), (6, "volatile"),
-                 (7, "transient"), (12, "synthetic"), (14, "enum")))
+                (
+                    (0, "public"),
+                    (1, "private"),
+                    (2, "protected"),
+                    (3, "static"),
+                    (4, "final"),
+                    (6, "volatile"),
+                    (7, "transient"),
+                    (12, "synthetic"),
+                    (14, "enum"),
+                ),
+            )
             field["name"] = self.resolve(self.buf.ru16())
             field["descriptor"] = self.resolve(self.buf.ru16())
 
@@ -875,10 +1185,21 @@ class JavaClassModule(module.RuminantModule):
 
             method["flags"] = utils.unpack_flags(
                 self.buf.ru16(),
-                ((0, "public"), (1, "private"), (2, "protected"),
-                 (3, "static"), (4, "final"), (5, "synchronized"),
-                 (6, "bridge"), (7, "varargs"), (8, "native"),
-                 (10, "abstract"), (11, "strict"), (12, "synthetic")))
+                (
+                    (0, "public"),
+                    (1, "private"),
+                    (2, "protected"),
+                    (3, "static"),
+                    (4, "final"),
+                    (5, "synchronized"),
+                    (6, "bridge"),
+                    (7, "varargs"),
+                    (8, "native"),
+                    (10, "abstract"),
+                    (11, "strict"),
+                    (12, "synthetic"),
+                ),
+            )
             method["name"] = self.resolve(self.buf.ru16())
             method["descriptor"] = self.resolve(self.buf.ru16())
 
@@ -899,10 +1220,7 @@ class ElfModule(module.RuminantModule):
         return buf.peek(4) == b"\x7fELF"
 
     def hex(self, val):
-        return {
-            "raw": val,
-            "hex": "0x" + hex(val)[2:].zfill(16 if self.wide else 8)
-        }
+        return {"raw": val, "hex": "0x" + hex(val)[2:].zfill(16 if self.wide else 8)}
 
     def chew(self):
         meta = {}
@@ -911,21 +1229,21 @@ class ElfModule(module.RuminantModule):
         self.buf.skip(4)
 
         meta["header"] = {}
-        meta["header"]["class"] = utils.unraw(self.buf.ru8(), 1, {
-            1: "32-bit",
-            2: "64-bit"
-        })
+        meta["header"]["class"] = utils.unraw(
+            self.buf.ru8(), 1, {1: "32-bit", 2: "64-bit"}
+        )
         self.wide = meta["header"]["class"]["raw"] != 1
 
-        meta["header"]["data"] = utils.unraw(self.buf.ru8(), 1, {
-            1: "little endian",
-            2: "big endian"
-        })
+        meta["header"]["data"] = utils.unraw(
+            self.buf.ru8(), 1, {1: "little endian", 2: "big endian"}
+        )
         self.little = meta["header"]["data"]["raw"] == 1
 
         meta["header"]["version"] = self.buf.ru8()
         meta["header"]["abi"] = utils.unraw(
-            self.buf.ru8(), 1, {
+            self.buf.ru8(),
+            1,
+            {
                 0x00: "System V",
                 0x01: "HP-UX",
                 0x02: "NetBSD",
@@ -943,20 +1261,26 @@ class ElfModule(module.RuminantModule):
                 0x0F: "AROS",
                 0x10: "FenixOS",
                 0x11: "Nuxi CloudABI",
-                0x12: "Stratus Technologies OpenVOS"
-            })
+                0x12: "Stratus Technologies OpenVOS",
+            },
+        )
         meta["header"]["abi-version"] = self.buf.ru8()
         meta["header"]["padding"] = self.buf.rh(7)
         meta["header"]["type"] = utils.unraw(
-            self.buf.ru16l() if self.little else self.buf.ru16(), 2, {
+            self.buf.ru16l() if self.little else self.buf.ru16(),
+            2,
+            {
                 0x00: "ET_NONE",
                 0x01: "ET_REL",
                 0x02: "ET_EXEC",
                 0x03: "ET_DYN",
-                0x04: "ET_CORE"
-            })
+                0x04: "ET_CORE",
+            },
+        )
         meta["header"]["machine"] = utils.unraw(
-            self.buf.ru16l() if self.little else self.buf.ru16(), 2, {
+            self.buf.ru16l() if self.little else self.buf.ru16(),
+            2,
+            {
                 0x00: "None",
                 0x01: "AT&T WE 32100",
                 0x02: "SPARC",
@@ -1041,43 +1365,50 @@ class ElfModule(module.RuminantModule):
                 0xf3: "RISC-V",
                 0xf7: "Berkeley Packet Filter",
                 0x101: "WDC 65C816",
-                0x102: "LoongArch"
-            })
+                0x102: "LoongArch",
+            },
+        )
 
-        meta["header"]["version2"] = self.buf.ru32l(
-        ) if self.little else self.buf.ru32()
-        meta["header"]["entry-point"] = self.hex((self.buf.ru64l(
-        ) if self.little else self.buf.ru64()) if self.wide else (
-            self.buf.ru32l() if self.little else self.buf.ru32()))
+        meta["header"]["version2"] = (
+            self.buf.ru32l() if self.little else self.buf.ru32()
+        )
+        meta["header"]["entry-point"] = self.hex(
+            (self.buf.ru64l() if self.little else self.buf.ru64())
+            if self.wide
+            else (self.buf.ru32l() if self.little else self.buf.ru32())
+        )
         meta["header"]["phoff"] = (
-            self.buf.ru64l()
-            if self.little else self.buf.ru64()) if self.wide else (
-                self.buf.ru32l() if self.little else self.buf.ru32())
+            (self.buf.ru64l() if self.little else self.buf.ru64())
+            if self.wide
+            else (self.buf.ru32l() if self.little else self.buf.ru32())
+        )
         meta["header"]["shoff"] = (
-            self.buf.ru64l()
-            if self.little else self.buf.ru64()) if self.wide else (
-                self.buf.ru32l() if self.little else self.buf.ru32())
-        meta["header"]["flags"] = self.buf.ru32l(
-        ) if self.little else self.buf.ru32()
-        meta["header"]["ehsize"] = self.buf.ru16l(
-        ) if self.little else self.buf.ru16()
-        meta["header"]["phentsize"] = self.buf.ru16l(
-        ) if self.little else self.buf.ru16()
-        meta["header"]["phnum"] = self.buf.ru16l(
-        ) if self.little else self.buf.ru16()
-        meta["header"]["shentsize"] = self.buf.ru16l(
-        ) if self.little else self.buf.ru16()
-        meta["header"]["shnum"] = self.buf.ru16l(
-        ) if self.little else self.buf.ru16()
-        meta["header"]["shstrndx"] = self.buf.ru16l(
-        ) if self.little else self.buf.ru16()
+            (self.buf.ru64l() if self.little else self.buf.ru64())
+            if self.wide
+            else (self.buf.ru32l() if self.little else self.buf.ru32())
+        )
+        meta["header"]["flags"] = self.buf.ru32l() if self.little else self.buf.ru32()
+        meta["header"]["ehsize"] = self.buf.ru16l() if self.little else self.buf.ru16()
+        meta["header"]["phentsize"] = (
+            self.buf.ru16l() if self.little else self.buf.ru16()
+        )
+        meta["header"]["phnum"] = self.buf.ru16l() if self.little else self.buf.ru16()
+        meta["header"]["shentsize"] = (
+            self.buf.ru16l() if self.little else self.buf.ru16()
+        )
+        meta["header"]["shnum"] = self.buf.ru16l() if self.little else self.buf.ru16()
+        meta["header"]["shstrndx"] = (
+            self.buf.ru16l() if self.little else self.buf.ru16()
+        )
 
         self.buf.seek(meta["header"]["phoff"])
         meta["program-headers"] = []
         for i in range(0, meta["header"]["phnum"]):
             ph = {}
             ph["type"] = utils.unraw(
-                self.buf.ru32l() if self.little else self.buf.ru32(), 2, {
+                self.buf.ru32l() if self.little else self.buf.ru32(),
+                2,
+                {
                     0x00000000: "PT_NULL",
                     0x00000001: "PT_LOAD",
                     0x00000002: "PT_DYNAMIC",
@@ -1089,48 +1420,56 @@ class ElfModule(module.RuminantModule):
                     0x6474e550: "PT_GNU_EH_FRAME",
                     0x6474e551: "PT_GNU_STACK",
                     0x6474e552: "PT_GNU_RELRO",
-                    0x6474e553: "PT_GNU_PROPERTY"
-                })
+                    0x6474e553: "PT_GNU_PROPERTY",
+                },
+            )
 
             if self.wide:
-                ph["flags"] = self.buf.ru32l(
-                ) if self.little else self.buf.ru32()
+                ph["flags"] = self.buf.ru32l() if self.little else self.buf.ru32()
 
             ph["offset"] = (
-                self.buf.ru64l()
-                if self.little else self.buf.ru64()) if self.wide else (
-                    self.buf.ru32l() if self.little else self.buf.ru32())
-            ph["vaddr"] = self.hex((self.buf.ru64l(
-            ) if self.little else self.buf.ru64()) if self.wide else (
-                self.buf.ru32l() if self.little else self.buf.ru32()))
-            ph["paddr"] = self.hex((self.buf.ru64l(
-            ) if self.little else self.buf.ru64()) if self.wide else (
-                self.buf.ru32l() if self.little else self.buf.ru32()))
+                (self.buf.ru64l() if self.little else self.buf.ru64())
+                if self.wide
+                else (self.buf.ru32l() if self.little else self.buf.ru32())
+            )
+            ph["vaddr"] = self.hex(
+                (self.buf.ru64l() if self.little else self.buf.ru64())
+                if self.wide
+                else (self.buf.ru32l() if self.little else self.buf.ru32())
+            )
+            ph["paddr"] = self.hex(
+                (self.buf.ru64l() if self.little else self.buf.ru64())
+                if self.wide
+                else (self.buf.ru32l() if self.little else self.buf.ru32())
+            )
             ph["filesz"] = (
-                self.buf.ru64l()
-                if self.little else self.buf.ru64()) if self.wide else (
-                    self.buf.ru32l() if self.little else self.buf.ru32())
+                (self.buf.ru64l() if self.little else self.buf.ru64())
+                if self.wide
+                else (self.buf.ru32l() if self.little else self.buf.ru32())
+            )
             ph["memsz"] = (
-                self.buf.ru64l()
-                if self.little else self.buf.ru64()) if self.wide else (
-                    self.buf.ru32l() if self.little else self.buf.ru32())
+                (self.buf.ru64l() if self.little else self.buf.ru64())
+                if self.wide
+                else (self.buf.ru32l() if self.little else self.buf.ru32())
+            )
 
             if not self.wide:
-                ph["flags"] = self.buf.ru32l(
-                ) if self.little else self.buf.ru32()
+                ph["flags"] = self.buf.ru32l() if self.little else self.buf.ru32()
 
-            ph["flags"] = utils.unpack_flags(ph["flags"],
-                                             ((0, "PF_X"), (1, "PF_W"),
-                                              (2, "PF_R")))
+            ph["flags"] = utils.unpack_flags(
+                ph["flags"], ((0, "PF_X"), (1, "PF_W"), (2, "PF_R"))
+            )
 
             ph["align"] = (
-                self.buf.ru64l()
-                if self.little else self.buf.ru64()) if self.wide else (
-                    self.buf.ru32l() if self.little else self.buf.ru32())
+                (self.buf.ru64l() if self.little else self.buf.ru64())
+                if self.wide
+                else (self.buf.ru32l() if self.little else self.buf.ru32())
+            )
 
             if meta["header"]["phentsize"] > (0x38 if self.wide else 0x20):
-                self.buf.skip(meta["header"]["phentsize"] -
-                              (0x38 if self.wide else 0x20))
+                self.buf.skip(
+                    meta["header"]["phentsize"] - (0x38 if self.wide else 0x20)
+                )
 
             with self.buf:
                 self.buf.seek(ph["offset"])
@@ -1147,7 +1486,9 @@ class ElfModule(module.RuminantModule):
                 "offset": self.buf.ru32l() if self.little else self.buf.ru32()
             }
             sh["type"] = utils.unraw(
-                self.buf.ru32l() if self.little else self.buf.ru32(), 4, {
+                self.buf.ru32l() if self.little else self.buf.ru32(),
+                4,
+                {
                     0x00000000: "SHT_NULL",
                     0x00000001: "SHT_PROGBITS",
                     0x00000002: "SHT_SYMTAB",
@@ -1172,39 +1513,58 @@ class ElfModule(module.RuminantModule):
                     0x6ffffff8: "SHT_CHECKSUM",
                     0x6ffffffd: "SHT_GNU_verdef",
                     0x6ffffffe: "SHT_GNU_verneed",
-                    0x6fffffff: "SHT_GNU_versym"
-                })
+                    0x6fffffff: "SHT_GNU_versym",
+                },
+            )
 
-            flags = (self.buf.ru64l()
-                     if self.little else self.buf.ru64()) if self.wide else (
-                         self.buf.ru32l() if self.little else self.buf.ru32())
+            flags = (
+                (self.buf.ru64l() if self.little else self.buf.ru64())
+                if self.wide
+                else (self.buf.ru32l() if self.little else self.buf.ru32())
+            )
             sh["flags"] = utils.unpack_flags(
                 flags,
-                ((0, "SHF_WRITE"), (1, "SHF_ALLOC"), (2, "SHF_EXECINSTR"),
-                 (4, "SHF_MERGE"), (5, "SHF_STRINGS"), (6, "SHF_INFO_LINK"),
-                 (7, "SHF_LINK_ORDER"), (8, "SHF_OS_NONCONFORMING"),
-                 (9, "SHF_GROUP"), (10, "SHF_TLS")))
+                (
+                    (0, "SHF_WRITE"),
+                    (1, "SHF_ALLOC"),
+                    (2, "SHF_EXECINSTR"),
+                    (4, "SHF_MERGE"),
+                    (5, "SHF_STRINGS"),
+                    (6, "SHF_INFO_LINK"),
+                    (7, "SHF_LINK_ORDER"),
+                    (8, "SHF_OS_NONCONFORMING"),
+                    (9, "SHF_GROUP"),
+                    (10, "SHF_TLS"),
+                ),
+            )
 
-            sh["addr"] = self.hex((self.buf.ru64l(
-            ) if self.little else self.buf.ru64()) if self.wide else (
-                self.buf.ru32l() if self.little else self.buf.ru32()))
+            sh["addr"] = self.hex(
+                (self.buf.ru64l() if self.little else self.buf.ru64())
+                if self.wide
+                else (self.buf.ru32l() if self.little else self.buf.ru32())
+            )
             sh["offset"] = (
-                self.buf.ru64l()
-                if self.little else self.buf.ru64()) if self.wide else (
-                    self.buf.ru32l() if self.little else self.buf.ru32())
-            sh["size"] = (self.buf.ru64l() if self.little else self.buf.ru64()
-                          ) if self.wide else (self.buf.ru32l() if self.little
-                                               else self.buf.ru32())
+                (self.buf.ru64l() if self.little else self.buf.ru64())
+                if self.wide
+                else (self.buf.ru32l() if self.little else self.buf.ru32())
+            )
+            sh["size"] = (
+                (self.buf.ru64l() if self.little else self.buf.ru64())
+                if self.wide
+                else (self.buf.ru32l() if self.little else self.buf.ru32())
+            )
             sh["link"] = self.buf.ru32l() if self.little else self.buf.ru32()
             sh["info"] = self.buf.ru32l() if self.little else self.buf.ru32()
             sh["addralign"] = (
-                self.buf.ru64l()
-                if self.little else self.buf.ru64()) if self.wide else (
-                    self.buf.ru32l() if self.little else self.buf.ru32())
+                (self.buf.ru64l() if self.little else self.buf.ru64())
+                if self.wide
+                else (self.buf.ru32l() if self.little else self.buf.ru32())
+            )
             sh["entsize"] = (
-                self.buf.ru64l()
-                if self.little else self.buf.ru64()) if self.wide else (
-                    self.buf.ru32l() if self.little else self.buf.ru32())
+                (self.buf.ru64l() if self.little else self.buf.ru64())
+                if self.wide
+                else (self.buf.ru32l() if self.little else self.buf.ru32())
+            )
 
             if sh["type"]["name"] != "SHT_NOBITS":
                 with self.buf:
@@ -1213,8 +1573,9 @@ class ElfModule(module.RuminantModule):
                         sh["blob"] = chew(self.buf, blob_mode=True)
 
             if meta["header"]["shentsize"] > (0x40 if self.wide else 0x28):
-                self.buf.skip(meta["header"]["shentsize"] -
-                              (0x40 if self.wide else 0x28))
+                self.buf.skip(
+                    meta["header"]["shentsize"] - (0x40 if self.wide else 0x28)
+                )
 
             meta["section-headers"].append(sh)
 
@@ -1254,26 +1615,32 @@ class ElfModule(module.RuminantModule):
                     sh["parsed"] = {}
 
                     if sh["name"]["string"] == ".interp":
-                        sh["parsed"]["string"] = self.buf.rs(
-                            self.buf.available())
+                        sh["parsed"]["string"] = self.buf.rs(self.buf.available())
                     elif sh["name"]["string"] == ".comment":
                         sh["parsed"]["strings"] = []
                         while self.buf.available() > 0:
                             sh["parsed"]["strings"].append(self.buf.rzs())
-                    elif sh["name"]["string"].startswith(
-                            ".note.") and self.buf.available() > 0:
+                    elif (
+                        sh["name"]["string"].startswith(".note.")
+                        and self.buf.available() > 0
+                    ):
                         base = self.buf.tell()
-                        sh["parsed"]["namesz"] = self.buf.ru32l(
-                        ) if self.little else self.buf.ru32()
-                        sh["parsed"]["descsz"] = self.buf.ru32l(
-                        ) if self.little else self.buf.ru32()
-                        sh["parsed"]["type"] = self.buf.ru32l(
-                        ) if self.little else self.buf.ru32()
-                        sh["parsed"]["name"] = self.buf.rs(
-                            sh["parsed"]["namesz"])
+                        sh["parsed"]["namesz"] = (
+                            self.buf.ru32l() if self.little else self.buf.ru32()
+                        )
+                        sh["parsed"]["descsz"] = (
+                            self.buf.ru32l() if self.little else self.buf.ru32()
+                        )
+                        sh["parsed"]["type"] = (
+                            self.buf.ru32l() if self.little else self.buf.ru32()
+                        )
+                        sh["parsed"]["name"] = self.buf.rs(sh["parsed"]["namesz"])
 
-                        self.buf.skip((4 - sh["parsed"]["namesz"] % 4) if (
-                            sh["parsed"]["namesz"] % 4 != 0) else 0)
+                        self.buf.skip(
+                            (4 - sh["parsed"]["namesz"] % 4)
+                            if (sh["parsed"]["namesz"] % 4 != 0)
+                            else 0
+                        )
                         self.buf.pushunit()
                         self.buf.setunit(sh["parsed"]["descsz"])
 
@@ -1284,10 +1651,16 @@ class ElfModule(module.RuminantModule):
                                     prop = {}
                                     prop["type"] = utils.unraw(
                                         self.buf.ru32l()
-                                        if self.little else self.buf.ru32(), 4,
-                                        {0xc0008002: "X86_FEATURE_1_AND"})
-                                    prop["datasz"] = self.buf.ru32l(
-                                    ) if self.little else self.buf.ru32()
+                                        if self.little
+                                        else self.buf.ru32(),
+                                        4,
+                                        {0xc0008002: "X86_FEATURE_1_AND"},
+                                    )
+                                    prop["datasz"] = (
+                                        self.buf.ru32l()
+                                        if self.little
+                                        else self.buf.ru32()
+                                    )
 
                                     self.buf.pushunit()
                                     self.buf.setunit(prop["datasz"])
@@ -1296,37 +1669,42 @@ class ElfModule(module.RuminantModule):
                                         case "X86_FEATURE_1_AND":
                                             prop["data"] = {}
                                             prop["data"]["flags"] = {
-                                                "raw":
-                                                self.buf.ru32l() if self.little
+                                                "raw": self.buf.ru32l()
+                                                if self.little
                                                 else self.buf.ru32(),
-                                                "name": []
+                                                "name": [],
                                             }
 
-                                            if prop["data"]["flags"][
-                                                    "raw"] & 0x00000001:
-                                                prop["data"]["flags"][
-                                                    "name"].append("IBT")
-                                            if prop["data"]["flags"][
-                                                    "raw"] & 0x00000002:
-                                                prop["data"]["flags"][
-                                                    "name"].append("SHSTK")
+                                            if (
+                                                prop["data"]["flags"]["raw"]
+                                                & 0x00000001
+                                            ):
+                                                prop["data"]["flags"]["name"].append(
+                                                    "IBT"
+                                                )
+                                            if (
+                                                prop["data"]["flags"]["raw"]
+                                                & 0x00000002
+                                            ):
+                                                prop["data"]["flags"]["name"].append(
+                                                    "SHSTK"
+                                                )
                                         case "Unknown":
-                                            prop["data"] = self.buf.rh(
-                                                self.buf.unit)
+                                            prop["data"] = self.buf.rh(self.buf.unit)
                                             prop["unknown"] = True
 
                                     self.buf.skipunit()
                                     self.buf.popunit()
 
-                                    self.buf.skip((
-                                        8 - (self.buf.tell() - base) % 8) if (
-                                            (self.buf.tell() - base) %
-                                            8 != 0) else 0)
+                                    self.buf.skip(
+                                        (8 - (self.buf.tell() - base) % 8)
+                                        if ((self.buf.tell() - base) % 8 != 0)
+                                        else 0
+                                    )
 
                                     sh["parsed"]["properties"].append(prop)
                             case _, _:
-                                sh["parsed"]["desc"] = self.buf.rh(
-                                    self.buf.unit)
+                                sh["parsed"]["desc"] = self.buf.rh(self.buf.unit)
                                 sh["unknown"] = True
 
                         self.buf.popunit()
@@ -1335,9 +1713,9 @@ class ElfModule(module.RuminantModule):
                         while self.buf.available() > 0:
                             sym = {}
                             sym["name"] = {
-                                "index":
-                                self.buf.ru32l()
-                                if self.little else self.buf.ru32()
+                                "index": self.buf.ru32l()
+                                if self.little
+                                else self.buf.ru32()
                             }
                             self.namebuf.seek(sym["name"]["index"])
                             sym["name"]["string"] = self.namebuf.rzs()
@@ -1345,30 +1723,35 @@ class ElfModule(module.RuminantModule):
                             if sym["name"]["string"].startswith("_Z"):
                                 try:
                                     sym["name"]["demangled"] = utils.demangle(
-                                        sym["name"]["string"])
+                                        sym["name"]["string"]
+                                    )
                                 except Exception:
                                     pass
 
                             if self.wide:
                                 sym["info"] = self.buf.ru8()
                                 sym["other"] = self.buf.ru8()
-                                sym["section-index"] = self.buf.ru16l(
-                                ) if self.little else self.buf.ru16()
+                                sym["section-index"] = (
+                                    self.buf.ru16l() if self.little else self.buf.ru16()
+                                )
                                 sym["addr"] = hex(
-                                    self.buf.ru64l() if self.little else self.
-                                    buf.ru64())[2:].zfill(8)
-                                sym["size"] = self.buf.ru64l(
-                                ) if self.little else self.buf.ru64()
+                                    self.buf.ru64l() if self.little else self.buf.ru64()
+                                )[2:].zfill(8)
+                                sym["size"] = (
+                                    self.buf.ru64l() if self.little else self.buf.ru64()
+                                )
                             else:
                                 sym["addr"] = hex(
-                                    self.buf.ru32l() if self.little else self.
-                                    buf.ru32())[2:].zfill(16)
-                                sym["size"] = self.buf.ru32l(
-                                ) if self.little else self.buf.ru32()
+                                    self.buf.ru32l() if self.little else self.buf.ru32()
+                                )[2:].zfill(16)
+                                sym["size"] = (
+                                    self.buf.ru32l() if self.little else self.buf.ru32()
+                                )
                                 sym["info"] = self.buf.ru8()
                                 sym["other"] = self.buf.ru8()
-                                sym["section-index"] = self.buf.ru16l(
-                                ) if self.little else self.buf.ru16()
+                                sym["section-index"] = (
+                                    self.buf.ru16l() if self.little else self.buf.ru16()
+                                )
 
                             sh["parsed"]["symbols"].append(sym)
                     elif sh["name"]["string"] == ".modinfo":
@@ -1379,11 +1762,15 @@ class ElfModule(module.RuminantModule):
                         del sh["parsed"]
 
         m = max(
-            m, meta["header"]["phoff"] +
-            meta["header"]["phnum"] * meta["header"]["phentsize"])
+            m,
+            meta["header"]["phoff"]
+            + meta["header"]["phnum"] * meta["header"]["phentsize"],
+        )
         m = max(
-            m, meta["header"]["shoff"] +
-            meta["header"]["shnum"] * meta["header"]["shentsize"])
+            m,
+            meta["header"]["shoff"]
+            + meta["header"]["shnum"] * meta["header"]["shentsize"],
+        )
 
         self.buf.seek(m)
 
@@ -1398,22 +1785,19 @@ class PeModule(module.RuminantModule):
         return buf.peek(2) == b"MZ"
 
     def hex(self, val):
-        return {
-            "raw": val,
-            "hex": "0x" + hex(val)[2:].zfill(16 if self.wide else 8)
-        }
+        return {"raw": val, "hex": "0x" + hex(val)[2:].zfill(16 if self.wide else 8)}
 
     def seek_vaddr(self, vaddr):
         for section in self.meta["sections"]:
             if vaddr >= section["vaddr"]["raw"] and vaddr < (
-                    section["vaddr"]["raw"] + section["psize"]):
+                section["vaddr"]["raw"] + section["psize"]
+            ):
                 self.buf.seek(section["paddr"])
                 self.buf.pasunit(section["psize"])
                 self.buf.skip(vaddr - section["vaddr"]["raw"])
                 return
 
-        raise ValueError(
-            f"Cannot find section that maps {self.hex(vaddr)['hex']}")
+        raise ValueError(f"Cannot find section that maps {self.hex(vaddr)['hex']}")
 
     def chew(self):
         meta = {}
@@ -1433,21 +1817,26 @@ class PeModule(module.RuminantModule):
 
         meta["pe-header"] = {}
         meta["pe-header"]["machine"] = utils.unraw(
-            self.buf.ru16l(), 2, {
+            self.buf.ru16l(),
+            2,
+            {
                 0x0000: "Unknown",
                 0x014c: "i386",
                 0x8664: "x64",
-                0xaa64: "ARM64 little endian"
-            })
+                0xaa64: "ARM64 little endian",
+            },
+        )
         meta["pe-header"]["section-count"] = self.buf.ru16l()
         meta["pe-header"]["timestamp"] = datetime.datetime.fromtimestamp(
-            self.buf.ru32l(), datetime.timezone.utc).isoformat()
+            self.buf.ru32l(), datetime.timezone.utc
+        ).isoformat()
         meta["pe-header"]["symbol-table-offset"] = self.buf.ru32l()
         meta["pe-header"]["symbol-count"] = self.buf.ru32l()
         meta["pe-header"]["optional-header-size"] = self.buf.ru16l()
 
         meta["pe-header"]["characteristics"] = utils.unpack_flags(
-            self.buf.ru16l(), (
+            self.buf.ru16l(),
+            (
                 (0, "RELOCS_STRIPPED"),
                 (1, "EXECUTABLE_IMAGE"),
                 (2, "LINE_NUMS_STRIPPED"),
@@ -1464,7 +1853,8 @@ class PeModule(module.RuminantModule):
                 (13, "DLL"),
                 (14, "UP_SYSTEM_ONLY"),
                 (15, "BYTES_REVERSED_HI"),
-            ))
+            ),
+        )
 
         if meta["pe-header"]["optional-header-size"] > 0:
             meta["optional-header"] = {}
@@ -1478,59 +1868,53 @@ class PeModule(module.RuminantModule):
                     meta["optional-header"]["type"] = "PE32+"
                     self.plus = True
                 case _:
-                    meta["optional-header"][
-                        "type"] = f"Unknown (0x{hex(typ)[2:].zfill(4)})"
+                    meta["optional-header"]["type"] = (
+                        f"Unknown (0x{hex(typ)[2:].zfill(4)})"
+                    )
                     meta["optional-header"]["unknown"] = True
 
             self.buf.pasunit(meta["pe-header"]["optional-header-size"] - 2)
 
             if "unknown" not in meta["optional-header"]:
-                meta["optional-header"]["major-linker-version"] = self.buf.ru8(
-                )
-                meta["optional-header"]["minor-linker-version"] = self.buf.ru8(
-                )
+                meta["optional-header"]["major-linker-version"] = self.buf.ru8()
+                meta["optional-header"]["minor-linker-version"] = self.buf.ru8()
                 meta["optional-header"]["size-of-code"] = self.buf.ru32l()
-                meta["optional-header"][
-                    "size-of-initialized-data"] = self.buf.ru32l()
-                meta["optional-header"][
-                    "size-of-uninitialized-data"] = self.buf.ru32l()
+                meta["optional-header"]["size-of-initialized-data"] = self.buf.ru32l()
+                meta["optional-header"]["size-of-uninitialized-data"] = self.buf.ru32l()
                 meta["optional-header"]["address-of-entrypoint"] = self.hex(
-                    self.buf.ru32l())
-                meta["optional-header"]["base-of-code"] = self.hex(
-                    self.buf.ru32l())
+                    self.buf.ru32l()
+                )
+                meta["optional-header"]["base-of-code"] = self.hex(self.buf.ru32l())
 
                 if not self.plus:
-                    meta["optional-header"]["base-of-data"] = self.hex(
-                        self.buf.ru32l())
+                    meta["optional-header"]["base-of-data"] = self.hex(self.buf.ru32l())
 
                 self.wide = self.plus
 
                 if self.buf.available() > 0:
                     meta["optional-header"]["image-base"] = self.hex(
-                        self.buf.ru64l() if self.wide else self.buf.ru32l())
-                    meta["optional-header"][
-                        "section-alignment"] = self.buf.ru32l()
-                    meta["optional-header"]["file-alignment"] = self.buf.ru32l(
+                        self.buf.ru64l() if self.wide else self.buf.ru32l()
                     )
-                    meta["optional-header"][
-                        "major-os-version"] = self.buf.ru16l()
-                    meta["optional-header"][
-                        "minor-os-version"] = self.buf.ru16l()
-                    meta["optional-header"][
-                        "major-image-version"] = self.buf.ru16l()
-                    meta["optional-header"][
-                        "minor-image-version"] = self.buf.ru16l()
-                    meta["optional-header"][
-                        "major-subsystem-version"] = self.buf.ru16l()
-                    meta["optional-header"][
-                        "minor-subsystem-version"] = self.buf.ru16l()
+                    meta["optional-header"]["section-alignment"] = self.buf.ru32l()
+                    meta["optional-header"]["file-alignment"] = self.buf.ru32l()
+                    meta["optional-header"]["major-os-version"] = self.buf.ru16l()
+                    meta["optional-header"]["minor-os-version"] = self.buf.ru16l()
+                    meta["optional-header"]["major-image-version"] = self.buf.ru16l()
+                    meta["optional-header"]["minor-image-version"] = self.buf.ru16l()
+                    meta["optional-header"]["major-subsystem-version"] = (
+                        self.buf.ru16l()
+                    )
+                    meta["optional-header"]["minor-subsystem-version"] = (
+                        self.buf.ru16l()
+                    )
                     meta["optional-header"]["win32-version"] = self.buf.ru32l()
                     meta["optional-header"]["size-of-image"] = self.buf.ru32l()
-                    meta["optional-header"][
-                        "size-of-headers"] = self.buf.ru32l()
+                    meta["optional-header"]["size-of-headers"] = self.buf.ru32l()
                     meta["optional-header"]["checksum"] = self.buf.ru32l()
                     meta["optional-header"]["subsystem"] = utils.unraw(
-                        self.buf.ru16l(), 2, {
+                        self.buf.ru16l(),
+                        2,
+                        {
                             0x0000: "UNKNOWN",
                             0x0001: "NATIVE",
                             0x0002: "WINDOWS_GUI",
@@ -1544,54 +1928,67 @@ class PeModule(module.RuminantModule):
                             0x000c: "EFI_RUNTIME_DRIVER",
                             0x000d: "EFI_ROM",
                             0x000e: "XBOX",
-                            0x0010: "WINDOWS_BOOT_APPLICATION"
-                        })
-                    meta["optional-header"][
-                        "dll-characteristics"] = utils.unpack_flags(
-                            self.buf.ru16l(), (
-                                (5, "HIGH_ENTROPY_VA"),
-                                (6, "DYNAMIC_BASE"),
-                                (7, "FORCE_INTEGRITY"),
-                                (8, "NX_COMPAT"),
-                                (9, "NO_ISOLATION"),
-                                (10, "NO_SEH"),
-                                (11, "NO_BIND"),
-                                (12, "APPCONTAINER"),
-                                (13, "WDM_DRIVER"),
-                                (14, "GUARD_CF"),
-                                (15, "TERMINAL_SERVER_AWARE"),
-                            ))
-                    meta["optional-header"][
-                        "size-of-stack-reserve"] = self.buf.ru64l(
-                        ) if self.plus else self.buf.ru32l()
-                    meta["optional-header"][
-                        "size-of-stack-commit"] = self.buf.ru64l(
-                        ) if self.plus else self.buf.ru32l()
-                    meta["optional-header"][
-                        "size-of-heap-reserve"] = self.buf.ru64l(
-                        ) if self.plus else self.buf.ru32l()
-                    meta["optional-header"][
-                        "size-of-heap-commit"] = self.buf.ru64l(
-                        ) if self.plus else self.buf.ru32l()
+                            0x0010: "WINDOWS_BOOT_APPLICATION",
+                        },
+                    )
+                    meta["optional-header"]["dll-characteristics"] = utils.unpack_flags(
+                        self.buf.ru16l(),
+                        (
+                            (5, "HIGH_ENTROPY_VA"),
+                            (6, "DYNAMIC_BASE"),
+                            (7, "FORCE_INTEGRITY"),
+                            (8, "NX_COMPAT"),
+                            (9, "NO_ISOLATION"),
+                            (10, "NO_SEH"),
+                            (11, "NO_BIND"),
+                            (12, "APPCONTAINER"),
+                            (13, "WDM_DRIVER"),
+                            (14, "GUARD_CF"),
+                            (15, "TERMINAL_SERVER_AWARE"),
+                        ),
+                    )
+                    meta["optional-header"]["size-of-stack-reserve"] = (
+                        self.buf.ru64l() if self.plus else self.buf.ru32l()
+                    )
+                    meta["optional-header"]["size-of-stack-commit"] = (
+                        self.buf.ru64l() if self.plus else self.buf.ru32l()
+                    )
+                    meta["optional-header"]["size-of-heap-reserve"] = (
+                        self.buf.ru64l() if self.plus else self.buf.ru32l()
+                    )
+                    meta["optional-header"]["size-of-heap-commit"] = (
+                        self.buf.ru64l() if self.plus else self.buf.ru32l()
+                    )
                     meta["optional-header"]["loader-flags"] = self.buf.ru32l()
 
-                    meta["optional-header"][
-                        "number-of-rva-and-sizes"] = self.buf.ru32l()
+                    meta["optional-header"]["number-of-rva-and-sizes"] = (
+                        self.buf.ru32l()
+                    )
                     meta["optional-header"]["rvas"] = []
                     for i in range(
-                            0, meta["optional-header"]
-                        ["number-of-rva-and-sizes"]):  # noqa: E131, E125
+                        0, meta["optional-header"]["number-of-rva-and-sizes"]
+                    ):  # noqa: E131, E125
                         if self.buf.unit < 8:
                             break
 
                         rva = {}
                         rva["name"] = [
-                            "Export Table", "Import Table", "Resource Table",
-                            "Exception Table", "Certificate Table",
-                            "Base Relocation Table", "Debug", "Architecture",
-                            "Global Ptr", "TLS Table", "Load Config Table",
-                            "Bound Import", "IAT", "Delay Import Descriptor",
-                            "CLR Runtime Header", "Reserved"
+                            "Export Table",
+                            "Import Table",
+                            "Resource Table",
+                            "Exception Table",
+                            "Certificate Table",
+                            "Base Relocation Table",
+                            "Debug",
+                            "Architecture",
+                            "Global Ptr",
+                            "TLS Table",
+                            "Load Config Table",
+                            "Bound Import",
+                            "IAT",
+                            "Delay Import Descriptor",
+                            "CLR Runtime Header",
+                            "Reserved",
                         ][i]
                         rva["base"] = self.buf.ru32l()
                         rva["size"] = self.buf.ru32l()
@@ -1613,7 +2010,8 @@ class PeModule(module.RuminantModule):
                 section["relocs-count"] = self.buf.ru16l()
                 section["linenums-count"] = self.buf.ru16l()
                 section["characteristics"] = utils.unpack_flags(
-                    self.buf.ru32l(), (
+                    self.buf.ru32l(),
+                    (
                         (3, "SCN_TYPE_NO_PAD"),
                         (5, "SCN_CNT_CODE"),
                         (6, "SCN_CNT_INITIALIZED_DATA"),
@@ -1634,7 +2032,8 @@ class PeModule(module.RuminantModule):
                         (29, "SCN_MEM_EXECUTE"),
                         (30, "SCN_MEM_READ"),
                         (31, "SCN_MEM_WRITE"),
-                    ))
+                    ),
+                )
 
                 if section["psize"] != 0:
                     with self.buf:
@@ -1643,8 +2042,11 @@ class PeModule(module.RuminantModule):
                         with self.buf.sub(section["psize"]):
                             section["blob"] = chew(
                                 self.buf,
-                                blob_mode=not (section["name"] == "mods" and
-                                               self.buf.peek(4) == b"mimg"))
+                                blob_mode=not (
+                                    section["name"] == "mods"
+                                    and self.buf.peek(4) == b"mimg"
+                                ),
+                            )
 
                 meta["sections"].append(section)
 
@@ -1669,12 +2071,13 @@ class PeModule(module.RuminantModule):
                             rev = self.buf.ru16l()
                             entry["revision"] = f"{rev >> 8}.{rev & 0xff}"
                             entry["type"] = utils.unraw(
-                                self.buf.ru16l(), 2, {
-                                    0x0001: "X509",
-                                    0x0002: "PKCS_SIGNED_DATA"
-                                })
-                            entry["blob"] = chew(self.buf.peek(self.buf.unit),
-                                                 blob_mode=True)
+                                self.buf.ru16l(),
+                                2,
+                                {0x0001: "X509", 0x0002: "PKCS_SIGNED_DATA"},
+                            )
+                            entry["blob"] = chew(
+                                self.buf.peek(self.buf.unit), blob_mode=True
+                            )
                             entry["signature"] = utils.read_der(self.buf)
 
                             self.buf.sapunit()
@@ -1691,35 +2094,33 @@ class PeModule(module.RuminantModule):
                         rva["parsed"] = {}
                         rva["parsed"]["size"] = self.buf.ru32l()
                         self.buf.setunit(min(self.buf.unit, rva["size"] - 2))
-                        rva["parsed"][
-                            "major-runtime-version"] = self.buf.ru16l()
-                        rva["parsed"][
-                            "minor-runtime-version"] = self.buf.ru16l()
+                        rva["parsed"]["major-runtime-version"] = self.buf.ru16l()
+                        rva["parsed"]["minor-runtime-version"] = self.buf.ru16l()
                         rva["parsed"]["metadata"] = {
                             "base": self.hex(self.buf.ru32l()),
-                            "size": self.hex(self.buf.ru32l())
+                            "size": self.hex(self.buf.ru32l()),
                         }
                         rva["parsed"]["flags"] = self.buf.ru32l()
                         rva["parsed"]["entry"] = self.hex(self.buf.ru32l())
                         rva["parsed"]["resources"] = {
                             "base": self.hex(self.buf.ru32l()),
-                            "size": self.hex(self.buf.ru32l())
+                            "size": self.hex(self.buf.ru32l()),
                         }
                         rva["parsed"]["code-manager-table"] = {
                             "base": self.hex(self.buf.ru32l()),
-                            "size": self.hex(self.buf.ru32l())
+                            "size": self.hex(self.buf.ru32l()),
                         }
                         rva["parsed"]["vtable-fixups"] = {
                             "base": self.hex(self.buf.ru32l()),
-                            "size": self.hex(self.buf.ru32l())
+                            "size": self.hex(self.buf.ru32l()),
                         }
                         rva["parsed"]["export-address-table-jumps"] = {
                             "base": self.hex(self.buf.ru32l()),
-                            "size": self.hex(self.buf.ru32l())
+                            "size": self.hex(self.buf.ru32l()),
                         }
                         rva["parsed"]["managed-native-header"] = {
                             "base": self.hex(self.buf.ru32l()),
-                            "size": self.hex(self.buf.ru32l())
+                            "size": self.hex(self.buf.ru32l()),
                         }
 
                         self.buf.sapunit()
@@ -1756,10 +2157,7 @@ class NbtModule(module.RuminantModule):
             for k, v in list(root.items()):
                 if k == "icon" and isinstance(v, str) and len(v) > 100:
                     try:
-                        root[k] = {
-                            "raw": v,
-                            "parsed": chew(base64.b64decode(v))
-                        }
+                        root[k] = {"raw": v, "parsed": chew(base64.b64decode(v))}
                     except binascii.Error:
                         pass
                 else:
@@ -1849,17 +2247,18 @@ class McaModule(module.RuminantModule):
                 with self.buf:
                     self.buf.seek(0x1000 + i * 4)
                     chunk["timestamp"] = datetime.datetime.fromtimestamp(
-                        self.buf.ru32(), datetime.timezone.utc).isoformat()
+                        self.buf.ru32(), datetime.timezone.utc
+                    ).isoformat()
 
                     self.buf.seek(offset)
                     chunk["length"] = self.buf.ru32()
                     self.buf.pasunit(chunk["length"])
 
-                    chunk["compression"] = utils.unraw(self.buf.ru8(), 1, {
-                        0x01: "GZip",
-                        0x02: "zlib",
-                        0x03: "Uncompressed"
-                    })
+                    chunk["compression"] = utils.unraw(
+                        self.buf.ru8(),
+                        1,
+                        {0x01: "GZip", 0x02: "zlib", 0x03: "Uncompressed"},
+                    )
 
                     data = None
                     content = self.buf.readunit()
@@ -1874,8 +2273,7 @@ class McaModule(module.RuminantModule):
                             chunk["unknown"] = True
 
                     if data is not None:
-                        chunk["data"] = chew(
-                            data, extra_ctx={"skip-chunk-data": True})
+                        chunk["data"] = chew(data, extra_ctx={"skip-chunk-data": True})
 
                     self.buf.sapunit()
 
@@ -1912,7 +2310,9 @@ class GrubModuleModule(module.RuminantModule):
         while self.buf.unit > 0:
             module = {}
             module["type"] = utils.unraw(
-                self.buf.ru32l(), 4, {
+                self.buf.ru32l(),
+                4,
+                {
                     0x00000000: "ELF",
                     0x00000001: "MEMDISK",
                     0x00000002: "CONFIG",
@@ -1920,7 +2320,8 @@ class GrubModuleModule(module.RuminantModule):
                     0x00000004: "PUBKEY",
                     0x00000005: "DTB",
                     0x00000006: "DISABLE_SHIM_LOCK",
-                })
+                },
+            )
             module["length"] = self.buf.ru32l()
 
             self.buf.pasunit(module["length"] - 8)
@@ -1981,10 +2382,17 @@ class SpirVModule(module.RuminantModule):
     def read_memory_operands(self):
         val = utils.unpack_flags(
             self.read(),
-            ((0, "Volatile"), (1, "Aligned"), (2, "Nontemporal"),
-             (3, "MakePointerAvailable"), (4, "MakePointerVisible"),
-             (5, "NonPrivatePointer"), (16, "AliasScopeINTELMask"),
-             (17, "NoAliasINTELMask")))
+            (
+                (0, "Volatile"),
+                (1, "Aligned"),
+                (2, "Nontemporal"),
+                (3, "MakePointerAvailable"),
+                (4, "MakePointerVisible"),
+                (5, "NonPrivatePointer"),
+                (16, "AliasScopeINTELMask"),
+                (17, "NoAliasINTELMask"),
+            ),
+        )
 
         return val
 
@@ -1999,7 +2407,9 @@ class SpirVModule(module.RuminantModule):
         meta["header"]["version"] = f"{(ver >> 16) & 0xff}.{(ver >> 8) & 0xff}"
         ver = self.read()
         meta["header"]["generator"] = utils.unraw(
-            ver >> 16, 2, {
+            ver >> 16,
+            2,
+            {
                 0x0000: "Khronos",
                 0x0001: "LunarG",
                 0x0002: "Valve",
@@ -2045,13 +2455,13 @@ class SpirVModule(module.RuminantModule):
                 0x002a: "Rendong Liang - spq",
                 0x002b: "LLVM - LLVM SPIR-V Backend",
                 0x002c: "Robert Konrad - Kongruent",
-                0x002d:
-                "Kitsunebi Games - Nuvk SPIR-V Emitter and DLSL compiler",
+                0x002d: "Kitsunebi Games - Nuvk SPIR-V Emitter and DLSL compiler",
                 0x002e: "Nintendo",
                 0x002f: "ARM",
                 0x0030: "Goopax",
-                0x0031: "Icyllis Milica - Arc3D Shader Compiler"
-            })
+                0x0031: "Icyllis Milica - Arc3D Shader Compiler",
+            },
+        )
         meta["header"]["generator-version"] = ver & 0xffff
         meta["header"]["bound"] = self.read()
         meta["header"]["reserved"] = self.read()
@@ -2060,8 +2470,9 @@ class SpirVModule(module.RuminantModule):
         while self.buf.available():
             inst = {}
             opcode = self.read()
-            inst["opcode"] = utils.unraw(opcode & 0xffff, 2,
-                                         constants.SPIRV_OPCODES, True)
+            inst["opcode"] = utils.unraw(
+                opcode & 0xffff, 2, constants.SPIRV_OPCODES, True
+            )
             inst["length"] = opcode >> 16
 
             self.buf.pasunit((inst["length"] - 1) * 4)
@@ -2070,29 +2481,40 @@ class SpirVModule(module.RuminantModule):
             match inst["opcode"]:
                 case "Capability":
                     inst["arguments"]["capability"] = utils.unraw(
-                        self.read(), 4, constants.SPIRV_CAPABILITIES, True)
+                        self.read(), 4, constants.SPIRV_CAPABILITIES, True
+                    )
                 case "ExtInstImport":
                     inst["arguments"]["result-id"] = self.read()
                     inst["arguments"]["name"] = self.read_string()
                 case "MemoryModel":
                     inst["arguments"]["addressing-model"] = utils.unraw(
-                        self.read(), 4, {
+                        self.read(),
+                        4,
+                        {
                             0x00000000: "Logical",
                             0x00000001: "Physical32",
                             0x00000002: "Physical64",
-                            0x000014e4: "PhysicalStorageBuffer64"
-                        }, True)
+                            0x000014e4: "PhysicalStorageBuffer64",
+                        },
+                        True,
+                    )
 
                     inst["arguments"]["memory-model"] = utils.unraw(
-                        self.read(), 4, {
+                        self.read(),
+                        4,
+                        {
                             0x00000000: "Simple",
                             0x00000001: "GLSL450",
                             0x00000002: "OpenCL",
-                            0x00000003: "Vulkan"
-                        }, True)
+                            0x00000003: "Vulkan",
+                        },
+                        True,
+                    )
                 case "EntryPoint":
                     inst["arguments"]["execution-model"] = utils.unraw(
-                        self.read(), 4, {
+                        self.read(),
+                        4,
+                        {
                             0x00000000: "Vertex",
                             0x00000001: "TessellationControl",
                             0x00000002: "TessellationEvaluation",
@@ -2109,20 +2531,24 @@ class SpirVModule(module.RuminantModule):
                             0x000014c5: "MissKHR",
                             0x000014c6: "CallableKHR",
                             0x000014f4: "TaskEXT",
-                            0x000014f5: "MeshEXT"
-                        }, True)
+                            0x000014f5: "MeshEXT",
+                        },
+                        True,
+                    )
                     inst["arguments"]["entry-point-id"] = self.read()
                     inst["arguments"]["name"] = self.read_string()
                     inst["arguments"]["interface-ids"] = self.read_rest()
                 case "ExecutionMode":
                     inst["arguments"]["entry-point-id"] = self.read()
                     inst["arguments"]["execution-mode"] = utils.unraw(
-                        self.read(), 4, constants.SPIRV_EXECUTION_MODES, True)
-                    inst["arguments"]["strings"] = self.read_rest(
-                        func=self.read_string)
+                        self.read(), 4, constants.SPIRV_EXECUTION_MODES, True
+                    )
+                    inst["arguments"]["strings"] = self.read_rest(func=self.read_string)
                 case "Source":
                     inst["arguments"]["source-language"] = utils.unraw(
-                        self.read(), 4, {
+                        self.read(),
+                        4,
+                        {
                             0x00000000: "Unknown",
                             0x00000001: "ESSL",
                             0x00000002: "GLSL",
@@ -2136,8 +2562,10 @@ class SpirVModule(module.RuminantModule):
                             0x0000000a: "WGSL",
                             0x0000000b: "Slang",
                             0x0000000c: "Zig",
-                            0x0000000d: "Rust"
-                        }, True)
+                            0x0000000d: "Rust",
+                        },
+                        True,
+                    )
                     inst["arguments"]["version"] = self.read()
                     if self.buf.unit > 0:
                         inst["arguments"]["file-id"] = self.read()
@@ -2149,7 +2577,8 @@ class SpirVModule(module.RuminantModule):
                 case "Decorate":
                     inst["arguments"]["target-id"] = self.read()
                     inst["arguments"]["decoration"] = utils.unraw(
-                        self.read(), 4, constants.SPIRV_DECORATIONS, True)
+                        self.read(), 4, constants.SPIRV_DECORATIONS, True
+                    )
 
                     match inst["arguments"]["decoration"]:
                         case _:
@@ -2167,7 +2596,8 @@ class SpirVModule(module.RuminantModule):
                 case "TypePointer":
                     inst["arguments"]["result-id"] = self.read()
                     inst["arguments"]["storage-class"] = utils.unraw(
-                        self.read(), 4, constants.SPIRV_STORAGE_CLASSES, True)
+                        self.read(), 4, constants.SPIRV_STORAGE_CLASSES, True
+                    )
                     inst["arguments"]["type-id"] = self.read()
                 case "TypeFloat":
                     inst["arguments"]["result-id"] = self.read()
@@ -2176,20 +2606,23 @@ class SpirVModule(module.RuminantModule):
                     inst["arguments"]["result-type-id"] = self.read()
                     inst["arguments"]["result-id"] = self.read()
                     inst["arguments"]["storage-class"] = utils.unraw(
-                        self.read(), 4, constants.SPIRV_STORAGE_CLASSES, True)
+                        self.read(), 4, constants.SPIRV_STORAGE_CLASSES, True
+                    )
                     if self.buf.unit > 0:
                         inst["arguments"]["initializer-id"] = self.read()
                 case "Function":
                     inst["arguments"]["result-type-id"] = self.read()
                     inst["arguments"]["result-id"] = self.read()
                     inst["arguments"]["function-control"] = utils.unpack_flags(
-                        self.read(), (
+                        self.read(),
+                        (
                             (0, "Inline"),
                             (1, "DontInline"),
                             (2, "Pure"),
                             (3, "Const"),
                             (16, "OptNoneExt"),
-                        ))
+                        ),
+                    )
 
                     inst["arguments"]["function-type-id"] = self.read()
                 case "Label":
@@ -2199,14 +2632,12 @@ class SpirVModule(module.RuminantModule):
                     inst["arguments"]["result-id"] = self.read()
                     inst["arguments"]["pointer-id"] = self.read()
                     if self.buf.unit > 0:
-                        inst["arguments"][
-                            "pointer-id"] = self.read_memory_operands()
+                        inst["arguments"]["pointer-id"] = self.read_memory_operands()
                 case "Store":
                     inst["arguments"]["pointer-id"] = self.read()
                     inst["arguments"]["object-id"] = self.read()
                     if self.buf.unit > 0:
-                        inst["arguments"][
-                            "pointer-id"] = self.read_memory_operands()
+                        inst["arguments"]["pointer-id"] = self.read_memory_operands()
                 case "Return" | "FunctionEnd":
                     pass
                 case _:
@@ -2243,8 +2674,9 @@ class PycModule(module.RuminantModule):
         meta["type"] = "pyc"
 
         meta["header"] = {}
-        meta["header"]["magic"] = utils.unraw(self.buf.ru16l(), 2,
-                                              constants.CPYTHON_MAGICS)
+        meta["header"]["magic"] = utils.unraw(
+            self.buf.ru16l(), 2, constants.CPYTHON_MAGICS
+        )
         self.buf.skip(2)
         meta["header"]["flags"] = self.buf.ru32l()
         if meta["header"]["flags"] & 0x0001:
@@ -2253,8 +2685,7 @@ class PycModule(module.RuminantModule):
             meta["header"]["timestamp"] = utils.unix_to_date(self.buf.ru32l())
             meta["header"]["source-length"] = self.buf.ru32l()
 
-        meta["data"] = utils.read_marshal(self.buf,
-                                          meta["header"]["magic"]["raw"])
+        meta["data"] = utils.read_marshal(self.buf, meta["header"]["magic"]["raw"])
 
         return meta
 
@@ -2298,12 +2729,9 @@ class BlendModule(module.RuminantModule):
         meta = {}
         meta["type"] = "blend"
         self.buf.skip(7)
-        meta["mode"] = {
-            "_v": "le32",
-            "_V": "be32",
-            "-v": "le64",
-            "-V": "be64"
-        }[self.buf.rs(2)]
+        meta["mode"] = {"_v": "le32", "_V": "be32", "-v": "le64", "-V": "be64"}[
+            self.buf.rs(2)
+        ]
         self.mode = meta["mode"]
         meta["version"] = int(self.buf.rs(3))
 
@@ -2334,8 +2762,8 @@ class BlendModule(module.RuminantModule):
                                 case "NAME" | "TYPE":
                                     section["data"]["count"] = self.r32()
                                     section["data"]["strings"] = [
-                                        self.buf.rzs() for i in range(
-                                            0, section["data"]["count"])
+                                        self.buf.rzs()
+                                        for i in range(0, section["data"]["count"])
                                     ]
                                 case "TLEN":
                                     count = 0
@@ -2403,11 +2831,9 @@ class GitModule(module.RuminantModule):
                 meta["data"] = []
                 while self.buf.unit > 0:
                     line = self.buf.rzs().split(" ")
-                    meta["data"].append({
-                        "filename": line[1],
-                        "mode": line[0],
-                        "sha1": self.buf.rh(20)
-                    })
+                    meta["data"].append(
+                        {"filename": line[1], "mode": line[0], "sha1": self.buf.rh(20)}
+                    )
             case "blob":
                 with self.buf.subunit():
                     meta["data"] = chew(self.buf)
@@ -2426,26 +2852,26 @@ class GitModule(module.RuminantModule):
                             line += "\n" + utils.decode(self.buf.rl()).strip()
 
                     line = line.split(" ")
-                    meta["data"]["header"].append({
-                        "key": line[0],
-                        "value": " ".join(line[1:])
-                    })
+                    meta["data"]["header"].append(
+                        {"key": line[0], "value": " ".join(line[1:])}
+                    )
 
-                meta["data"]["commit-message"] = self.buf.rs(
-                    self.buf.unit).strip().split("\n")
+                meta["data"]["commit-message"] = (
+                    self.buf.rs(self.buf.unit).strip().split("\n")
+                )
 
                 for header in meta["data"]["header"]:
                     match header["key"]:
                         case "gpgsig":
-                            header["parsed"] = chew(
-                                header["value"].encode("utf-8"))
+                            header["parsed"] = chew(header["value"].encode("utf-8"))
                         case "author" | "committer":
                             header["parsed"] = {}
                             line = header["value"].split(" ")
                             header["parsed"]["name"] = " ".join(line[:-3])
                             header["parsed"]["email"] = line[-3][1:-1]
                             header["parsed"]["timestamp"] = utils.unix_to_date(
-                                int(line[-2]))
+                                int(line[-2])
+                            )
                             header["parsed"]["timezone"] = line[-1]
 
         self.buf.sapunit()
@@ -2471,10 +2897,10 @@ class IntelFlashModule(module.RuminantModule):
         meta["flash-descriptor"] = {}
 
         self.buf.pasunit(4096)
-        meta["flash-descriptor"]["reserved-vector"] = chew(self.buf.read(16),
-                                                           blob_mode=True)
-        meta["flash-descriptor"]["signature"] = hex(
-            self.buf.ru32l())[2:].zfill(8)
+        meta["flash-descriptor"]["reserved-vector"] = chew(
+            self.buf.read(16), blob_mode=True
+        )
+        meta["flash-descriptor"]["signature"] = hex(self.buf.ru32l())[2:].zfill(8)
         temp = self.buf.ru32l()
         meta["flash-descriptor"]["flmap0"] = {
             "raw": temp,
@@ -2483,7 +2909,7 @@ class IntelFlashModule(module.RuminantModule):
             "padding0": (temp >> 10) & ((1 << 6) - 1),
             "region-base": (temp >> 16) & ((1 << 8) - 1),
             "number-of-regions": (temp >> 24) & ((1 << 3) - 1),
-            "padding1": (temp >> 27) & ((1 << 5) - 1)
+            "padding1": (temp >> 27) & ((1 << 5) - 1),
         }
         meta["flash-descriptor"]["flmap1"] = {
             "raw": temp,
@@ -2491,13 +2917,13 @@ class IntelFlashModule(module.RuminantModule):
             "number-of-regions": (temp >> 8) & ((1 << 2) - 1),
             "padding0": (temp >> 10) & ((1 << 6) - 1),
             "pch-straps-base": (temp >> 16) & ((1 << 8) - 1),
-            "number-of-pch-straps": (temp >> 24) & ((1 << 8) - 1)
+            "number-of-pch-straps": (temp >> 24) & ((1 << 8) - 1),
         }
         meta["flash-descriptor"]["flmap2"] = {
             "raw": temp,
             "proc-straps-base": (temp >> 0) & ((1 << 8) - 1),
             "number-of-proc-straps": (temp >> 8) & ((1 << 8) - 1),
-            "padding0": (temp >> 16) & ((1 << 16) - 1)
+            "padding0": (temp >> 16) & ((1 << 16) - 1),
         }
         meta["flash-descriptor"]["flmap3"] = {
             "raw": temp,
@@ -2541,8 +2967,20 @@ class IntelMicrocodeModule(module.RuminantModule):
             if not cls.valid_bcd(val) or val > 0x31:
                 return False
 
-            if buf.ru8() not in (0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-                                 0x08, 0x09, 0x10, 0x11, 0x12):
+            if buf.ru8() not in (
+                0x01,
+                0x02,
+                0x03,
+                0x04,
+                0x05,
+                0x06,
+                0x07,
+                0x08,
+                0x09,
+                0x10,
+                0x11,
+                0x12,
+            ):
                 return False
 
             buf.seek(32)
@@ -2572,42 +3010,56 @@ class IntelMicrocodeModule(module.RuminantModule):
         year = self.buf.ru16l()
         day = self.buf.ru8()
         month = self.buf.ru8()
-        meta["header"][
-            "date"] = f"{hex(year)[2:].zfill(4)}-{hex(month)[2:].zfill(2)}-{hex(day)[2:].zfill(2)}"
+        meta["header"]["date"] = (
+            f"{hex(year)[2:].zfill(4)}-{hex(month)[2:].zfill(2)}-{hex(day)[2:].zfill(2)}"
+        )
         meta["header"]["processor-signature"] = {"raw": self.buf.ru32l()}
         meta["header"]["processor-signature"]["hex"] = hex(
-            meta["header"]["processor-signature"]["raw"])[2:].zfill(8)
+            meta["header"]["processor-signature"]["raw"]
+        )[2:].zfill(8)
         meta["header"]["processor-signature"]["stepping"] = (
-            meta["header"]["processor-signature"]["raw"] >> 0) & 0x0f
+            meta["header"]["processor-signature"]["raw"] >> 0
+        ) & 0x0f
         meta["header"]["processor-signature"]["model"] = (
-            meta["header"]["processor-signature"]["raw"] >> 4) & 0x0f
+            meta["header"]["processor-signature"]["raw"] >> 4
+        ) & 0x0f
         meta["header"]["processor-signature"]["family"] = (
-            meta["header"]["processor-signature"]["raw"] >> 8) & 0x0f
+            meta["header"]["processor-signature"]["raw"] >> 8
+        ) & 0x0f
         meta["header"]["processor-signature"]["processor-type"] = (
-            meta["header"]["processor-signature"]["raw"] >> 12) & 0x03
+            meta["header"]["processor-signature"]["raw"] >> 12
+        ) & 0x03
         meta["header"]["processor-signature"]["extended-model"] = (
-            meta["header"]["processor-signature"]["raw"] >> 16) & 0x0f
+            meta["header"]["processor-signature"]["raw"] >> 16
+        ) & 0x0f
         meta["header"]["processor-signature"]["extended-family"] = (
-            meta["header"]["processor-signature"]["raw"] >> 20) & 0xff
+            meta["header"]["processor-signature"]["raw"] >> 20
+        ) & 0xff
 
         family = meta["header"]["processor-signature"]["family"]
         model = meta["header"]["processor-signature"]["model"]
         if family == 0x0f:
             family += meta["header"]["processor-signature"]["extended-family"]
         if family in (0x06, 0x0f):
-            model += meta["header"]["processor-signature"][
-                "extended-model"] << 4
+            model += meta["header"]["processor-signature"]["extended-model"] << 4
 
-        meta["header"]["processor-signature"][
-            "linux-name"] = f"{hex(family)[2:].zfill(2)}-{hex(model)[2:].zfill(2)}-{hex(meta['header']['processor-signature']['stepping'])[2:].zfill(2)}"
+        meta["header"]["processor-signature"]["linux-name"] = (
+            f"{hex(family)[2:].zfill(2)}-{hex(model)[2:].zfill(2)}-{hex(meta['header']['processor-signature']['stepping'])[2:].zfill(2)}"
+        )
         meta["header"]["checksum"] = self.buf.rh(4)
         meta["header"]["loader-revision"] = self.buf.ru32l()
         meta["header"]["data-size"] = self.buf.ru32l()
         meta["header"]["total-size"] = self.buf.ru32l()
         meta["header"]["reserved"] = self.buf.rh(12)
 
-        self.buf.pasunit((meta["header"]["total-size"] if meta["header"]
-                          ["total-size"] != 0 else 2048) - self.buf.tell())
+        self.buf.pasunit(
+            (
+                meta["header"]["total-size"]
+                if meta["header"]["total-size"] != 0
+                else 2048
+            )
+            - self.buf.tell()
+        )
 
         with self.buf:
             has_exponent = False
@@ -2632,8 +3084,9 @@ class IntelMicrocodeModule(module.RuminantModule):
                     meta["signature"]["modulus"] = self.buf.rh(256)
                     meta["signature"]["exponent"] = self.buf.ru32l()
 
-                n = int.from_bytes(bytes.fromhex(meta["signature"]["modulus"]),
-                                   "little")
+                n = int.from_bytes(
+                    bytes.fromhex(meta["signature"]["modulus"]), "little"
+                )
                 e = meta["signature"]["exponent"]
 
                 with self.buf:
@@ -2642,14 +3095,14 @@ class IntelMicrocodeModule(module.RuminantModule):
                         m = pow(c, e, n)
 
                         if (m >> 2024) == 0x01ff:
-                            meta["signature"][
-                                "signature-offset"] = self.buf.tell()
-                            meta["signature"][
-                                "signature-encrypted"] = self.buf.rh(256)
-                            meta["signature"]["signature-decrypted"] = hex(
-                                m)[2:].zfill(512)
-                            meta["signature"]["signature-hash"] = hex(
-                                m)[2:].zfill(512)[448:]
+                            meta["signature"]["signature-offset"] = self.buf.tell()
+                            meta["signature"]["signature-encrypted"] = self.buf.rh(256)
+                            meta["signature"]["signature-decrypted"] = hex(m)[2:].zfill(
+                                512
+                            )
+                            meta["signature"]["signature-hash"] = hex(m)[2:].zfill(512)[
+                                448:
+                            ]
                             break
 
                         self.buf.skip(1)
@@ -2702,11 +3155,14 @@ class BtrfsModule(module.RuminantModule):
         meta["header"]["sys-chunk-array-size"] = self.buf.ru32l()
         meta["header"]["chunk-root-generation"] = self.buf.ru64l()
         meta["header"]["compat-flags"] = utils.unpack_flags(
-            self.buf.ru64l(), constants.BTRFS_FLAGS)
+            self.buf.ru64l(), constants.BTRFS_FLAGS
+        )
         meta["header"]["compat-flags-ro"] = utils.unpack_flags(
-            self.buf.ru64l(), constants.BTRFS_FLAGS)
+            self.buf.ru64l(), constants.BTRFS_FLAGS
+        )
         meta["header"]["incompat-flags"] = utils.unpack_flags(
-            self.buf.ru64l(), constants.BTRFS_FLAGS)
+            self.buf.ru64l(), constants.BTRFS_FLAGS
+        )
 
         self.buf.seek(0)
         if meta["header"]["device-count"] == 1:

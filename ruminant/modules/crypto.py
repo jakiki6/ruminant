@@ -37,11 +37,13 @@ class PemModule(module.RuminantModule):
     desc = "PEM encoded files."
 
     def identify(buf, ctx):
-        return buf.peek(27) == b"-----BEGIN CERTIFICATE-----" or buf.peek(
-            15) == b"-----BEGIN RSA " or buf.peek(
-                26) == b"-----BEGIN PUBLIC KEY-----" or buf.peek(
-                    27) == b"-----BEGIN PRIVATE KEY-----" or buf.peek(
-                        30) == b"-----BEGIN EC PRIVATE KEY-----"
+        return (
+            buf.peek(27) == b"-----BEGIN CERTIFICATE-----"
+            or buf.peek(15) == b"-----BEGIN RSA "
+            or buf.peek(26) == b"-----BEGIN PUBLIC KEY-----"
+            or buf.peek(27) == b"-----BEGIN PRIVATE KEY-----"
+            or buf.peek(30) == b"-----BEGIN EC PRIVATE KEY-----"
+        )
 
     def chew(self):
         meta = {}
@@ -70,8 +72,11 @@ class PgpModule(module.RuminantModule):
     desc = "Binary or armored PGP files."
 
     def identify(buf, ctx):
-        if buf.available() > 4 and buf.pu8() in (
-                0x85, 0x89) and buf.peek(4)[3] in (0x03, 0x04):
+        if (
+            buf.available() > 4
+            and buf.pu8() in (0x85, 0x89)
+            and buf.peek(4)[3] in (0x03, 0x04)
+        ):
             return True
 
         return buf.peek(15) == b"-----BEGIN PGP "
@@ -84,15 +89,16 @@ class PgpModule(module.RuminantModule):
             if self.buf.rl() == b"-----BEGIN PGP SIGNED MESSAGE-----":
                 message = b""
 
-                meta["message-hash"] = self.buf.rl().split(b": ")[1].decode(
-                    "utf-8")
+                meta["message-hash"] = self.buf.rl().split(b": ")[1].decode("utf-8")
                 self.buf.rl()
 
                 while True:
                     line = self.buf.rl()
 
-                    if self.buf.available(
-                    ) == 0 or line == b"-----BEGIN PGP SIGNATURE-----":
+                    if (
+                        self.buf.available() == 0
+                        or line == b"-----BEGIN PGP SIGNATURE-----"
+                    ):
                         break
 
                     message += line + b"\n"
@@ -102,8 +108,7 @@ class PgpModule(module.RuminantModule):
             content = b""
             while True:
                 line = self.buf.rl()
-                if self.buf.available() == 0 or line.startswith(
-                        b"-----END PGP "):
+                if self.buf.available() == 0 or line.startswith(b"-----END PGP "):
                     break
 
                 if b":" in line:
@@ -164,18 +169,15 @@ class KdbxModule(module.RuminantModule):
                     field["algorithm"] = {
                         "raw": uuid,
                         "name": {
-                            "31c1f2e6-bf71-4350-be58-05216afc5aff":
-                            "AES-256 (NIST FIPS 197, CBC mode, PKCS #7 padding)",
-                            "d6038a2b-8b6f-4cb5-a524-339a31dbb59a":
-                            "ChaCha20 (RFC 8439)"
-                        }.get(uuid, "Unknown")
+                            "31c1f2e6-bf71-4350-be58-05216afc5aff": "AES-256 (NIST FIPS 197, CBC mode, PKCS #7 padding)",
+                            "d6038a2b-8b6f-4cb5-a524-339a31dbb59a": "ChaCha20 (RFC 8439)",
+                        }.get(uuid, "Unknown"),
                     }
                 case 0x03:
                     field["type"] = "Compression algorithm"
-                    field["algorithm"] = utils.unraw(self.buf.ru32l(), 4, {
-                        0: "No compression",
-                        1: "GZip"
-                    })
+                    field["algorithm"] = utils.unraw(
+                        self.buf.ru32l(), 4, {0: "No compression", 1: "GZip"}
+                    )
                 case 0x04:
                     field["type"] = "Master salt/seed"
                     field["salt"] = self.buf.rh(32)
@@ -185,13 +187,12 @@ class KdbxModule(module.RuminantModule):
                 case 0x0b | 0x0c:
                     field["type"] = {
                         0x0b: "KDF parameters",
-                        0x0c: "Public custom data"
+                        0x0c: "Public custom data",
                     }.get(typ)
 
                     field["dict"] = {}
                     version = self.buf.ru16l()
-                    field["dict"][
-                        "version"] = f"{version >> 8}.{version & 0xff}"
+                    field["dict"]["version"] = f"{version >> 8}.{version & 0xff}"
 
                     field["dict"]["entries"] = []
 
@@ -233,23 +234,22 @@ class KdbxModule(module.RuminantModule):
                                     entry["type"] = "bytes"
                                     entry["data"] = self.buf.rh(self.buf.unit)
                                 case _:
-                                    entry[
-                                        "type"] = f"Unknown (0x{hex(typ2)[2:].zfill(2)})"
+                                    entry["type"] = (
+                                        f"Unknown (0x{hex(typ2)[2:].zfill(2)})"
+                                    )
 
                             match entry["name"], entry["type"]:
                                 case "$UUID", "bytes":
                                     entry["data"] = utils.to_uuid(
-                                        bytes.fromhex(entry["data"]))
+                                        bytes.fromhex(entry["data"])
+                                    )
                                     entry["data"] = {
                                         "raw": entry["data"],
                                         "name": {
-                                            "c9d9f39a-628a-4460-bf74-0d08c18a4fea":
-                                            "AES-KDF",
-                                            "ef636ddf-8c29-444b-91f7-a9a403e30a0c":
-                                            "Argon2d",
-                                            "9e298b19-56db-4773-b23d-fc3ec6f0a1e6":
-                                            "Argon2id"
-                                        }.get(entry["data"], "Unknown")
+                                            "c9d9f39a-628a-4460-bf74-0d08c18a4fea": "AES-KDF",
+                                            "ef636ddf-8c29-444b-91f7-a9a403e30a0c": "Argon2d",
+                                            "9e298b19-56db-4773-b23d-fc3ec6f0a1e6": "Argon2id",
+                                        }.get(entry["data"], "Unknown"),
                                     }
 
                             self.buf.skipunit()
@@ -291,9 +291,10 @@ class AgeModule(module.RuminantModule):
     desc = "age encrypted files including the tlock extension."
 
     def identify(buf, ctx):
-        return buf.peek(
-            34) == b"-----BEGIN AGE ENCRYPTED FILE-----" or buf.peek(
-                20) == b"age-encryption.org/v"
+        return (
+            buf.peek(34) == b"-----BEGIN AGE ENCRYPTED FILE-----"
+            or buf.peek(20) == b"age-encryption.org/v"
+        )
 
     def chew(self):
         meta = {}
@@ -329,7 +330,8 @@ class AgeModule(module.RuminantModule):
                     line = self.buf.rl()
                     if line.startswith(b"---"):
                         meta["data"]["header-mac"] = base64.b64decode(
-                            line[4:] + b"==").hex()
+                            line[4:] + b"=="
+                        ).hex()
                         break
 
                     stanza["type"] = utils.decode(line).split(" ")[1]
@@ -337,26 +339,27 @@ class AgeModule(module.RuminantModule):
                     args = utils.decode(line).split(" ")[2:]
                     match stanza["type"]:
                         case "X25519":
-                            stanza["arguments"]["ephemeral-share"] = args[
-                                0].hex()
+                            stanza["arguments"]["ephemeral-share"] = args[0].hex()
                         case "scrypt":
                             stanza["arguments"]["salt"] = base64.b64decode(
-                                args[0] + "==").hex()
+                                args[0] + "=="
+                            ).hex()
                             stanza["arguments"]["work"] = 1 << int(args[1])
                         case "tlock":
                             stanza["arguments"]["round"] = int(args[0])
                             stanza["arguments"]["chain"] = args[1]
 
-                            if stanza["arguments"][
-                                    "chain"] in AGE_DRAND_CHAINS:
-                                chain = AGE_DRAND_CHAINS[stanza["arguments"]
-                                                         ["chain"]]
+                            if stanza["arguments"]["chain"] in AGE_DRAND_CHAINS:
+                                chain = AGE_DRAND_CHAINS[stanza["arguments"]["chain"]]
                                 stanza["parsed"] = {}
                                 stanza["parsed"]["chain-name"] = chain["name"]
-                                stanza["parsed"][
-                                    "decryption-time"] = utils.unix_to_date(
-                                        chain["genesis"] + chain["period"] *
-                                        (stanza["arguments"]["round"] - 1))
+                                stanza["parsed"]["decryption-time"] = (
+                                    utils.unix_to_date(
+                                        chain["genesis"]
+                                        + chain["period"]
+                                        * (stanza["arguments"]["round"] - 1)
+                                    )
+                                )
                         case _:
                             stanza["arguments"] = args
                             stanza["unknown"] = True
@@ -365,13 +368,13 @@ class AgeModule(module.RuminantModule):
                     while self.buf.peek(3) not in (b"---", b"-> "):
                         line += self.buf.rl()
 
-                    stanza["wrapped-key"] = base64.b64decode(line +
-                                                             b"==").hex()
+                    stanza["wrapped-key"] = base64.b64decode(line + b"==").hex()
 
                     meta["data"]["stanzas"].append(stanza)
 
-                meta["data"]["block-count"] = (self.buf.available() + 65536 +
-                                               15) // (65536 + 16)
+                meta["data"]["block-count"] = (self.buf.available() + 65536 + 15) // (
+                    65536 + 16
+                )
                 self.buf.skip(self.buf.available())
             case _:
                 meta["unknown"] = True
@@ -409,10 +412,12 @@ class LuksModule(module.RuminantModule):
                 meta["header"]["key-slots"] = []
                 for i in range(0, 8):
                     ks = {}
-                    ks["active"] = utils.unraw(self.buf.ru32(), 4, {
-                        0x0000dead: "disabled",
-                        0x00ac71f3: "enabled"
-                    }, True)
+                    ks["active"] = utils.unraw(
+                        self.buf.ru32(),
+                        4,
+                        {0x0000dead: "disabled", 0x00ac71f3: "enabled"},
+                        True,
+                    )
                     ks["iterations"] = self.buf.ru32()
                     ks["salt"] = self.buf.rh(32)
                     ks["key-material-offset"] = self.buf.ru32()
@@ -562,7 +567,7 @@ class OpenSshPrivateKeyModule(module.RuminantModule):
             case "bcrypt":
                 meta["data"]["kdfoptions"] = {
                     "salt": self.rs(),
-                    "rounds": self.ibuf.ru32()
+                    "rounds": self.ibuf.ru32(),
                 }
             case _:
                 meta["unknown"] = True

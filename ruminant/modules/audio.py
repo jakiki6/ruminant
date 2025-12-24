@@ -45,8 +45,7 @@ class FlacModule(module.RuminantModule):
                     temp = self.buf.ru64()
                     block["data"]["sample-rate"] = temp >> 44
                     block["data"]["channel-count"] = ((temp >> 41) & 0x07) + 1
-                    block["data"]["bits-per-sample"] = (
-                        (temp >> 36) & 0x1f) + 1
+                    block["data"]["bits-per-sample"] = ((temp >> 36) & 0x1f) + 1
                     block["data"]["sample-count"] = temp & 0xfffffffff
 
                     block["data"]["unencoded-md5"] = self.buf.rh(16)
@@ -68,13 +67,13 @@ class FlacModule(module.RuminantModule):
                         block["data"]["entries"].append(entry)
                 case 4:
                     block["type"] = "Vorbis comment"
-                    block["data"]["vendor-string"] = self.buf.rs(
-                        self.buf.ru32l())
+                    block["data"]["vendor-string"] = self.buf.rs(self.buf.ru32l())
 
                     block["data"]["user-strings"] = []
                     for i in range(0, self.buf.ru32l()):
                         block["data"]["user-strings"].append(
-                            self.buf.rs(self.buf.ru32l()))
+                            self.buf.rs(self.buf.ru32l())
+                        )
                 case 6:
                     block["type"] = "Picture"
                     picture_type = self.buf.ru32()
@@ -99,17 +98,17 @@ class FlacModule(module.RuminantModule):
                         17: "A bright colored fish",
                         18: "Illustration",
                         19: "Band or artist logotype",
-                        20: "Publisher or studio logotype"
-                    }.get(picture_type,
-                          "Unknown") + f" (0x{hex(picture_type)[2:].zfill(4)})"
+                        20: "Publisher or studio logotype",
+                    }.get(
+                        picture_type, "Unknown"
+                    ) + f" (0x{hex(picture_type)[2:].zfill(4)})"
                     block["data"]["media-type"] = self.buf.rs(self.buf.ru32())
                     block["data"]["description"] = self.buf.rs(self.buf.ru32())
                     block["data"]["width"] = self.buf.ru32()
                     block["data"]["height"] = self.buf.ru32()
                     block["data"]["bits-per-pixel"] = self.buf.ru32()
                     block["data"]["palette-element-count"] = self.buf.ru32()
-                    block["data"]["picture"] = chew(
-                        self.buf.read(self.buf.ru32()))
+                    block["data"]["picture"] = chew(self.buf.read(self.buf.ru32()))
                 case _:
                     block["type"] = f"Unknown (0x{hex(typ)[2:].zfill(2)})"
                     block["unknown"] = True
@@ -158,8 +157,9 @@ class ID3v2Module(module.RuminantModule):
 
         self.buf.skip(3)
         meta["header"] = {}
-        meta["header"]["version"] = str("2." + str(self.buf.ru8()) + "." +
-                                        str(self.buf.ru8()))
+        meta["header"]["version"] = str(
+            "2." + str(self.buf.ru8()) + "." + str(self.buf.ru8())
+        )
 
         flags = self.buf.ru8()
         meta["header"]["flags"] = {
@@ -188,7 +188,8 @@ class ID3v2Module(module.RuminantModule):
             meta["extended-header"]["flag-values"] = []
             while self.buf.unit > 0:
                 meta["extended-header"]["flag-values"].append(
-                    self.buf.rh(self.buf.ru8()))
+                    self.buf.rh(self.buf.ru8())
+                )
 
             self.buf.skipunit()
             self.buf.popunit()
@@ -207,7 +208,7 @@ class ID3v2Module(module.RuminantModule):
                 "raw": status_flags,
                 "discard-on-tag-alter": bool(status_flags & 0b01000000),
                 "discard-on-file-alter": bool(status_flags & 0b00100000),
-                "read-only": bool(status_flags & 0b00010000)
+                "read-only": bool(status_flags & 0b00010000),
             }
 
             format_flags = self.buf.ru8()
@@ -217,7 +218,7 @@ class ID3v2Module(module.RuminantModule):
                 "is-compressed": bool(format_flags & 0b00001000),
                 "is-encrypted": bool(format_flags & 0b00000100),
                 "is-unsynchronized": bool(format_flags & 0b00000010),
-                "has-data-length-indictator": bool(format_flags & 0b00000001)
+                "has-data-length-indictator": bool(format_flags & 0b00000001),
             }
 
             if frame["format-flags"]["is-grouped"]:
@@ -225,7 +226,8 @@ class ID3v2Module(module.RuminantModule):
 
             if frame["format-flags"]["has-data-length-indictator"]:
                 frame["format-flags"]["data-length"] = self.read_length(
-                    bool(format_flags & 0b00000010))
+                    bool(format_flags & 0b00000010)
+                )
 
             content = self.buf.read(frame["length"])
 
@@ -247,7 +249,7 @@ class ID3v2Module(module.RuminantModule):
                             0: "latin-1",
                             1: "utf-16",
                             2: "utf-16be",
-                            3: "utf-8"
+                            3: "utf-8",
                         }.get(content[0])
                         content = content[1:]
 
@@ -261,14 +263,16 @@ class ID3v2Module(module.RuminantModule):
                                     content = content[1:]
                                     break
 
-                            mime_type += content[:2 if "16" in encoding else 1]
-                            content = content[2 if "16" in encoding else 1:]
+                            mime_type += content[: 2 if "16" in encoding else 1]
+                            content = content[2 if "16" in encoding else 1 :]
 
                         frame["data"] = {}
                         frame["data"]["encoding"] = encoding
                         frame["data"]["mime-type"] = mime_type.decode(encoding)
                         frame["data"]["image-type"] = utils.unraw(
-                            content[0], 1, {
+                            content[0],
+                            1,
+                            {
                                 0x00: "Other",
                                 0x01: "32x32 pixels file icon PNG only",
                                 0x02: "Other file icon",
@@ -289,8 +293,9 @@ class ID3v2Module(module.RuminantModule):
                                 0x11: "A bright coloured fish",
                                 0x12: "Illustration",
                                 0x13: "Band/artist logotype",
-                                0x14: "Publisher/Studio logotype"
-                            })
+                                0x14: "Publisher/Studio logotype",
+                            },
+                        )
                         content = content[1:]
 
                         desc = b""
@@ -303,8 +308,8 @@ class ID3v2Module(module.RuminantModule):
                                     content = content[1:]
                                     break
 
-                            desc += content[:2 if "16" in encoding else 1]
-                            content = content[2 if "16" in encoding else 1:]
+                            desc += content[: 2 if "16" in encoding else 1]
+                            content = content[2 if "16" in encoding else 1 :]
 
                         frame["data"]["description"] = desc.decode(encoding)
                         frame["data"]["image"] = chew(content)
@@ -313,7 +318,7 @@ class ID3v2Module(module.RuminantModule):
                             0: "latin-1",
                             1: "utf-16",
                             2: "utf-16be",
-                            3: "utf-8"
+                            3: "utf-8",
                         }.get(content[0])
                         content = content[1:]
 
@@ -330,24 +335,22 @@ class ID3v2Module(module.RuminantModule):
                                     content = content[1:]
                                     break
 
-                            short_description += content[:2 if "16" in
-                                                         encoding else 1]
-                            content = content[2 if "16" in encoding else 1:]
+                            short_description += content[: 2 if "16" in encoding else 1]
+                            content = content[2 if "16" in encoding else 1 :]
 
                         frame["data"] = {}
                         frame["data"]["encoding"] = encoding
                         frame["data"]["language"] = language
-                        frame["data"][
-                            "short-description"] = short_description.decode(
-                                encoding)
-                        frame["data"]["text"] = content.decode(
-                            encoding).rstrip("\x00")
+                        frame["data"]["short-description"] = short_description.decode(
+                            encoding
+                        )
+                        frame["data"]["text"] = content.decode(encoding).rstrip("\x00")
                     case "GEOB":
                         encoding = {
                             0: "latin-1",
                             1: "utf-16",
                             2: "utf-16be",
-                            3: "utf-8"
+                            3: "utf-8",
                         }.get(content[0])
                         content = content[1:]
 
@@ -367,8 +370,8 @@ class ID3v2Module(module.RuminantModule):
                                     content = content[1:]
                                     break
 
-                            file_name += content[:2 if "16" in encoding else 1]
-                            content = content[2 if "16" in encoding else 1:]
+                            file_name += content[: 2 if "16" in encoding else 1]
+                            content = content[2 if "16" in encoding else 1 :]
 
                         description = b""
                         while True:
@@ -380,39 +383,61 @@ class ID3v2Module(module.RuminantModule):
                                     content = content[1:]
                                     break
 
-                            description += content[:2 if "16" in
-                                                   encoding else 1]
-                            content = content[2 if "16" in encoding else 1:]
+                            description += content[: 2 if "16" in encoding else 1]
+                            content = content[2 if "16" in encoding else 1 :]
 
                         frame["data"] = {}
                         frame["data"]["encoding"] = encoding
-                        frame["data"]["mime-type"] = mime_type.decode(
-                            "latin-1")
+                        frame["data"]["mime-type"] = mime_type.decode("latin-1")
                         frame["data"]["file-name"] = file_name.decode(encoding)
-                        frame["data"]["description"] = description.decode(
-                            encoding)
+                        frame["data"]["description"] = description.decode(encoding)
                         frame["data"]["blob"] = chew(content)
-                    case "TALB" | "TIT1" | "TIT2" | "TIT3" | "TYER" | "TXXX" | "TPE1" | "TSSE" | "TCOM" | "TPUB" | "TOPE" | "TOAL" | "TCON" | "TPE2" | "TENC" | "TBPM" | "TRCK" | "TDEN" | "TDTG" | "TOFN":
+                    case (
+                        "TALB"
+                        | "TIT1"
+                        | "TIT2"
+                        | "TIT3"
+                        | "TYER"
+                        | "TXXX"
+                        | "TPE1"
+                        | "TSSE"
+                        | "TCOM"
+                        | "TPUB"
+                        | "TOPE"
+                        | "TOAL"
+                        | "TCON"
+                        | "TPE2"
+                        | "TENC"
+                        | "TBPM"
+                        | "TRCK"
+                        | "TDEN"
+                        | "TDTG"
+                        | "TOFN"
+                    ):
                         frame["data"] = {}
                         frame["data"]["encoding"] = {
                             0: "latin-1",
                             1: "utf-16",
                             2: "utf-16be",
-                            3: "utf-8"
+                            3: "utf-8",
                         }.get(content[0])
-                        frame["data"]["string"] = content[1:].decode(
-                            frame["data"]["encoding"]).rstrip("\x00")
+                        frame["data"]["string"] = (
+                            content[1:].decode(frame["data"]["encoding"]).rstrip("\x00")
+                        )
 
                         if frame["type"] == "TXXX":
-                            frame["data"]["namespace"] = frame["data"][
-                                "string"].split("\x00")[0]
-                            frame["data"]["string"] = frame["data"][
-                                "string"].split("\x00")[1]
+                            frame["data"]["namespace"] = frame["data"]["string"].split(
+                                "\x00"
+                            )[0]
+                            frame["data"]["string"] = frame["data"]["string"].split(
+                                "\x00"
+                            )[1]
 
                             match frame["data"]["namespace"]:
                                 case "segmentmetadata":
                                     frame["data"]["string"] = json.loads(
-                                        frame["data"]["string"])
+                                        frame["data"]["string"]
+                                    )
                     case _:
                         frame["data"] = content.hex()
                         frame["unknown"] = True
