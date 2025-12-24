@@ -35,7 +35,7 @@ def main():
 
                 failures[group].append(name)
 
-    print(f"Summary: [{success}/{test_counts}]")
+    print(f"\033[0;30;47mSummary: [{success}/{test_counts}]\033[0m")
     if success != test_counts:
         print("Failed tests:")
 
