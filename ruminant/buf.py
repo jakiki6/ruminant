@@ -383,16 +383,16 @@ class Buf(object):
         return int.from_bytes(self.peek(8), "little", signed=True)
 
     def pf32(self):
-        return struct.unpack(">f", self.peek(4))
+        return struct.unpack(">f", self.peek(4))[0]
 
     def pf64(self):
-        return struct.unpack(">d", self.peek(8))
+        return struct.unpack(">d", self.peek(8))[0]
 
     def pf32l(self):
-        return struct.unpack("<f", self.peek(4))
+        return struct.unpack("<f", self.peek(4))[0]
 
     def pf64l(self):
-        return struct.unpack("<d", self.peek(8))
+        return struct.unpack("<d", self.peek(8))[0]
 
     def pfp16(self):
         return self.ru16() / 256
