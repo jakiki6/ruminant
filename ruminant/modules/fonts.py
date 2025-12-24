@@ -226,7 +226,7 @@ class TrueTypeModule(module.RuminantModule):
                             str(self.buf.ru16()) + "." + str(self.buf.ru16())
                         )
                         table["data"]["num-glyphs"] = self.buf.ru16()
-                        if table["data"]["version"] != "0.5":
+                        if table["data"]["version"] != "0.5" and self.buf.unit > 0:
                             table["data"]["max-points"] = self.buf.ru16()
                             table["data"]["max-contours"] = self.buf.ru16()
                             table["data"]["max-component-points"] = self.buf.ru16()
