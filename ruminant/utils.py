@@ -405,7 +405,8 @@ def read_der(buf):
                 main_time, fraction = time_string.split(".", 1)
                 fraction = (fraction + "000000")[:6]
                 data["value"] = (
-                    datetime.strptime(main_time, "%Y%m%d%H%M%S")
+                    datetime
+                    .strptime(main_time, "%Y%m%d%H%M%S")
                     .replace(microsecond=int(fraction))
                     .isoformat(timespec="microseconds")
                     + "Z"

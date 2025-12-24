@@ -391,12 +391,10 @@ class IsoModule(module.RuminantModule):
 
             atom["data"]["entries"] = []
             for i in range(0, entry_count):
-                atom["data"]["entries"].append(
-                    {
-                        "sample-count": self.buf.ru32(),
-                        "group_description_index": self.buf.ru32(),
-                    }
-                )
+                atom["data"]["entries"].append({
+                    "sample-count": self.buf.ru32(),
+                    "group_description_index": self.buf.ru32(),
+                })
         elif typ == "smhd":
             self.read_version(atom)
             atom["data"]["balance"] = self.buf.rfp16()
@@ -921,9 +919,10 @@ class IsoModule(module.RuminantModule):
             while self.buf.unit:
                 length = self.buf.ru32()
                 i = self.buf.rs(4)
-                atom["entries"].append(
-                    {"id": i, "content": self.read_atom(root_context=i)}
-                )
+                atom["entries"].append({
+                    "id": i,
+                    "content": self.read_atom(root_context=i),
+                })
         elif typ in ("clef", "prof", "enof"):
             self.read_version(atom)
             atom["data"]["width"] = self.buf.rfp32()

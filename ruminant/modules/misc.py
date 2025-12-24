@@ -744,24 +744,20 @@ class JavaClassModule(module.RuminantModule):
                                     self.buf.ru32(),
                                 ]
 
-                                name.append(
-                                    [
-                                        self.buf.ru32()
-                                        for i in range(0, name[3] - name[2] + 1)
-                                    ]
-                                )
+                                name.append([
+                                    self.buf.ru32()
+                                    for i in range(0, name[3] - name[2] + 1)
+                                ])
                             case 0xab:
                                 while (self.buf.tell() - start) % 4 != 0:
                                     self.buf.skip(1)
 
                                 name = [name, self.buf.ru32(), self.buf.ru32()]
 
-                                name.append(
-                                    [
-                                        (self.buf.ru32(), self.buf.ru32())
-                                        for i in range(0, name[2])
-                                    ]
-                                )
+                                name.append([
+                                    (self.buf.ru32(), self.buf.ru32())
+                                    for i in range(0, name[2])
+                                ])
                             case 0xc4:
                                 wide = 2
 
@@ -816,27 +812,23 @@ class JavaClassModule(module.RuminantModule):
                 case "LocalVariableTable":
                     val = []
                     for i in range(0, self.buf.ru16()):
-                        val.append(
-                            {
-                                "start-pc": self.buf.ru16(),
-                                "length": self.buf.ru16(),
-                                "name": self.resolve(self.buf.ru16()),
-                                "descriptor": self.resolve(self.buf.ru16()),
-                                "index": self.buf.ru16(),
-                            }
-                        )
+                        val.append({
+                            "start-pc": self.buf.ru16(),
+                            "length": self.buf.ru16(),
+                            "name": self.resolve(self.buf.ru16()),
+                            "descriptor": self.resolve(self.buf.ru16()),
+                            "index": self.buf.ru16(),
+                        })
                 case "LocalVariableTypeTable":
                     val = []
                     for i in range(0, self.buf.ru16()):
-                        val.append(
-                            {
-                                "start-pc": self.buf.ru16(),
-                                "length": self.buf.ru16(),
-                                "name": self.resolve(self.buf.ru16()),
-                                "signature": self.resolve(self.buf.ru16()),
-                                "index": self.buf.ru16(),
-                            }
-                        )
+                        val.append({
+                            "start-pc": self.buf.ru16(),
+                            "length": self.buf.ru16(),
+                            "name": self.resolve(self.buf.ru16()),
+                            "signature": self.resolve(self.buf.ru16()),
+                            "index": self.buf.ru16(),
+                        })
                 case "MethodParameters":
                     val = []
                     for i in range(0, self.buf.ru8()):
@@ -855,43 +847,36 @@ class JavaClassModule(module.RuminantModule):
                         if tag <= 63:
                             val.append({"type": "same", "offset-delta": tag - 64})
                         elif tag <= 127:
-                            val.append(
-                                {
-                                    "type": "same-locals-1-stack-item",
-                                    "offset-delta": tag - 64,
-                                    "stack": self.read_verification_type(),
-                                }
-                            )
+                            val.append({
+                                "type": "same-locals-1-stack-item",
+                                "offset-delta": tag - 64,
+                                "stack": self.read_verification_type(),
+                            })
                         elif tag == 247:
-                            val.append(
-                                {
-                                    "type": "same-locals-1-stack-item-extended",
-                                    "offset-delta": self.buf.ru16(),
-                                    "stack": self.read_verification_type(),
-                                }
-                            )
+                            val.append({
+                                "type": "same-locals-1-stack-item-extended",
+                                "offset-delta": self.buf.ru16(),
+                                "stack": self.read_verification_type(),
+                            })
                         elif tag >= 248 and tag <= 250:
-                            val.append(
-                                {"type": "CHOP", "offset-delta": self.buf.ru16()}
-                            )
+                            val.append({
+                                "type": "CHOP",
+                                "offset-delta": self.buf.ru16(),
+                            })
                         elif tag == 251:
-                            val.append(
-                                {
-                                    "type": "same-frame-extended",
-                                    "offset-delta": self.buf.ru16(),
-                                }
-                            )
+                            val.append({
+                                "type": "same-frame-extended",
+                                "offset-delta": self.buf.ru16(),
+                            })
                         elif tag >= 252 and tag <= 254:
-                            val.append(
-                                {
-                                    "type": "same-frame-extended",
-                                    "offset-delta": self.buf.ru16(),
-                                    "locals": [
-                                        self.read_verification_type()
-                                        for i in range(0, tag - 251)
-                                    ],
-                                }
-                            )
+                            val.append({
+                                "type": "same-frame-extended",
+                                "offset-delta": self.buf.ru16(),
+                                "locals": [
+                                    self.read_verification_type()
+                                    for i in range(0, tag - 251)
+                                ],
+                            })
                         elif tag == 255:
                             frame = {}
                             frame["type"] = "full"
@@ -2831,9 +2816,11 @@ class GitModule(module.RuminantModule):
                 meta["data"] = []
                 while self.buf.unit > 0:
                     line = self.buf.rzs().split(" ")
-                    meta["data"].append(
-                        {"filename": line[1], "mode": line[0], "sha1": self.buf.rh(20)}
-                    )
+                    meta["data"].append({
+                        "filename": line[1],
+                        "mode": line[0],
+                        "sha1": self.buf.rh(20),
+                    })
             case "blob":
                 with self.buf.subunit():
                     meta["data"] = chew(self.buf)
@@ -2852,9 +2839,10 @@ class GitModule(module.RuminantModule):
                             line += "\n" + utils.decode(self.buf.rl()).strip()
 
                     line = line.split(" ")
-                    meta["data"]["header"].append(
-                        {"key": line[0], "value": " ".join(line[1:])}
-                    )
+                    meta["data"]["header"].append({
+                        "key": line[0],
+                        "value": " ".join(line[1:]),
+                    })
 
                 meta["data"]["commit-message"] = (
                     self.buf.rs(self.buf.unit).strip().split("\n")

@@ -116,9 +116,11 @@ class PdfModule(module.RuminantModule):
                                     compressed_buf,
                                     packed=(compressed_index, compressed_id),
                                 )
-                            self.compressed.remove(
-                                (compressed_id, compressed_index, compressed_buf)
-                            )
+                            self.compressed.remove((
+                                compressed_id,
+                                compressed_index,
+                                compressed_buf,
+                            ))
                             stuck = False
                         except ReparsePoint:
                             pass
@@ -249,7 +251,8 @@ class PdfModule(module.RuminantModule):
                             case "/ASCIIHexDecode":
                                 buf = Buf(
                                     bytes.fromhex(
-                                        buf.read()
+                                        buf
+                                        .read()
                                         .rstrip(b"\n")
                                         .split(b">")[0]
                                         .decode("latin-1")
@@ -258,7 +261,8 @@ class PdfModule(module.RuminantModule):
                             case "/ASCII85Decode":
                                 buf = Buf(
                                     base64.a85decode(
-                                        buf.read()
+                                        buf
+                                        .read()
                                         .rstrip(b"\n")
                                         .split(b">")[0]
                                         .decode("latin-1")
@@ -348,9 +352,10 @@ class PdfModule(module.RuminantModule):
                                     self.compressed.append((f1, f2, old_buf))
 
                             if "Prev" in obj["value"]:
-                                self.queue.append(
-                                    (self.resolve(obj["value"]["Prev"]), old_buf)
-                                )
+                                self.queue.append((
+                                    self.resolve(obj["value"]["Prev"]),
+                                    old_buf,
+                                ))
                         case "/ObjStm", _:
                             tokens = list(self.tokenize(buf.rs(buf.unit)))
 

@@ -52,14 +52,12 @@ class EntryModule(module.RuminantModule):
 
                         stack_list = []
                         for frame in traceback.extract_tb(e.__traceback__):
-                            stack_list.append(
-                                {
-                                    "filename": frame.filename,
-                                    "lineno": frame.lineno,
-                                    "name": frame.name,
-                                    "line": frame.line,
-                                }
-                            )
+                            stack_list.append({
+                                "filename": frame.filename,
+                                "lineno": frame.lineno,
+                                "name": frame.name,
+                                "line": frame.line,
+                            })
 
                         rest = {
                             "type": "error",
@@ -100,9 +98,10 @@ class EntryModule(module.RuminantModule):
             meta |= {"type": "unknown", "length": self.buf.size()}
 
         if extract_all and my_blob_id > 0:
-            to_extract.append(
-                (my_blob_id, os.path.join("blobs", f"{str(my_blob_id).zfill(8)}.bin"))
-            )
+            to_extract.append((
+                my_blob_id,
+                os.path.join("blobs", f"{str(my_blob_id).zfill(8)}.bin"),
+            ))
 
         for entry in to_extract[:]:
             k, v = entry
@@ -136,7 +135,7 @@ def chew(blob, walk_mode=False, blob_mode=False, flat=False, extra_ctx={}):
     return EntryModule(walk_mode, blob_mode, flat, extra_ctx, Buf.of(blob)).chew()
 
 
-from . import (
+from . import (  # noqa: F401,E402
     containers,
     images,
     videos,
@@ -148,4 +147,4 @@ from . import (
     text,
     misc,
     android,
-)  # noqa: F401,E402
+)

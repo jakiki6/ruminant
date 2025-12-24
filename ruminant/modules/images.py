@@ -469,12 +469,14 @@ class IRBModule(module.RuminantModule):
                         block["data"]["version"] = self.buf.ru32()
                         block["data"]["has-real-merged-data"] = bool(self.buf.ru8())
                         block["data"]["writer"] = (
-                            self.buf.read(self.buf.ru32() * 2)
+                            self.buf
+                            .read(self.buf.ru32() * 2)
                             .decode("utf-16be")
                             .rstrip("\x00")
                         )
                         block["data"]["reader"] = (
-                            self.buf.read(self.buf.ru32() * 2)
+                            self.buf
+                            .read(self.buf.ru32() * 2)
                             .decode("utf-16be")
                             .rstrip("\x00")
                         )
@@ -2878,7 +2880,8 @@ class DicomModule(module.RuminantModule):
                             raise ValueError(f"Invalid DICOM TM string: {tag['value']}")
 
                     tag["value"] = (
-                        datetime.datetime.strptime(tag["value"], fmt)
+                        datetime.datetime
+                        .strptime(tag["value"], fmt)
                         .time()
                         .strftime("%H:%M:%S.%f")
                     )
@@ -2891,9 +2894,9 @@ class DicomModule(module.RuminantModule):
                     }
                 elif vr == "UI":
                     try:
-                        tag["value"] = utils.lookup_oid(
-                            [int(x) for x in tag["value"].split(".")]
-                        )
+                        tag["value"] = utils.lookup_oid([
+                            int(x) for x in tag["value"].split(".")
+                        ])
                     except Exception:
                         pass
                 else:

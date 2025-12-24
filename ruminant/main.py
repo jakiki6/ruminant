@@ -48,14 +48,12 @@ def process(file, walk):
 
         if entry is not None:
             if unknown > 0:
-                data.append(
-                    {
-                        "type": "unknown",
-                        "length": unknown,
-                        "offset": buf.tell() - unknown,
-                        "blob-id": modules.blob_id,
-                    }
-                )
+                data.append({
+                    "type": "unknown",
+                    "length": unknown,
+                    "offset": buf.tell() - unknown,
+                    "blob-id": modules.blob_id,
+                })
                 modules.blob_id += 1
                 unknown = 0
 
@@ -66,14 +64,12 @@ def process(file, walk):
             buf.skip(1)
 
     if unknown > 0:
-        data.append(
-            {
-                "type": "unknown",
-                "length": unknown,
-                "offset": buf.tell() - unknown,
-                "blob-id": modules.blob_id,
-            }
-        )
+        data.append({
+            "type": "unknown",
+            "length": unknown,
+            "offset": buf.tell() - unknown,
+            "blob-id": modules.blob_id,
+        })
 
     for entry in data:
         for k, v in modules.to_extract:
@@ -328,12 +324,10 @@ def main(dev=False):
                         )
 
                         print(
-                            "\n".join(
-                                [
-                                    "      " + x
-                                    for x in process(fd, args.walk).split("\n")[1:-1]
-                                ]
-                            )
+                            "\n".join([
+                                "      " + x
+                                for x in process(fd, args.walk).split("\n")[1:-1]
+                            ])
                         )
 
                         print("      }\n    }", end="")

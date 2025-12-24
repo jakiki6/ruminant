@@ -2,3 +2,4 @@
 
 indent-size = 4
 max-line-length = 1000000
+extend-ignore = E203
