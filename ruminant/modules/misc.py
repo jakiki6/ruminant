@@ -3159,3 +3159,51 @@ class BtrfsModule(module.RuminantModule):
             self.buf.skip(self.buf.available())
 
         return meta
+
+
+@module.register
+class AOutExecutableModule(module.RuminantModule):
+    dev = True
+    desc = "a.out executables."
+
+    def identify(buf, ctx):
+        return buf.pu16l() in (0x00cc, 0x0107, 0x0108, 0x010b)
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "a.out"
+
+        meta["header"] = {}
+        meta["header"]["mode"] = utils.unraw(
+            self.buf.ru16l(),
+            2,
+            {0x00cc: "QMAGIC", 0x0107: "OMAGIC", 0x0108: "NMAGIC", 0x010b: "ZMAGIC"},
+            True,
+        )
+        meta["header"]["text-size"] = self.buf.ru16l()
+        meta["header"]["data-size"] = self.buf.ru16l()
+        meta["header"]["bss-size"] = self.buf.ru16l()
+        meta["header"]["symbol-table-size"] = self.buf.ru16l()
+        meta["header"]["entry-point"] = self.buf.ru16l()
+        meta["header"]["text-relocation-size"] = self.buf.ru16l()
+        meta["header"]["data-relocation-size"] = self.buf.ru16l()
+
+        if meta["header"]["data-relocation-size"] == 1:
+            meta["header"]["data-relocation-size"] = 0
+
+        self.buf.pasunit(meta["header"]["text-size"])
+        with self.buf.subunit():
+            meta["text"] = chew(self.buf, blob_mode=True)
+        self.buf.sapunit()
+
+        self.buf.pasunit(meta["header"]["data-size"])
+        with self.buf.subunit():
+            meta["data"] = chew(self.buf, blob_mode=True)
+        self.buf.sapunit()
+
+        self.buf.pasunit(meta["header"]["symbol-table-size"])
+        with self.buf.subunit():
+            meta["symbol-table"] = chew(self.buf, blob_mode=True)
+        self.buf.sapunit()
+
+        return meta
