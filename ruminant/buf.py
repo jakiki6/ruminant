@@ -70,6 +70,10 @@ class Buf(object):
         ), f"unit overread by {-self.unit} byte{'s' if self.unit != -1 else ''}"
 
     def setunit(self, length):
+        if length > self.available() or (self.unit is not None
+                                         and length > self.unit):
+            raise ValueError("Oversized unit")
+
         self.unit = length
         self._target = self.tell() + length
         self._checkunit()
