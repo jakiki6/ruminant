@@ -338,12 +338,12 @@ def read_der(buf):
                     with buf.subunit():
                         data["value"] = read_der(buf)
                 else:
-                    data["value"] = bin(int.from_bytes(buf.readunit()))[2:].zfill(
-                        bit_length
+                    data["value"] = hex(int.from_bytes(buf.readunit()))[2:].zfill(
+                        (bit_length + 7) // 8
                     )
             else:
-                data["value"] = bin(int.from_bytes(buf.readunit()) >> skip)[2:].zfill(
-                    bit_length
+                data["value"] = hex(int.from_bytes(buf.readunit()) >> skip)[2:].zfill(
+                    (bit_length + 7) // 8
                 )
         case 0x04:
             data["type"] = "OCTET STRING"

@@ -195,6 +195,498 @@ der_test_cases = (
             ],
         },
     ),
+    (
+        "lets-encrypt-root-certificate",
+        "3082056b30820353a0030201020211008210cfb0d240e3594463e0bb63828b00300d06092a864886"
+        "f70d01010b0500304f310b300906035504061302555331293027060355040a1320496e7465726e65"
+        "742053656375726974792052657365617263682047726f7570311530130603550403130c49535247"
+        "20526f6f74205831301e170d3135303630343131303433385a170d3335303630343131303433385a"
+        "304f310b300906035504061302555331293027060355040a1320496e7465726e6574205365637572"
+        "6974792052657365617263682047726f7570311530130603550403130c4953524720526f6f742058"
+        "3130820222300d06092a864886f70d01010105000382020f003082020a0282020100ade82473f414"
+        "37f39b9e2b57281c87bedcb7df38908c6e3ce657a078f775c2a2fef56a6ef6004f28dbde68866c44"
+        "93b6b163fd14126bbf1fd2ea319b217ed1333cba48f5dd79dfb3b8ff12f1219a4bc18a8671694a66"
+        "666c8f7e3c70bfad292206f3e4c0e680aee24b8fb7997e94039fd347977c99482353e838ae4f0a6f"
+        "832ed149578c8074b6da2fd0388d7b0370211b75f2303cfa8faeddda63abeb164fc28e114b7ecf0b"
+        "e8ffb5772ef4b27b4ae04c12250c708d0329a0e15324ec13d9ee19bf10b34a8c3f89a36151deac87"
+        "0794f46371ec2ee26f5b9881e1895c34796c76ef3b906279e6dba49a2f26c5d010e10eded9108e16"
+        "fbb7f7a8f7c7e50207988f360895e7e237960d36759efb0e72b11d9bbc03f94905d881dd05b42ad6"
+        "41e9ac0176950a0fd8dfd5bd121f352f28176cd298c1a80964776e4737baceac595e689d7f72d689"
+        "c50641293e593edd26f524c911a75aa34c401f46a199b5a73a516e863b9e7d72a712057859ed3e51"
+        "78150b038f8dd02f05b23e7b4a1c4b730512fcc6eae050137c439374b3ca74e78e1f0108d030d45b"
+        "7136b407bac130305c48b7823b98a67d608aa2a32982ccbabd83041ba2830341a1d605f11bc2b6f0"
+        "a87c863b46a8482a88dc769a76bf1f6aa53d198feb38f364dec82b0d0a28fff7dbe21542d422d027"
+        "5de179fe18e77088ad4ee6d98b3ac6dd27516effbc64f533434f0203010001a3423040300e060355"
+        "1d0f0101ff040403020106300f0603551d130101ff040530030101ff301d0603551d0e0416041479"
+        "b459e67bb6e5e40173800888c81a58f6e99b6e300d06092a864886f70d01010b0500038202010055"
+        "1f58a9bcb2a850d00cb1d81a6920272908ac61755c8a6ef882e5692fd5f6564bb9b8731059d32197"
+        "7ee74c71fbb2d260ad39a80bea17215685f1500e59ebcee059e9bac915ef869d8f8480f6e4e99190"
+        "dc179b621b45f06695d27c6fc2ea3bef1fcfcbd6ae27f1a9b0c8aefd7d7e9afa2204ebffd97fea91"
+        "2b22b1170e8ff28a345b58d8fc01c954b9b826cc8a8833894c2d843c82dfee965705ba2cbbf7c4b7"
+        "c74e3b82be31c822737392d1c280a43939103323824c3c9f86b255981dbe29868c229b9ee26b3b57"
+        "3a82704ddc09c789cb0a074d6ce85d8ec9efceabc7bbb52b4e45d64ad026cce572ca086aa595e315"
+        "a1f7a4edc92c5fa5fbffac28022ebed77bbbe3717b9016d3075e46537c3707428cd3c4969cd599b5"
+        "2ae0951a8048ae4c3907cecc47a452952bbab8fbadd233537de51d4d6dd5a1b1c7426fe64027355c"
+        "a328b7078de78d3390e7239ffb509c796c46d5b415b3966e7e9b0c963ab8522d3fd65be1fb08c284"
+        "fe24a8a389daac6ae1182ab1a843615bd31fdc3b8d76f22de88d75df17336c3d53fb7bcb415fffdc"
+        "a2d06138e196b8ac5d8b37d775d533c09911ae9d41c1727584be0241425f67244894d19b27be073f"
+        "b9b84f817451e17ab7ed9d23e2bee0d52804133c31039edd7a6c8fc60718c67fde478e3f289e0406"
+        "cfa5543477bdec899be91743df5bdb5ffe8e1e57a2cd409d7e6222dade1827",
+        {
+            "type": "SEQUENCE",
+            "length": 1387,
+            "value": [
+                {
+                    "type": "SEQUENCE",
+                    "length": 851,
+                    "value": [
+                        {
+                            "type": "X509 [0]",
+                            "length": 3,
+                            "value": [{"type": "INTEGER", "length": 1, "value": 2}],
+                        },
+                        {
+                            "type": "INTEGER",
+                            "length": 17,
+                            "value": 172886928669790476064670243504169061120,
+                        },
+                        {
+                            "type": "SEQUENCE",
+                            "length": 13,
+                            "value": [
+                                {
+                                    "type": "OBJECT IDENTIFIER",
+                                    "length": 9,
+                                    "value": {
+                                        "raw": "1.2.840.113549.1.1.11",
+                                        "tree": [
+                                            "iso",
+                                            "member-body",
+                                            "us",
+                                            "rsadsi",
+                                            "pkcs",
+                                            "pkcs-1",
+                                            "sha256WithRSAEncryption",
+                                        ],
+                                        "name": "sha256WithRSAEncryption",
+                                    },
+                                },
+                                {"type": "NULL", "length": 0, "value": None},
+                            ],
+                        },
+                        {
+                            "type": "SEQUENCE",
+                            "length": 79,
+                            "value": [
+                                {
+                                    "type": "SET",
+                                    "length": 11,
+                                    "value": [
+                                        {
+                                            "type": "SEQUENCE",
+                                            "length": 9,
+                                            "value": [
+                                                {
+                                                    "type": "OBJECT IDENTIFIER",
+                                                    "length": 3,
+                                                    "value": {
+                                                        "raw": "2.5.4.6",
+                                                        "tree": [
+                                                            "joint-iso-itu-t",
+                                                            "ds",
+                                                            "attributeType",
+                                                            "countryName",
+                                                        ],
+                                                        "name": "countryName",
+                                                    },
+                                                },
+                                                {
+                                                    "type": "PrintableString",
+                                                    "length": 2,
+                                                    "value": "US",
+                                                },
+                                            ],
+                                        }
+                                    ],
+                                },
+                                {
+                                    "type": "SET",
+                                    "length": 41,
+                                    "value": [
+                                        {
+                                            "type": "SEQUENCE",
+                                            "length": 39,
+                                            "value": [
+                                                {
+                                                    "type": "OBJECT IDENTIFIER",
+                                                    "length": 3,
+                                                    "value": {
+                                                        "raw": "2.5.4.10",
+                                                        "tree": [
+                                                            "joint-iso-itu-t",
+                                                            "ds",
+                                                            "attributeType",
+                                                            "organizationName",
+                                                        ],
+                                                        "name": "organizationName",
+                                                    },
+                                                },
+                                                {
+                                                    "type": "PrintableString",
+                                                    "length": 32,
+                                                    "value": "Internet Security Research Group",
+                                                },
+                                            ],
+                                        }
+                                    ],
+                                },
+                                {
+                                    "type": "SET",
+                                    "length": 21,
+                                    "value": [
+                                        {
+                                            "type": "SEQUENCE",
+                                            "length": 19,
+                                            "value": [
+                                                {
+                                                    "type": "OBJECT IDENTIFIER",
+                                                    "length": 3,
+                                                    "value": {
+                                                        "raw": "2.5.4.3",
+                                                        "tree": [
+                                                            "joint-iso-itu-t",
+                                                            "ds",
+                                                            "attributeType",
+                                                            "commonName",
+                                                        ],
+                                                        "name": "commonName",
+                                                    },
+                                                },
+                                                {
+                                                    "type": "PrintableString",
+                                                    "length": 12,
+                                                    "value": "ISRG Root X1",
+                                                },
+                                            ],
+                                        }
+                                    ],
+                                },
+                            ],
+                        },
+                        {
+                            "type": "SEQUENCE",
+                            "length": 30,
+                            "value": [
+                                {
+                                    "type": "UTCTime",
+                                    "length": 13,
+                                    "value": "2015-06-04T11:04:38",
+                                },
+                                {
+                                    "type": "UTCTime",
+                                    "length": 13,
+                                    "value": "2035-06-04T11:04:38",
+                                },
+                            ],
+                        },
+                        {
+                            "type": "SEQUENCE",
+                            "length": 79,
+                            "value": [
+                                {
+                                    "type": "SET",
+                                    "length": 11,
+                                    "value": [
+                                        {
+                                            "type": "SEQUENCE",
+                                            "length": 9,
+                                            "value": [
+                                                {
+                                                    "type": "OBJECT IDENTIFIER",
+                                                    "length": 3,
+                                                    "value": {
+                                                        "raw": "2.5.4.6",
+                                                        "tree": [
+                                                            "joint-iso-itu-t",
+                                                            "ds",
+                                                            "attributeType",
+                                                            "countryName",
+                                                        ],
+                                                        "name": "countryName",
+                                                    },
+                                                },
+                                                {
+                                                    "type": "PrintableString",
+                                                    "length": 2,
+                                                    "value": "US",
+                                                },
+                                            ],
+                                        }
+                                    ],
+                                },
+                                {
+                                    "type": "SET",
+                                    "length": 41,
+                                    "value": [
+                                        {
+                                            "type": "SEQUENCE",
+                                            "length": 39,
+                                            "value": [
+                                                {
+                                                    "type": "OBJECT IDENTIFIER",
+                                                    "length": 3,
+                                                    "value": {
+                                                        "raw": "2.5.4.10",
+                                                        "tree": [
+                                                            "joint-iso-itu-t",
+                                                            "ds",
+                                                            "attributeType",
+                                                            "organizationName",
+                                                        ],
+                                                        "name": "organizationName",
+                                                    },
+                                                },
+                                                {
+                                                    "type": "PrintableString",
+                                                    "length": 32,
+                                                    "value": "Internet Security Research Group",
+                                                },
+                                            ],
+                                        }
+                                    ],
+                                },
+                                {
+                                    "type": "SET",
+                                    "length": 21,
+                                    "value": [
+                                        {
+                                            "type": "SEQUENCE",
+                                            "length": 19,
+                                            "value": [
+                                                {
+                                                    "type": "OBJECT IDENTIFIER",
+                                                    "length": 3,
+                                                    "value": {
+                                                        "raw": "2.5.4.3",
+                                                        "tree": [
+                                                            "joint-iso-itu-t",
+                                                            "ds",
+                                                            "attributeType",
+                                                            "commonName",
+                                                        ],
+                                                        "name": "commonName",
+                                                    },
+                                                },
+                                                {
+                                                    "type": "PrintableString",
+                                                    "length": 12,
+                                                    "value": "ISRG Root X1",
+                                                },
+                                            ],
+                                        }
+                                    ],
+                                },
+                            ],
+                        },
+                        {
+                            "type": "SEQUENCE",
+                            "length": 546,
+                            "value": [
+                                {
+                                    "type": "SEQUENCE",
+                                    "length": 13,
+                                    "value": [
+                                        {
+                                            "type": "OBJECT IDENTIFIER",
+                                            "length": 9,
+                                            "value": {
+                                                "raw": "1.2.840.113549.1.1.1",
+                                                "tree": [
+                                                    "iso",
+                                                    "member-body",
+                                                    "us",
+                                                    "rsadsi",
+                                                    "pkcs",
+                                                    "pkcs-1",
+                                                    "rsaEncryption",
+                                                ],
+                                                "name": "rsaEncryption",
+                                            },
+                                        },
+                                        {"type": "NULL", "length": 0, "value": None},
+                                    ],
+                                },
+                                {
+                                    "type": "BIT STRING",
+                                    "length": 527,
+                                    "value": {
+                                        "type": "SEQUENCE",
+                                        "length": 522,
+                                        "value": [
+                                            {
+                                                "type": "INTEGER",
+                                                "length": 513,
+                                                "value": 709477870415445373015359016562426660610553770685944520893298396600226760899977879191004898543350831842119174188613678136510262472550532722234131754439181090009824131001234702144200501816519311599904090606194984753842587622398776018408050245574116028550608708896478977104703101364577377554823893350339376892984086676842821506637376561471221178677513035811884589888230947855482554780924844280661412982827405878164907670403886160896655313460186264922042760067692235383478494519985672059698752915965998412445946254227413232257276525240006651483130792248112417425846451951438781260632137645358927568158361961710185115502577127010922344394993078948994750404287047493247048147066090211292167313905862438457453781042040498702821432013765502024105065778257759178356925494156447570322373310256999609083201778278588599854706241788119448943034477370959349516873162063461521707809689839710972753590949570167489887658749686740890549110678989462474318310617765270337415238713770800711236563610171101328052424145478220993016515262478543813796899677215192789612682845145008993144513547444131126029557147570005369943143213525671105288817016183804256755470528641042403865830064493168693765438364296560479053823886598989258655438933191724193029337334607,
+                                            },
+                                            {
+                                                "type": "INTEGER",
+                                                "length": 3,
+                                                "value": 65537,
+                                            },
+                                        ],
+                                    },
+                                },
+                            ],
+                        },
+                        {
+                            "type": "X509 [3]",
+                            "length": 66,
+                            "value": [
+                                {
+                                    "type": "SEQUENCE",
+                                    "length": 64,
+                                    "value": [
+                                        {
+                                            "type": "SEQUENCE",
+                                            "length": 14,
+                                            "value": [
+                                                {
+                                                    "type": "OBJECT IDENTIFIER",
+                                                    "length": 3,
+                                                    "value": {
+                                                        "raw": "2.5.29.15",
+                                                        "tree": [
+                                                            "joint-iso-itu-t",
+                                                            "ds",
+                                                            "certificateExtension",
+                                                            "keyUsage",
+                                                        ],
+                                                        "name": "keyUsage",
+                                                    },
+                                                },
+                                                {
+                                                    "type": "BOOLEAN",
+                                                    "length": 1,
+                                                    "value": True,
+                                                },
+                                                {
+                                                    "type": "OCTET STRING",
+                                                    "length": 4,
+                                                    "value": {
+                                                        "type": "BIT STRING",
+                                                        "length": 2,
+                                                        "value": "03",
+                                                    },
+                                                },
+                                            ],
+                                        },
+                                        {
+                                            "type": "SEQUENCE",
+                                            "length": 15,
+                                            "value": [
+                                                {
+                                                    "type": "OBJECT IDENTIFIER",
+                                                    "length": 3,
+                                                    "value": {
+                                                        "raw": "2.5.29.19",
+                                                        "tree": [
+                                                            "joint-iso-itu-t",
+                                                            "ds",
+                                                            "certificateExtension",
+                                                            "basicConstraints",
+                                                        ],
+                                                        "name": "basicConstraints",
+                                                    },
+                                                },
+                                                {
+                                                    "type": "BOOLEAN",
+                                                    "length": 1,
+                                                    "value": True,
+                                                },
+                                                {
+                                                    "type": "OCTET STRING",
+                                                    "length": 5,
+                                                    "value": {
+                                                        "type": "SEQUENCE",
+                                                        "length": 3,
+                                                        "value": [
+                                                            {
+                                                                "type": "BOOLEAN",
+                                                                "length": 1,
+                                                                "value": True,
+                                                            }
+                                                        ],
+                                                    },
+                                                },
+                                            ],
+                                        },
+                                        {
+                                            "type": "SEQUENCE",
+                                            "length": 29,
+                                            "value": [
+                                                {
+                                                    "type": "OBJECT IDENTIFIER",
+                                                    "length": 3,
+                                                    "value": {
+                                                        "raw": "2.5.29.14",
+                                                        "tree": [
+                                                            "joint-iso-itu-t",
+                                                            "ds",
+                                                            "certificateExtension",
+                                                            "subjectKeyIdentifier",
+                                                        ],
+                                                        "name": "subjectKeyIdentifier",
+                                                    },
+                                                },
+                                                {
+                                                    "type": "OCTET STRING",
+                                                    "length": 22,
+                                                    "value": {
+                                                        "type": "OCTET STRING",
+                                                        "length": 20,
+                                                        "value": "79b459e67bb6e5e40173800888c81a58f6e99b6e",
+                                                    },
+                                                },
+                                            ],
+                                        },
+                                    ],
+                                }
+                            ],
+                        },
+                    ],
+                },
+                {
+                    "type": "SEQUENCE",
+                    "length": 13,
+                    "value": [
+                        {
+                            "type": "OBJECT IDENTIFIER",
+                            "length": 9,
+                            "value": {
+                                "raw": "1.2.840.113549.1.1.11",
+                                "tree": [
+                                    "iso",
+                                    "member-body",
+                                    "us",
+                                    "rsadsi",
+                                    "pkcs",
+                                    "pkcs-1",
+                                    "sha256WithRSAEncryption",
+                                ],
+                                "name": "sha256WithRSAEncryption",
+                            },
+                        },
+                        {"type": "NULL", "length": 0, "value": None},
+                    ],
+                },
+                {
+                    "type": "BIT STRING",
+                    "length": 513,
+                    "value": "551f58a9bcb2a850d00cb1d81a6920272908ac61755c8a6ef882e5692fd5f6564bb9b8731059d321977ee74c71fbb2d260ad39a80bea17215685f1500e59ebcee059e9bac915ef869d8f8480f6e4e99190dc179b621b45f06695d27c6fc2ea3bef1fcfcbd6ae27f1a9b0c8aefd7d7e9afa2204ebffd97fea912b22b1170e8ff28a345b58d8fc01c954b9b826cc8a8833894c2d843c82dfee965705ba2cbbf7c4b7c74e3b82be31c822737392d1c280a43939103323824c3c9f86b255981dbe29868c229b9ee26b3b573a82704ddc09c789cb0a074d6ce85d8ec9efceabc7bbb52b4e45d64ad026cce572ca086aa595e315a1f7a4edc92c5fa5fbffac28022ebed77bbbe3717b9016d3075e46537c3707428cd3c4969cd599b52ae0951a8048ae4c3907cecc47a452952bbab8fbadd233537de51d4d6dd5a1b1c7426fe64027355ca328b7078de78d3390e7239ffb509c796c46d5b415b3966e7e9b0c963ab8522d3fd65be1fb08c284fe24a8a389daac6ae1182ab1a843615bd31fdc3b8d76f22de88d75df17336c3d53fb7bcb415fffdca2d06138e196b8ac5d8b37d775d533c09911ae9d41c1727584be0241425f67244894d19b27be073fb9b84f817451e17ab7ed9d23e2bee0d52804133c31039edd7a6c8fc60718c67fde478e3f289e0406cfa5543477bdec899be91743df5bdb5ffe8e1e57a2cd409d7e6222dade1827",
+                },
+            ],
+        },
+    ),
 )
 
 
