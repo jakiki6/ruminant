@@ -1,3 +1,4 @@
+from . import utils
 from .buf import Buf
 
 tests = {}
@@ -177,3 +178,32 @@ def f():
     assert_eq(buf.unit, 5)
     buf.sapunit()
     assert_eq(buf.unit, 2)
+
+
+der_test_cases = (
+    ("null", "0500", {"type": "NULL", "length": 0, "value": None}),
+    ("small-integer", "0203010001", {"type": "INTEGER", "length": 3, "value": 65537}),
+    (
+        "lets-encrypt-point-example",
+        "3006 8001 0981 0109",
+        {
+            "type": "SEQUENCE",
+            "length": 6,
+            "value": [
+                {"type": "X509 [0]", "length": 1, "value": "09"},
+                {"type": "X509 [1]", "length": 1, "value": "09"},
+            ],
+        },
+    ),
+)
+
+
+def der_instance(name, data, dest):
+    @test("utils.read_der", name)
+    def f():
+        buf = Buf(bytes.fromhex(data))
+        assert_eq(utils.read_der(buf), dest)
+
+
+for instance in der_test_cases:
+    der_instance(*instance)
