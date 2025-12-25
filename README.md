@@ -99,6 +99,7 @@ Ruminant is still in early alpha but it can already process the following file t
   * including public key detection and signature extraction
 * EXR/OpenEXR files
 * Android vbmeta partitions
+* PDP-11 a.out files
 
 # How do I install it?
 Run `pip3 install ruminant`.

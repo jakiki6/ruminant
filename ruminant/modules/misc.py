@@ -3163,11 +3163,10 @@ class BtrfsModule(module.RuminantModule):
 
 @module.register
 class AOutExecutableModule(module.RuminantModule):
-    dev = True
     desc = "a.out executables."
 
     def identify(buf, ctx):
-        return buf.pu16l() in (0x00cc, 0x0107, 0x0108, 0x010b)
+        return buf.pu16l() in (0x0107, 0x0108, 0x010b)
 
     def chew(self):
         meta = {}
@@ -3177,7 +3176,11 @@ class AOutExecutableModule(module.RuminantModule):
         meta["header"]["mode"] = utils.unraw(
             self.buf.ru16l(),
             2,
-            {0x00cc: "QMAGIC", 0x0107: "OMAGIC", 0x0108: "NMAGIC", 0x010b: "ZMAGIC"},
+            {
+                0x0107: "Writable text",
+                0x0108: "Read-only shared text",
+                0x010b: "Read-only shared text, split data",
+            },
             True,
         )
         meta["header"]["text-size"] = self.buf.ru16l()
@@ -3185,11 +3188,10 @@ class AOutExecutableModule(module.RuminantModule):
         meta["header"]["bss-size"] = self.buf.ru16l()
         meta["header"]["symbol-table-size"] = self.buf.ru16l()
         meta["header"]["entry-point"] = self.buf.ru16l()
-        meta["header"]["text-relocation-size"] = self.buf.ru16l()
-        meta["header"]["data-relocation-size"] = self.buf.ru16l()
-
-        if meta["header"]["data-relocation-size"] == 1:
-            meta["header"]["data-relocation-size"] = 0
+        meta["header"]["unused"] = self.buf.ru16l()
+        meta["header"]["flags"] = utils.unpack_flags(
+            self.buf.ru16l(), ((0, "RELOC_STRIPPED"),)
+        )
 
         self.buf.pasunit(meta["header"]["text-size"])
         with self.buf.subunit():
@@ -3201,9 +3203,45 @@ class AOutExecutableModule(module.RuminantModule):
             meta["data"] = chew(self.buf, blob_mode=True)
         self.buf.sapunit()
 
+        if "RELOC_STRIPPED" not in meta["header"]["flags"]["names"]:
+            self.buf.pasunit(meta["header"]["text-size"])
+            with self.buf.subunit():
+                meta["text-reloc"] = chew(self.buf, blob_mode=True)
+            self.buf.sapunit()
+
+            self.buf.pasunit(meta["header"]["data-size"])
+            with self.buf.subunit():
+                meta["data-reloc"] = chew(self.buf, blob_mode=True)
+            self.buf.sapunit()
+
         self.buf.pasunit(meta["header"]["symbol-table-size"])
-        with self.buf.subunit():
-            meta["symbol-table"] = chew(self.buf, blob_mode=True)
+        meta["symbols"] = []
+        while self.buf.unit > 0:
+            symbol = {}
+            symbol["name"] = self.buf.rs(8)
+            symbol["type"] = utils.unraw(
+                self.buf.ru16l(),
+                2,
+                {
+                    0x00: "undefined",
+                    0x01: "absolute",
+                    0x02: "text",
+                    0x03: "data",
+                    0x04: "BSS",
+                    0x24: "register assignment",
+                    0x37: "file name",
+                    0x40: "undefined external",
+                    0x41: "absolute external",
+                    0x42: "text external",
+                    0x43: "data external",
+                    0x44: "BSS external",
+                },
+                True,
+            )
+            symbol["value"] = self.buf.ru16l()
+
+            meta["symbols"].append(symbol)
+
         self.buf.sapunit()
 
         return meta

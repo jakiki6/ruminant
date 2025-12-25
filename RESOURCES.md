@@ -97,3 +97,6 @@ This is a list of useful resources.
 
 # APK signature block
 * https://source.android.com/docs/security/features/apksigning
+
+# PDP-11 a.out
+* https://gunkies.org/wiki/UNIX_a.out_file
