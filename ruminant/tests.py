@@ -162,13 +162,6 @@ def f():
     buf.ru64()
 
 
-@test("Buffer", "unit-oversize")
-@inv
-def f():
-    buf = Buf(bytes(8))
-    buf.pasunit(9)
-
-
 @test("Buffer", "unit-stack")
 def f():
     buf = Buf(bytes(8))

@@ -7656,3 +7656,8 @@ APK_SIGNATURE_ALGORITHMS = {
     0x0202: "ECDSA with SHA2-512 digest",
     0x0301: "DSA with SHA2-256 digest",
 }
+
+GPT_TYPE_UUIDS = {
+    "0657fd6d-a4ab-43c4-84e5-0933c84b4f4f": "Swap partition",
+    "0fc63daf-8483-4772-8e79-3d69d8477de4": "Linux filesystem data",
+}
