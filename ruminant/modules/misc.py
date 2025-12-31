@@ -3364,8 +3364,16 @@ class MbrGptModule(module.RuminantModule):
         meta["mbr"]["disk-id"] = hex(self.buf.ru32l())[2:].zfill(8)
         meta["mbr"]["copy-protected"] = self.buf.ru16l() == 0x5a5a
         meta["mbr"]["partition-entries"] = []
+
+        number = 0
         for i in range(0, 4):
             partition = {}
+            partition["number"] = number
+
+            if sum(self.buf.peek(16)) == 0:
+                continue
+            number += 1
+
             partition["flags"] = utils.unpack_flags(self.buf.ru8(), ((7, "bootable"),))
             partition["start-chs"] = self.buf.rh(3)
             partition["parition-type"] = utils.unraw(

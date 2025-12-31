@@ -436,6 +436,7 @@ def read_der(buf):
 
     if (
         data["type"] == "SEQUENCE"
+        and "value" in data
         and len(data["value"]) == 2
         and data["value"][0]["type"] == "OBJECT IDENTIFIER"
         and data["value"][1]["type"] == "OCTET STRING"
