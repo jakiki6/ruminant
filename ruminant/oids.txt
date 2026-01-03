@@ -444,6 +444,10 @@
 1.2.840.113556.1.4: attribute-schema-objects
 1.2.840.113556.4: ms-files
 1.2.840.113583: adbe
+1.2.840.113583.1: acrobat
+1.2.840.113583.1.1: security
+1.2.840.113583.1.1.5: AuthenticDocumentsTrust
+1.2.840.113583.1.1.8: revocationInfoArchival
 1.2.840.113628: canadian-national-railways
 1.2.840.113635: apple
 1.2.840.114021: identrus-llc
@@ -485,6 +489,7 @@
 1.3.6.1.4.1.311.3.3.1: timestampingSignature
 1.3.6.1.4.1.311.10: crypto-2-0
 1.3.6.1.4.1.311.10.3: enhanced-key-usage
+1.3.6.1.4.1.311.10.3.12: Signer of documents
 1.3.6.1.4.1.311.10.4: microsoft-attribute
 1.3.6.1.4.1.311.10.5: drm
 1.3.6.1.4.1.311.10.6: licenses
@@ -1755,6 +1760,11 @@
 2.5.29.68: attributeMappings
 2.5.29.69: holderNameConstraints
 2.16: country
+2.16.356: India
+2.16.356.100: cca
+2.16.356.100.2: cp
+2.16.356.100.2.2: Certificate policy Class 2
+2.16.356.100.2.3: Certificate policy Class 3
 2.16.528: nl
 2.16.528.1: nederlandse-organisatie
 2.16.528.1.1001: diginotar

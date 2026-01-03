@@ -220,6 +220,11 @@ class PdfModule(module.RuminantModule):
                                 "AAPL:AKAnnotationObject"
                             ].encode("utf-8")
                         )
+                case "/Sig", _:
+                    if "Contents" in obj["value"]:
+                        obj["value"]["Contents"] = chew(
+                            bytes.fromhex(obj["value"]["Contents"])
+                        )
 
             if "Length" in obj["value"]:
                 length = self.resolve(obj["value"]["Length"])
