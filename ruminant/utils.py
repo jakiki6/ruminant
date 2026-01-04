@@ -6,6 +6,7 @@ from .constants import (
     PGP_AEADS,
     PGP_SIGNATURE_TYPES,
     PGP_S2K_TYPES,
+    CXX_OPERATORS,
 )
 from .buf import Buf, _decode
 from .modules import chew
@@ -1122,33 +1123,122 @@ def read_cbor(buf):
     return value
 
 
-def demangle(name):
-    assert name[:2] == "_Z"
-    res = None
-
-    name = name[2:]
-    if name[0] == "N":
+def _demangle(name, top=None):
+    modifiers = []
+    while name[0] in "PK":
+        modifiers.append(name[0])
         name = name[1:]
-        res = []
 
-        while True:
-            if name[0] == "E":
-                name = name[1:]
-                break
+    for k, v in CXX_OPERATORS.items():
+        if name.startswith(k):
+            return v, name[len(k) :]
 
-            length = ""
+    if name[0] in "vbcahstijlmxyfdew" or name[:2] == "Dn":
+        typ = ""
+        if "K" in modifiers:
+            typ += "const "
+
+        typ += {
+            "v": "void",
+            "b": "bool",
+            "c": "char",
+            "a": "signed char",
+            "h": "unsigned char",
+            "s": "short",
+            "t": "unsigned short",
+            "i": "int",
+            "j": "unsigned int",
+            "l": "long",
+            "m": "unsigned long",
+            "x": "long long",
+            "y": "unsigned long long",
+            "f": "float",
+            "d": "double",
+            "e": "long double",
+            "w": "wchar_t",
+            "D": "std::nullptr_t",
+        }[name[0]]
+
+        if "P":
+            typ += " *"
+
+        if name[0] == "D":
+            name = name[1:]
+        name = name[1:]
+
+        return typ, name
+    elif name[0] == "N":
+        name = name[1:]
+        parts = []
+        while name[0] != "E":
+            part, name = _demangle(name, parts)
+            parts.append(part)
+        name = name[1:]
+        return "::".join(parts), name
+    elif name[:2] in ("C0", "C1", "C2", "D0", "D1", "D2"):
+        return ("~" if name[0] == "D" else "") + top[-1] + "()", name[2:]
+    elif name[0] == "L":
+        name = name[1:]
+        typ = name[0]
+        name = name[1:]
+
+        if typ == "b":
+            return ["false", "true"][int(name[0])], name[1:]
+        elif typ in "0123456789":
+            length = typ
             while name[0] in "0123456789":
                 length += name[0]
                 name = name[1:]
 
             length = int(length)
-            res.append(name[:length])
-            name = name[length:]
+            return name[:length], name[length:]
 
-            if res[-1].startswith("_$"):
-                res[-1] = res[-1][1:]
+        raise ValueError(f"Unknown literal type '{typ}'")
+    elif name[:2] == "S_":
+        name = name[2:]
+        return "::".join(top), name
+    elif name[0] == "I":
+        name = name[1:]
+        parts = []
+        while name[0] != "E":
+            part, name = _demangle(name)
+            parts.append(part)
+        name = name[1:]
+        return "<" + ", ".join(parts) + ">", name
+    elif name[0] in "0123456789":
+        length = ""
+        while name[0] in "0123456789":
+            length += name[0]
+            name = name[1:]
 
-        res = "::".join(res)
+        if length == "":
+            print(name)
+
+        length = int(length)
+        res = name[:length]
+        name = name[length:]
+
+        if res.startswith("_$"):
+            res = res[1:]
+
+        return res, name
+
+    else:
+        raise ValueError()
+
+
+def demangle(name):
+    old_name = name
+
+    assert name[:2] == "_Z"
+    res = None
+
+    name = name[2:]
+
+    try:
+        res, name = _demangle(name)
+    except Exception:
+        return old_name
 
     res = res.replace("$LT$", "<")
     res = res.replace("$GT$", ">")

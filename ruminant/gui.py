@@ -31,6 +31,17 @@ if has_gui:
             self.populate_root(data)
 
             self.tree.bind("<Return>", self.toggle_mark)
+            self.tree.bind("<Shift-space>", self.toggle_fold_recursive)
+            self.tree.bind("<Shift-Down>", self.jump_down)
+            self.tree.bind("<Shift-Up>", self.jump_up)
+            self.tree.bind("<Escape>", lambda _: self.root.destroy())
+
+            children = self.tree.get_children("")
+            if children:
+                self.tree.event_generate("<<TreeviewSelect>>")
+                self.tree.selection_set(children[0])
+                self.tree.focus(children[0])
+                self.tree.focus_set()
 
         def setup_styles(self):
             style = ttk.Style()
@@ -85,6 +96,72 @@ if has_gui:
                     self.insert_item(parent_id, str(index), val, depth, depth == 0)
             else:
                 pass
+
+        def toggle_fold_recursive(self, event):
+            selected_item = self.tree.focus()
+            if not selected_item:
+                return "break"
+
+            is_open = self.tree.item(selected_item, "open")
+            new_state = not is_open
+
+            self.propagate_fold(selected_item, new_state)
+
+            return "break"
+
+        def propagate_fold(self, item_id, state):
+            self.tree.item(item_id, open=state)
+
+            children = self.tree.get_children(item_id)
+            for child in children:
+                self.propagate_fold(child, state)
+
+        def jump_down(self, event):
+            selection = self.tree.focus()
+            if not selection:
+                return "break"
+
+            next_item = self.tree.next(selection)
+
+            if not next_item:
+                parent = self.tree.parent(selection)
+                while parent:
+                    uncle = self.tree.next(parent)
+                    if uncle:
+                        next_item = uncle
+                        break
+                    parent = self.tree.parent(parent)
+
+            if next_item:
+                self.select_and_focus(next_item)
+
+            return "break"
+
+        def jump_up(self, event):
+            selection = self.tree.focus()
+            if not selection:
+                return "break"
+
+            prev_item = self.tree.prev(selection)
+
+            if not prev_item:
+                parent = self.tree.parent(selection)
+                while parent:
+                    uncle = self.tree.prev(parent)
+                    if uncle:
+                        prev_item = uncle
+                        break
+                    parent = self.tree.parent(parent)
+
+            if prev_item:
+                self.select_and_focus(prev_item)
+
+            return "break"
+
+        def select_and_focus(self, item_id):
+            self.tree.selection_set(item_id)
+            self.tree.focus(item_id)
+            self.tree.see(item_id)
 
         def insert_item(self, parent_id, key, value, depth, is_open):
             item_type = "primitive"

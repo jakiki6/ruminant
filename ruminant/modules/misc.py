@@ -3468,3 +3468,112 @@ class MbrGptModule(module.RuminantModule):
         self.buf.seek(self.buf.size())
 
         return meta
+
+
+@module.register
+class OpenTimestampsProofModule(module.RuminantModule):
+    dev = True
+    desc = "OpenTimestamps Proof files."
+
+    def identify(buf, ctx):
+        return (
+            buf.peek(31)
+            == b"\x00OpenTimestamps\x00\x00Proof\x00\xbf\x89\xe2\xe8\x84\xe8\x92\x94"
+        )
+
+    def read_op(self):
+        op = {}
+        opcode = self.buf.ru8()
+
+        match opcode:
+            case 0x00:
+                op["type"] = "attestation"
+                op["size"] = None
+                op["payload"] = {}
+                op["payload"]["attestation-type"] = utils.unraw(
+                    self.buf.ru64(),
+                    8,
+                    {
+                        0x83dfe30d2ef90c8e: "Pending",
+                        0x0588960d73d71901: "BitcoinBlockHeader",
+                    },
+                    True,
+                )
+
+                op["size"] = self.buf.ruleb()
+                self.buf.pasunit(op["size"])
+
+                match op["payload"]["attestation-type"]:
+                    case "Pending":
+                        op["payload"]["uri"] = self.buf.rs(self.buf.ruleb())
+                    case "BitcoinBlockHeader":
+                        op["payload"]["block-height"] = self.buf.ruleb()
+                    case _:
+                        op["payload"]["raw"] = self.buf.rh(self.buf.unit)
+
+                self.buf.sapunit()
+            case 0x08:
+                op["type"] = "sha256"
+            case 0xf0:
+                op["type"] = "append"
+                op["size"] = self.buf.ruleb()
+                op["payload"] = self.buf.rh(op["size"])
+            case 0xf1:
+                op["type"] = "prepend"
+                op["size"] = self.buf.ruleb()
+                op["payload"] = self.buf.rh(op["size"])
+            case 0xff:
+                op["type"] = "fork"
+                op["payload"] = {}
+                op["payload"]["children"] = []
+            case _:
+                raise ValueError(f"Unknown opcode (0x{hex(opcode)[2:].zfill(2)})")
+
+        return op
+
+    def read_ops(self):
+        ops = []
+
+        level = 1
+        while level > 0:
+            ops.append(self.read_op())
+            if ops[-1]["type"] == "attestation":
+                level -= 1
+            elif ops[-1]["type"] == "fork":
+                level += 1
+
+        root = []
+
+        tree = root
+        stack = [tree]
+        while len(ops):
+            elem = ops.pop(0)
+            tree.append(elem)
+
+            if elem["type"] == "fork":
+                stack.append(tree)
+                tree = []
+                elem["payload"]["children"] = tree
+            elif elem["type"] == "attestation":
+                tree = stack.pop()
+
+        return root
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "opentimestamps-proof"
+
+        self.buf.skip(31)
+        meta["version"] = self.buf.ru8()
+
+        match meta["version"]:
+            case 0x01:
+                meta["file-hash-op"] = self.read_op()
+                meta["file-hash"] = self.buf.rh(
+                    {"sha256": 32}[meta["file-hash-op"]["type"]]
+                )
+                meta["timestamp"] = self.read_ops()
+            case _:
+                meta["unknown"] = True
+
+        return meta

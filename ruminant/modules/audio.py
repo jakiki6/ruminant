@@ -196,6 +196,10 @@ class ID3v2Module(module.RuminantModule):
 
         meta["frames"] = []
         while self.buf.unit > 0:
+            if self.buf.pu16() == 0xfffb:
+                self.buf.setunit(0)
+                break
+
             frame = {}
             frame["type"] = self.buf.rs(4)
             if frame["type"] == "\x00\x00\x00\x00":
@@ -413,6 +417,10 @@ class ID3v2Module(module.RuminantModule):
                         | "TDEN"
                         | "TDTG"
                         | "TOFN"
+                        | "TCOP"
+                        | "TIME"
+                        | "TLAN"
+                        | "TDAT"
                     ):
                         frame["data"] = {}
                         frame["data"]["encoding"] = {
@@ -438,10 +446,13 @@ class ID3v2Module(module.RuminantModule):
                                     frame["data"]["string"] = json.loads(
                                         frame["data"]["string"]
                                     )
+                    case "WORS" | "WPUB":
+                        frame["data"] = content.decode("latin-1")
                     case _:
                         frame["data"] = content.hex()
                         frame["unknown"] = True
 
+            print(frame)
             meta["frames"].append(frame)
 
         self.buf.skipunit()
