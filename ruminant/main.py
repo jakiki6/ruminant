@@ -198,6 +198,9 @@ def main(dev=False):
             help="Print filenames in the progress bar",
         )
 
+    if sys.stdin.isatty() and len(sys.argv) == 1:
+        sys.argv.append("--help")
+
     args = parser.parse_args()
 
     if args.self_test:
