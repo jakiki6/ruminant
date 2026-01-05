@@ -100,6 +100,7 @@ Ruminant is still in early alpha but it can already process the following file t
 * EXR/OpenEXR files
 * Android vbmeta partitions
 * PDP-11 a.out files
+* OpenTimestamps proof files
 
 # How do I install it?
 Run `pip3 install ruminant`.

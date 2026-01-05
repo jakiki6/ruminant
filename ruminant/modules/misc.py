@@ -3472,7 +3472,6 @@ class MbrGptModule(module.RuminantModule):
 
 @module.register
 class OpenTimestampsProofModule(module.RuminantModule):
-    dev = True
     desc = "OpenTimestamps Proof files."
 
     def identify(buf, ctx):
