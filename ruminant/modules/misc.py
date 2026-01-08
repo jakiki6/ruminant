@@ -3442,8 +3442,11 @@ class MbrGptModule(module.RuminantModule):
         for partition in meta["mbr"]["partition-entries"]:
             self.buf.seek(partition["start-lba"] * 512)
 
-            with self.buf.sub(partition["sector-count"] * 512):
-                meta["mbr"]["partitions"].append(chew(self.buf))
+            try:
+                with self.buf.sub(partition["sector-count"] * 512):
+                    meta["mbr"]["partitions"].append(chew(self.buf))
+            except Exception:
+                pass
 
         self.bs = None
         self.buf.seek(512)

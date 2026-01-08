@@ -69,9 +69,6 @@ class Buf(object):
         )
 
     def setunit(self, length):
-        if self.unit is not None and length > self.unit:
-            raise ValueError("Oversized unit")
-
         self.unit = length
         self._target = self.tell() + length
         self._checkunit()
