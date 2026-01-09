@@ -845,3 +845,21 @@ class HttpFramedModule(module.RuminantModule):
         self.buf.rl()
 
         return meta
+
+
+@module.register
+class JmodModule(module.RuminantModule):
+    desc = "Java .jmod files."
+
+    def identify(buf, ctx):
+        return buf.peek(4) == b"\x4a\x4d\x01\x00"
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "jmod"
+
+        self.buf.skip(4)
+        with self.buf.sub(self.buf.available()):
+            meta["content"] = chew(self.buf)
+
+        return meta

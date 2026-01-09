@@ -942,6 +942,65 @@ class JavaClassModule(module.RuminantModule):
                     }
                 case "Deprecated":
                     val = True
+                case "Module":
+                    val = {}
+                    val["module-name"] = self.resolve(self.buf.ru16())
+                    val["module-flags"] = utils.unpack_flags(self.buf.ru16(), ())
+                    val["module-version"] = self.buf.ru16()
+
+                    val["requires"] = []
+                    for i in range(0, self.buf.ru16()):
+                        entry = {}
+                        entry["value"] = self.resolve(self.buf.ru16())
+                        entry["flags"] = utils.unpack_flags(self.buf.ru16(), ())
+                        entry["version"] = self.buf.ru16()
+
+                        val["requires"].append(entry)
+
+                    val["exports"] = []
+                    for i in range(0, self.buf.ru16()):
+                        entry = {}
+                        entry["value"] = self.resolve(self.buf.ru16())
+                        entry["flags"] = utils.unpack_flags(self.buf.ru16(), ())
+                        entry["to"] = [
+                            self.resolve(self.buf.ru16())
+                            for j in range(0, self.buf.ru16())
+                        ]
+
+                        val["exports"].append(entry)
+
+                    val["opens"] = []
+                    for i in range(0, self.buf.ru16()):
+                        entry = {}
+                        entry["value"] = self.resolve(self.buf.ru16())
+                        entry["flags"] = utils.unpack_flags(self.buf.ru16(), ())
+                        entry["to"] = [
+                            self.resolve(self.buf.ru16())
+                            for j in range(0, self.buf.ru16())
+                        ]
+
+                        val["opens"].append(entry)
+
+                    val["uses"] = [
+                        self.resolve(self.buf.ru16()) for j in range(0, self.buf.ru16())
+                    ]
+
+                    val["provides"] = []
+                    for i in range(0, self.buf.ru16()):
+                        entry = {}
+                        entry["value"] = self.resolve(self.buf.ru16())
+                        entry["with"] = [
+                            self.resolve(self.buf.ru16())
+                            for j in range(0, self.buf.ru16())
+                        ]
+
+                        val["provides"].append(entry)
+                case "ModulePackages":
+                    val = [
+                        self.resolve(self.buf.ru16()) for j in range(0, self.buf.ru16())
+                    ]
+                case "AnnotationDefault":
+                    val = self.read_element()
                 case "RuntimeVisibleAnnotations" | "RuntimeInvisibleAnnotations":
                     val = []
                     for i in range(0, self.buf.ru16()):
@@ -963,7 +1022,7 @@ class JavaClassModule(module.RuminantModule):
                             val2.append(self.read_annotation())
 
                         val.append(val2)
-                case "NestHost" | "ConstantValue":
+                case "NestHost" | "ConstantValue" | "ModuleTarget":
                     val = self.resolve(self.buf.ru16())
                 case "NestMembers" | "Exceptions" | "PermittedSubclasses":
                     val = []
@@ -1063,6 +1122,10 @@ class JavaClassModule(module.RuminantModule):
                     const = ["method-type", self.buf.ru16()]
                 case 18:
                     const = ["invokedynamic", -self.buf.ru16(), self.buf.ru16()]
+                case 19:
+                    const = ["module", self.buf.ru16()]
+                case 20:
+                    const = ["package", self.buf.ru16()]
                 case _:
                     raise ValueError(f"Unknown constant type {tag}")
 
@@ -1114,7 +1177,7 @@ class JavaClassModule(module.RuminantModule):
                                 meta["constants"][k] = f"{v[1]} {v[2]}"
                             case "interface-method-ref":
                                 meta["constants"][k] = f"{v[1]}.{v[2]}"
-                            case "method-type":
+                            case "method-type" | "module" | "package":
                                 meta["constants"][k] = v[1]
                             case _:
                                 raise ValueError(f"Cannot render type '{v[0]}' in {v}")
