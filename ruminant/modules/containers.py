@@ -3,6 +3,7 @@ from .. import module, utils, constants
 from ..buf import Buf
 
 import tempfile
+import datetime
 
 
 @module.register
@@ -11,6 +12,16 @@ class ZipModule(module.RuminantModule):
 
     def identify(buf, ctx):
         return buf.peek(4) == b"\x50\x4b\x03\x04"
+
+    def to_timestamp(self, dos_date, dos_time):
+        return datetime.datetime(
+            ((dos_date >> 9) & 0x7f) + 1980,
+            (dos_date >> 5) & 0x0f,
+            dos_date & 0x1f,
+            dos_time >> 11,
+            (dos_time >> 5) & 0x3f,
+            (dos_time & 0x1f) * 2,
+        ).isoformat()
 
     def read_single_signature(self):
         signature = {}
@@ -247,12 +258,47 @@ class ZipModule(module.RuminantModule):
 
             file = {}
             file["meta"] = {}
-            file["meta"]["version-producer"] = self.buf.ru16l()
-            file["meta"]["version-needed"] = self.buf.ru16l()
-            file["meta"]["general-flags"] = self.buf.rh(2)
+            temp = self.buf.ru16l()
+            file["meta"]["version-producer"] = {
+                "platform": utils.unraw(
+                    temp >> 8,
+                    1,
+                    {
+                        0x00: "MS-DOS / FAT",
+                        0x03: "Unix",
+                        0x0a: "Windows NTFS",
+                        0x0b: "MVS",
+                        0x0f: "Mac OS",
+                        0x19: "macOS (Unix)",
+                    },
+                    True,
+                ),
+                "pkzip-version": f"{(temp & 0xff) // 10}.{(temp & 0xff) % 10}",
+            }
+            temp = self.buf.ru16l()
+            file["meta"]["version-needed"] = (
+                f"{(temp & 0xff) // 10}.{(temp & 0xff) % 10}"
+            )
+            file["meta"]["general-flags"] = utils.unpack_flags(
+                self.buf.ru16l(),
+                (
+                    (0, "encrypted"),
+                    (1, "compression option 1"),
+                    (2, "compression option 2"),
+                    (3, "data-descriptor-present"),
+                    (4, "enhanced deflation"),
+                    (5, "compressed patched data"),
+                    (6, "strong encryption"),
+                    (8, "utf8"),
+                    (9, "local header values masked"),
+                ),
+            )
             file["meta"]["compression-method"] = self.buf.ru16l()
             file["meta"]["modification-time"] = self.buf.ru16l()
             file["meta"]["modification-date"] = self.buf.ru16l()
+            file["meta"]["modification-timestamp"] = self.to_timestamp(
+                file["meta"]["modification-date"], file["meta"]["modification-time"]
+            )
             file["meta"]["crc32"] = self.buf.rh(4)
             file["meta"]["compressed-size"] = self.buf.ru32l()
             file["uncompressed-size"] = self.buf.ru32l()
@@ -260,11 +306,116 @@ class ZipModule(module.RuminantModule):
             extra_field_length = self.buf.ru16l()
             comment_length = self.buf.ru16l()
             file["meta"]["start-disk"] = self.buf.ru16l()
-            file["meta"]["internal-attributes"] = self.buf.rh(2)
-            file["meta"]["external-attributes"] = self.buf.rh(4)
+            file["meta"]["internal-attributes"] = utils.unpack_flags(
+                self.buf.ru16l(), ((0, "text file"),)
+            )
+            file["meta"]["external-attributes"] = {
+                "dos-attributes": self.buf.ru16l(),
+            }
+            match file["meta"]["version-producer"]["platform"]:
+                case "Unix" | "macOS (Unix)":
+                    st_mode = self.buf.ru16l()
+                    file["meta"]["external-attributes"]["st-mode"] = {
+                        "type": utils.unraw(
+                            st_mode >> 12,
+                            1,
+                            {
+                                0x08: "file",
+                                0x04: "directory",
+                                0x0a: "symlink",
+                                0x02: "char device",
+                                0x06: "block device",
+                                0x01: "FIFO",
+                                0x0c: "socket",
+                            },
+                            True,
+                        ),
+                        "flags": utils.unpack_flags(
+                            st_mode & 0x0fff,
+                            (
+                                (0, "other-execute"),
+                                (1, "other-write"),
+                                (2, "other-read"),
+                                (3, "group-execute"),
+                                (4, "group-write"),
+                                (5, "group-read"),
+                                (6, "user-execute"),
+                                (7, "user-write"),
+                                (8, "user-read"),
+                                (9, "sticky"),
+                                (10, "set-gid"),
+                                (11, "set-uid"),
+                            ),
+                        ),
+                    }
+                case "MS-DOS / FAT" | "Windows NTFS":
+                    file["meta"]["external-attributes"]["st-mode"] = utils.unpack_flags(
+                        self.buf.ru16l(),
+                        (
+                            (0, "read-only"),
+                            (1, "hidden"),
+                            (2, "system"),
+                            (3, "volume label"),
+                            (4, "directory"),
+                            (5, "archive"),
+                            (6, "device"),
+                        ),
+                    )
+                case _:
+                    file["meta"]["external-attributes"]["platform-attributes"] = (
+                        self.buf.ru16l()
+                    )
+
             file["offset"] = self.buf.ru32l()
             file["filename"] = self.buf.rs(filename_length)
-            file["meta"]["extra-field"] = self.buf.rs(extra_field_length, "latin-1")
+
+            self.buf.pasunit(extra_field_length)
+
+            file["meta"]["extra-field"] = []
+            while self.buf.unit > 0:
+                entry = {}
+                typ = self.buf.ru16l()
+                entry["type"] = None
+                entry["length"] = self.buf.ru16l()
+                entry["payload"] = {}
+
+                self.buf.pasunit(entry["length"])
+                match typ:
+                    case 0x5455:
+                        entry["type"] = "Extended Timestamp"
+                        flags = self.buf.ru8()
+                        print(flags, self.buf.unit)
+                        if flags & 0x01 and self.buf.unit > 0:
+                            entry["payload"]["mtime"] = utils.unix_to_date(
+                                self.buf.ru32l()
+                            )
+                        if flags & 0x02 and self.buf.unit > 0:
+                            entry["payload"]["ctime"] = utils.unix_to_date(
+                                self.buf.ru32l()
+                            )
+                        if flags & 0x04 and self.buf.unit > 0:
+                            entry["payload"]["atime"] = utils.unix_to_date(
+                                self.buf.ru32l()
+                            )
+                    case 0x7875:
+                        entry["type"] = "Unicode Path"
+                        entry["payload"]["version"] = self.buf.ru8()
+                        entry["payload"]["uid"] = int.from_bytes(
+                            self.buf.read(self.buf.ru8()), "little"
+                        )
+                        entry["payload"]["gid"] = int.from_bytes(
+                            self.buf.read(self.buf.ru8()), "little"
+                        )
+                    case _:
+                        entry["type"] = f"Unknown (0x{hex(typ)[2:].zfill(4)})"
+                        entry["payload"] = self.buf.rh(self.buf.unit)
+                        entry["unknown"] = True
+
+                self.buf.sapunit()
+                file["meta"]["extra-field"].append(entry)
+
+            self.buf.sapunit()
+
             file["meta"]["comment"] = self.buf.rs(comment_length)
 
             if file["uncompressed-size"] > 0:

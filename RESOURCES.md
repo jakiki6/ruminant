@@ -100,3 +100,6 @@ This is a list of useful resources.
 
 # PDP-11 a.out
 * https://gunkies.org/wiki/UNIX_a.out_file
+
+# ZIP
+* https://libzip.org/specifications/extrafld.txt
