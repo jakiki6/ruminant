@@ -442,7 +442,7 @@ class ZipModule(module.RuminantModule):
 
         if meta["eocd"]["central-directory-offset"] > 16:
             self.buf.seek(meta["eocd"]["central-directory-offset"] - 16)
-            if self.buf.read(16) == b"APK Sig Block 42":
+            if self.buf.available() >= 16 and self.buf.read(16) == b"APK Sig Block 42":
                 meta["apk-signature"] = {}
 
                 self.buf.seek(meta["eocd"]["central-directory-offset"] - 24)

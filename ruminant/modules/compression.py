@@ -271,3 +271,43 @@ class ZlibModule(module.RuminantModule):
         meta["data"] = chew(fd)
 
         return meta
+
+
+@module.register
+class XzModule(module.RuminantModule):
+    desc = "xz streams."
+
+    def identify(buf, ctx):
+        return buf.peek(6) == b"\xfd7zXZ\x00"
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "xz"
+
+        self.buf.skip(6)
+
+        meta["stream-header"] = {}
+        temp = self.buf.ru16()
+        meta["stream-header"]["check-type"] = utils.unraw(
+            temp & 0x0f,
+            2,
+            {0x00: "None", 0x01: "CRC-32", 0x04: "CRC-64", 0x0a: "SHA-256"},
+            True,
+        )
+        meta["stream-header"]["flags"] = utils.unpack_flags(temp & 0xfff0, ())
+        meta["stream-header"]["crc32"] = {}
+
+        crc32 = self.buf.ru32l()
+        meta["stream-header"]["crc32"]["value"] = hex(crc32)[2:].zfill(8)
+        actual_crc32 = zlib.crc32(temp.to_bytes(2, "big"))
+        meta["stream-header"]["crc32"]["correct"] = crc32 == actual_crc32
+        if not meta["stream-header"]["crc32"]["correct"]:
+            meta["stream-header"]["crc32"]["actual"] = hex(actual_crc32)[2:].zfill(8)
+
+        self.buf.seek(0)
+        fd = utils.tempfd()
+        utils.stream_xz(self.buf, fd, self.buf.available())
+        fd.seek(0)
+        meta["data"] = chew(fd)
+
+        return meta

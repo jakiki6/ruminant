@@ -20,6 +20,7 @@ import struct
 import json
 import tempfile
 import re
+import lzma
 
 
 def _xml_to_dict(elem):
@@ -260,6 +261,18 @@ def stream_zlib(src, dst, compressed_size, chunk_size=1 << 24):
     flushed = decompressor.flush()
     if flushed:
         dst.write(flushed)
+
+
+def stream_xz(src, dst, compressed_size, chunk_size=1 << 24):
+    remaining = compressed_size
+    decompressor = lzma.LZMADecompressor()
+
+    while remaining > 0:
+        chunk = src.read(min(chunk_size, remaining))
+        dst.write(decompressor.decompress(chunk))
+        remaining -= len(chunk)
+
+    src.seek(-len(decompressor.unused_data), 1)
 
 
 def read_oid(buf, limit=-1):

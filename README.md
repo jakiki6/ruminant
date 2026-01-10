@@ -12,6 +12,7 @@ This tool behaves similarly as extracted blobs themselves can be "chewed over ag
 Ruminant is still in early alpha but it can already process the following file types:
 * ZIP files
   * APK signatures
+  * Java jmod modules
 * PDF files
 * JPEG files
   * EXIF metadata
@@ -101,6 +102,7 @@ Ruminant is still in early alpha but it can already process the following file t
 * Android vbmeta partitions
 * PDP-11 a.out files
 * OpenTimestamps proof files
+* xz files
 
 # How do I install it?
 Run `pip3 install ruminant`.
