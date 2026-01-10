@@ -1014,3 +1014,55 @@ class JmodModule(module.RuminantModule):
             meta["content"] = chew(self.buf)
 
         return meta
+
+
+@module.register
+class Uf2Module(module.RuminantModule):
+    dev = True
+    desc = "UF2 files (e.g. for RP2040)."
+
+    def identify(buf, ctx):
+        return buf.peek(8) == b"UF2\nWQ]\x9e"
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "uf2"
+
+        meta["blocks"] = []
+        while self.buf.peek(4) == b"UF2\n":
+            block = {}
+            self.buf.pasunit(512)
+
+            self.buf.skip(4)
+            block["second-magic-correct"] = self.buf.ru32l() == 0x9e5d5157
+            block["flags"] = utils.unpack_flags(
+                self.buf.ru32l(),
+                (
+                    (0, "not-flash"),
+                    (12, "file-container"),
+                    (13, "family-id-present"),
+                    (14, "md5-present"),
+                    (15, "extension-tags-present"),
+                ),
+            )
+            block["address"] = f"0x{hex(self.buf.ru32l())[2:].zfill(8)}"
+            block["bytes-used"] = self.buf.ru32l()
+            block["block-number"] = self.buf.ru32l()
+            block["total-block-number"] = self.buf.ru32l()
+
+            if "family-id-present" in block["flags"]["names"]:
+                block["family-id"] = utils.unraw(
+                    self.buf.ru32l(), 4, constants.UF2_FAMILY_IDS, True
+                )
+            elif "file-container" in block["flags"]["names"]:
+                block["file-size"] = self.buf.ru32l()
+            else:
+                block["unused"] = self.buf.ru32l()
+
+            block["data"] = self.buf.rh(476)[: block["bytes-used"] * 2]
+            block["third-magic-correct"] = self.buf.ru32l() == 0x0ab16f30
+
+            self.buf.sapunit()
+            meta["blocks"].append(block)
+
+        return meta
