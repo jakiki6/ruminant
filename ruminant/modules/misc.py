@@ -1693,6 +1693,8 @@ class ElfModule(module.RuminantModule):
                         self.buf.setunit(sh["parsed"]["descsz"])
 
                         match sh["parsed"]["name"], sh["parsed"]["type"]:
+                            case "GNU", 0x00000004:
+                                sh["parsed"]["string"] = self.buf.rs(self.buf.unit)
                             case "GNU", 0x00000005:
                                 sh["parsed"]["properties"] = []
                                 while self.buf.unit > 0:

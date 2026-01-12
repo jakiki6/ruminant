@@ -1016,9 +1016,31 @@ class JmodModule(module.RuminantModule):
         return meta
 
 
+class Span(object):
+    def __init__(self):
+        self.ranges = []
+
+    def add(self, address, length):
+        self.ranges.append([address, address + length])
+
+        self._fix()
+
+    def _fix(self):
+        new_ranges = []
+        ranges = sorted(self.ranges, key=lambda x: x[0])
+
+        for r in ranges:
+            new_ranges.append(r)
+
+            if len(new_ranges) >= 2 and new_ranges[-2][1] == new_ranges[-1][0]:
+                new_ranges[-2][1] = new_ranges[-1][1]
+                new_ranges.pop()
+
+        self.ranges = new_ranges
+
+
 @module.register
 class Uf2Module(module.RuminantModule):
-    dev = True
     desc = "UF2 files (e.g. for RP2040)."
 
     def identify(buf, ctx):
@@ -1033,6 +1055,7 @@ class Uf2Module(module.RuminantModule):
             block = {}
             self.buf.pasunit(512)
 
+            block["offset"] = self.buf.tell()
             self.buf.skip(4)
             block["second-magic-correct"] = self.buf.ru32l() == 0x9e5d5157
             block["flags"] = utils.unpack_flags(
@@ -1059,10 +1082,58 @@ class Uf2Module(module.RuminantModule):
             else:
                 block["unused"] = self.buf.ru32l()
 
-            block["data"] = self.buf.rh(476)[: block["bytes-used"] * 2]
+            self.buf.skip(476)
             block["third-magic-correct"] = self.buf.ru32l() == 0x0ab16f30
 
             self.buf.sapunit()
             meta["blocks"].append(block)
+
+        families = set()
+        for block in meta["blocks"]:
+            families.add(block.get("family-id", "Generic"))
+
+        meta["families"] = list(families)
+
+        spans = {}
+        for block in meta["blocks"]:
+            family_id = block.get("family-id", "Generic")
+
+            if family_id not in spans:
+                spans[family_id] = Span()
+
+            spans[family_id].add(int(block["address"][2:], 16), block["bytes-used"])
+
+        with self.buf:
+            data = {}
+
+            for k, v in spans.items():
+                data[k] = {}
+                for span in v.ranges:
+                    span = tuple(span)
+
+                    data[k][span] = bytearray(span[1] - span[0])
+
+            for block in meta["blocks"]:
+                family_id = block.get("family-id", "Generic")
+                span = None
+                for r in spans[family_id].ranges:
+                    if int(block["address"][2:], 16) >= r[0]:
+                        span = tuple(r)
+                        break
+
+                self.buf.seek(block["offset"] + 32)
+                buf = data[family_id][span]
+                base = int(block["address"][2:], 16) - span[0]
+                for i in range(0, block["bytes-used"]):
+                    buf[base + i] = self.buf.ru8()
+
+        meta["ranges"] = {}
+        for k, v in data.items():
+            meta["ranges"][k] = {}
+
+            for k2, v2 in v.items():
+                meta["ranges"][k][
+                    f"0x{hex(k2[0])[2:].zfill(8)}-0x{hex(k2[1])[2:].zfill(8)}"
+                ] = chew(Buf(v2), blob_mode=True)
 
         return meta

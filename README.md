@@ -103,6 +103,7 @@ Ruminant is still in early alpha but it can already process the following file t
 * PDP-11 a.out files
 * OpenTimestamps proof files
 * xz files
+* UF2 files
 
 # How do I install it?
 Run `pip3 install ruminant`.
