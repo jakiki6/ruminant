@@ -1120,6 +1120,8 @@ class JavaClassModule(module.RuminantModule):
                     const = ["method-handle", -self.buf.ru8(), self.buf.ru16()]
                 case 16:
                     const = ["method-type", self.buf.ru16()]
+                case 17:
+                    const = ["name-and-type", self.buf.ru16(), self.buf.ru16()]
                 case 18:
                     const = ["invokedynamic", -self.buf.ru16(), self.buf.ru16()]
                 case 19:
@@ -1693,7 +1695,9 @@ class ElfModule(module.RuminantModule):
                         self.buf.setunit(sh["parsed"]["descsz"])
 
                         match sh["parsed"]["name"], sh["parsed"]["type"]:
-                            case "GNU", 0x00000004:
+                            case "GNU", 0x00000003:
+                                sh["parsed"]["build-id"] = self.buf.rh(self.buf.unit)
+                            case ("GNU", 0x00000004) | ("Go", 0x00000004):
                                 sh["parsed"]["string"] = self.buf.rs(self.buf.unit)
                             case "GNU", 0x00000005:
                                 sh["parsed"]["properties"] = []

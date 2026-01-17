@@ -1137,3 +1137,44 @@ class Uf2Module(module.RuminantModule):
                 ] = chew(Buf(v2), blob_mode=True)
 
         return meta
+
+
+@module.register
+class DvdMpegSequenceModule(module.RuminantModule):
+    dev = True
+    desc = "DVD MPEG sequence files (the .VOB ones)."
+
+    def identify(buf, ctx):
+        return buf.pu32() == 0x000001ba
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "mpeg-sequence"
+
+        meta["packs"] = []
+        while self.buf.pu32() == 0x000001ba:
+            pack = {}
+
+            self.buf.pasunit(2048)
+            self.buf.skip(4)
+
+            pack["pack-header-indicator"] = self.buf.rb(2)
+            pack["scr"] = self.buf.rb(46)
+            pack["mux-rate"] = self.buf.rb(22)
+            pack["marker1"] = self.buf.rb(1)
+            pack["marker2"] = self.buf.rb(1)
+            pack["reserved"] = self.buf.rb(5)
+            pack["stuffing-length"] = self.buf.rb(3)
+            pack["stuffing"] = self.buf.rh(pack["stuffing-length"])
+
+            i = pack["scr"]
+            pack["scr"] = (
+                ((i >> 43) & 7) << 30
+                | ((i >> 27) & 0x7fff) << 15
+                | ((i >> 11) & 0x7fff)
+            ) * 300 + ((i >> 1) & 0x01ff)
+
+            self.buf.sapunit()
+            meta["packs"].append(pack)
+
+        return meta

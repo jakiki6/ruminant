@@ -497,7 +497,6 @@ class Buf(object):
 
     def rb(self, count):
         i = 0
-        j = 0
 
         c = self.pu8()
         while count:
@@ -506,10 +505,14 @@ class Buf(object):
                 self.skip(1)
                 c = self.pu8()
 
-            i |= ((c >> (7 - self._bits)) & 0x01) << j
-            j += 1
+            i <<= 1
+            i |= (c >> (7 - self._bits)) & 0x01
             self._bits += 1
             count -= 1
+
+        if self._bits >= 8:
+            self._bits = 0
+            self.skip(1)
 
         return i
 
