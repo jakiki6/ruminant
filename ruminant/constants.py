@@ -7791,4 +7791,5 @@ UF2_FAMILY_IDS = {
     0xf0c30d71: "Analog Devices MAX32665/6",
     0x91d3fd18: "Analog Devices MAX78002",
     0x7d7a66ef: "Quansheng UV-K5 V3 amateur radio based on Puya Semiconductor PY32F071",
+    0xa21e1295: "STM32H7 ChibiOS Bootloader",
 }

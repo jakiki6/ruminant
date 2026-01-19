@@ -1082,7 +1082,42 @@ class Uf2Module(module.RuminantModule):
             else:
                 block["unused"] = self.buf.ru32l()
 
-            self.buf.skip(476)
+            self.buf.pasunit(476)
+
+            if "extension-tags-present" in block["flags"]["names"]:
+                self.buf.skip(block["bytes-used"])
+                if block["bytes-used"] % 4:
+                    self.buf.skip(4 - (block["bytes-used"] % 4))
+
+                block["extension-tags"] = []
+                while self.buf.unit > 0:
+                    tag = {}
+
+                    tag["size"] = self.buf.ru8()
+                    if tag["size"] == 0 and self.buf.pu24l() == 0:
+                        break
+
+                    tag["type"] = utils.unraw(
+                        self.buf.ru24l(),
+                        3,
+                        {0x9957e3: "RP2350 Errata E10 abs block"},
+                        True,
+                    )
+
+                    self.buf.pasunit(tag["size"] - 4)
+
+                    tag["payload"] = {}
+                    match tag["type"]:
+                        case "RP2350 Errata E10 abs block":
+                            pass
+                        case _:
+                            tag["payload"]["raw"] = self.buf.rh(self.buf.unit)
+                            tag["unknown"] = True
+
+                    self.buf.sapunit()
+                    block["extension-tags"].append(tag)
+
+            self.buf.sapunit()
             block["third-magic-correct"] = self.buf.ru32l() == 0x0ab16f30
 
             self.buf.sapunit()

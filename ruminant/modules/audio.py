@@ -452,7 +452,6 @@ class ID3v2Module(module.RuminantModule):
                         frame["data"] = content.hex()
                         frame["unknown"] = True
 
-            print(frame)
             meta["frames"].append(frame)
 
         self.buf.skipunit()
