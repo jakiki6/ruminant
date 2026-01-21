@@ -185,6 +185,8 @@ class Buf(object):
                 self._offset += self.tell()
                 self._size = size
 
+                self.resetunit()
+
             def __exit__(self2, *args):
                 self.restore(self2._bak)
 
