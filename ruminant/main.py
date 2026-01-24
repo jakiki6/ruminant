@@ -10,13 +10,18 @@ import io
 import urllib.request
 from urllib.parse import urlparse, urlunparse
 
+# remove limits so we can process big files
 sys.set_int_max_str_digits(0)
 sys.setrecursionlimit(1000000)
 
+# tqdm installed?
 has_tqdm = False
+# print filenames when displaying the tqdm bar?
+# this makes the bar jitter so it's optional
 print_filenames = False
 
 
+# find files recursively in path that maches a regex
 def walk_helper(path, filename_regex):
     for root, _, files in os.walk(path):
         for file in files:
@@ -28,11 +33,13 @@ def walk_helper(path, filename_regex):
             yield file
 
 
+# process a file
 def process(file, walk):
     if not walk:
+        # shortcut if walk mode isn't needed
         return json.dumps(modules.chew(file), indent=2, ensure_ascii=False)
-        return
 
+    # we do a binwalk style walk now
     buf = Buf(file)
     unknown = 0
 
@@ -48,7 +55,9 @@ def process(file, walk):
                 entry = None
 
         if entry is not None:
+            # we finally parsed something
             if unknown > 0:
+                # add the previous unknown range to the data first
                 data.append({
                     "type": "unknown",
                     "length": unknown,
@@ -58,12 +67,15 @@ def process(file, walk):
                 modules.blob_id += 1
                 unknown = 0
 
+            # now add the parsed entry
             data.append(entry)
             buf.skip(entry["length"])
         else:
+            # nothing found, skip one byte
             unknown += 1
             buf.skip(1)
 
+    # trailing unknown segment?
     if unknown > 0:
         data.append({
             "type": "unknown",
@@ -72,6 +84,7 @@ def process(file, walk):
             "blob-id": modules.blob_id,
         })
 
+    # --extract-blob logic for the walk mode
     for entry in data:
         for k, v in modules.to_extract:
             if k == entry["blob-id"]:
@@ -95,6 +108,8 @@ def main(dev=False):
     global has_tqdm, args
 
     if sys.platform == "linux":
+        # register SIGUSR1 handler that dumps the stacktrace to stderr
+        # useful for debugging infinite loops
         import traceback
         import signal
 
@@ -107,6 +122,7 @@ def main(dev=False):
         signal.signal(signal.SIGUSR1, print_stacktrace)
 
         if len(sys.argv) == 2 and sys.argv[1] == "--dev":
+            # internal tool to install the dev mode of ruminant
             if not os.path.isdir(os.path.expanduser("~/ruminant")):
                 print("Please clone the repo to ~/ruminant first.")
                 exit(1)
@@ -181,6 +197,7 @@ def main(dev=False):
         help="Strip metadata-removing parameters fromknown URLs like '?filetype=webp'",
     )
 
+    # look for tqdm
     has_tqdm = True
     try:
         import tqdm
@@ -188,6 +205,7 @@ def main(dev=False):
         has_tqdm = False
 
     if has_tqdm:
+        # add tqdm specific options
         parser.add_argument(
             "--progress", "-p", action="store_true", help="Print progress"
         )
@@ -198,6 +216,8 @@ def main(dev=False):
             help="Print filenames in the progress bar",
         )
 
+    # check if stdin is a console (and not part of a pipe chain) and make it print the help otherwise
+    # this is done so just running `ruminant` in a shell prints help while `cat ... | ruminant` works
     if sys.stdin.isatty() and len(sys.argv) == 1:
         sys.argv.append("--help")
 
@@ -231,6 +251,7 @@ def main(dev=False):
 
     if args.extract is not None:
         for k, v in args.extract:
+            # register blobs to extract
             try:
                 modules.to_extract.append((int(k), v))
             except ValueError:
@@ -257,6 +278,7 @@ def main(dev=False):
             urlunparse(url), headers={"User-Agent": user_agent}
         )
 
+        # download to temproray file with name
         with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
             try:
                 with urllib.request.urlopen(req) as response:
@@ -275,13 +297,17 @@ def main(dev=False):
 
             args.file = tmp_file.name
     else:
+        # allow `ruminant -`
         if args.file == "-":
             args.file = "/dev/stdin"
 
+    # GUI mode
     if args.gui:
+        # redirect stdout to capture and parse it later
         old_stdout = sys.stdout
         sys.stdout = io.StringIO()
 
+    # /dev/stdin isn't seekable so we copy it into a temporary file
     if args.file == "/dev/stdin":
         file = tempfile.TemporaryFile()
 
@@ -303,6 +329,7 @@ def main(dev=False):
             print(process(file, args.walk))
     else:
         if os.path.isdir(args.file):
+            # fake json so it prints for each file the moment it has been parsed
             print('{\n  "type": "directory",\n  "files": [')
 
             filename_regex = re.compile(args.filename_regex)
@@ -360,7 +387,9 @@ def main(dev=False):
                 exit(1)
 
         if args.gui:
+            # swap stdout back
             data = sys.stdout.getvalue()
             sys.stdout = old_stdout
 
+            # start GUI
             gui.GUI.run(json.loads(data))
