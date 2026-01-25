@@ -23,6 +23,7 @@ import re
 import lzma
 
 
+# inner part of xml_to_dict
 def _xml_to_dict(elem):
     res = {}
 
@@ -32,8 +33,10 @@ def _xml_to_dict(elem):
     if elem.attrib:
         res["attributes"] = elem.attrib
 
+        # attribute special handling
         for k, v in elem.attrib.items():
             match k:
+                # Google HDR+ specific attributes
                 case (
                     "{http://ns.google.com/photos/1.0/camera/}hdrp_makernote"
                     | "{http://ns.google.com/photos/1.0/camera/}shot_log_data"
@@ -44,21 +47,26 @@ def _xml_to_dict(elem):
     if elem.text and len(elem.text.strip()):
         res["text"] = elem.text
 
+        # text special handling
         if elem.tag == "{http://ns.adobe.com/xap/1.0/g/img/}image":
+            # adobe adds images as base64 for some reason
             res["text"] = chew(base64.b64decode(res["text"]))
         elif (
+            # Android keybox XMLs embed the keys as PEM
             elem.tag in ("PrivateKey", "Certificate")
             and res.get("attributes", {}).get("format") == "pem"
         ):
             res["text"] = chew(res["text"].strip().encode("utf-8"))
 
     children = list(elem)
+    # recurse
     if len(children):
         res["children"] = [_xml_to_dict(child) for child in children]
 
     return res
 
 
+# top level for _xml_to_dict
 def xml_to_dict(string, fail=False):
     while len(string):
         try:
@@ -67,11 +75,14 @@ def xml_to_dict(string, fail=False):
             if fail:
                 raise e
 
+            # remove trailing shit until it works
             string = string[:-1]
 
+    # string was cut until it was empty
     return {}
 
 
+# read only one XML document from a buf with other stuff trailing it
 def read_xml(buf, chunk_size=4096):
     parser = ET.XMLPullParser(events=("start", "end"))
     content = b""
@@ -103,9 +114,11 @@ def read_xml(buf, chunk_size=4096):
                     elif event == "end" and elem is root:
                         break
     finally:
+        # undo seeking if anything fails
         buf.restore(bak)
 
     try:
+        # decode xml and do the seeking again
         xml = xml_to_dict(content, True)
         buf.skip(len(content))
         return xml
@@ -113,6 +126,7 @@ def read_xml(buf, chunk_size=4096):
         raise ValueError("No complete XML document found")
 
 
+# read usual uleb128
 def read_varint(buf):
     i = 0
     o = 0
@@ -125,6 +139,7 @@ def read_varint(buf):
     return i
 
 
+# read Google Protobufs
 def read_protobuf(buf, length, escape=False, decode={}):
     buf.pushunit()
     buf.setunit(length)
@@ -148,14 +163,18 @@ def read_protobuf(buf, length, escape=False, decode={}):
             case _:
                 break
 
+        # handle the renaming and special decode logic
         if entry_id in decode:
             if isinstance(decode[entry_id], dict):
+                # bytes are actually another Protobuf
                 value = read_protobuf(Buf(value), len(value), escape, decode[entry_id])
             else:
                 match decode[entry_id]:
                     case "utf-8":
+                        # bytes are actually UTF-8 string
                         value = value.decode(decode[entry_id])
                     case "float":
+                        # bytes are actually floats
                         if isinstance(value, int):
                             value = value.to_bytes(4, "little")
 
@@ -163,6 +182,7 @@ def read_protobuf(buf, length, escape=False, decode={}):
                         if len(value) == 1:
                             value = value[0]
                     case "double":
+                        # bytes are actually doubles
                         if isinstance(value, int):
                             value = value.to_bytes(8, "little")
 
@@ -170,19 +190,25 @@ def read_protobuf(buf, length, escape=False, decode={}):
                         if len(value) == 1:
                             value = value[0]
                     case "s32":
+                        # bytes are actually a signed int
                         value = (2**32 - 1) - value - 1
                     case "s64":
+                        # bytes are actually a signed long
                         value = (2**64 - 1) - value - 1
                     case _:
+                        # unknown decode type, shouldn't happen
                         if escape:
                             value = value.hex()
         elif escape and isinstance(value, bytes):
+            # escape bytes so it can be in a json object
             value = value.hex()
 
         if entry_id in decode.get("keys", {}):
+            # rename entry id to something more readable
             entry_id = decode["keys"][entry_id]
 
         if entry_id in entries:
+            # make an entry a list if it appears more than once
             if not isinstance(entries[entry_id], list):
                 entries[entry_id] = [entries[entry_id]]
 
@@ -196,6 +222,7 @@ def read_protobuf(buf, length, escape=False, decode={}):
     return entries
 
 
+# safely convert a blob to a UUID or as hex if it's not 16 bytes
 def to_uuid(blob):
     try:
         return str(uuid.UUID(bytes=blob))
@@ -203,15 +230,18 @@ def to_uuid(blob):
         return blob.hex()
 
 
+# safely convert ISO container date to isoformat and handle overflow
 def mp4_time_to_iso(mp4_time):
     mp4_epoch = datetime(1904, 1, 1, tzinfo=timezone.utc)
     try:
         dt = mp4_epoch + timedelta(seconds=mp4_time)
         return dt.isoformat()
     except OverflowError:
+        # don't panic, just return fallback stringified value
         return "??? - " + str(mp4_time)
 
 
+# stream deflate compressed data from src to dst
 def stream_deflate(src, dst, compressed_size, chunk_size=1 << 24):
     remaining = compressed_size
     decompressor = zlib.decompressobj(-zlib.MAX_WBITS)
@@ -226,6 +256,7 @@ def stream_deflate(src, dst, compressed_size, chunk_size=1 << 24):
         dst.write(flushed)
 
 
+# stream bzip2 compressed data from src to dst
 def stream_bzip2(src, dst, compressed_size, chunk_size=1 << 24):
     remaining = compressed_size
     decompressor = bz2.BZ2Decompressor()
@@ -238,6 +269,7 @@ def stream_bzip2(src, dst, compressed_size, chunk_size=1 << 24):
     src.seek(-len(decompressor.unused_data), 1)
 
 
+# stream compressed data from src to dst, decoded by the passed decompressor
 def stream_generic(decompressor, src, dst, compressed_size, chunk_size=1 << 24):
     remaining = compressed_size
 
@@ -249,6 +281,7 @@ def stream_generic(decompressor, src, dst, compressed_size, chunk_size=1 << 24):
     src.seek(-len(decompressor.unused_data), 1)
 
 
+# stream zlib compressed data from src to dst
 def stream_zlib(src, dst, compressed_size, chunk_size=1 << 24):
     remaining = compressed_size
     decompressor = zlib.decompressobj()
@@ -263,6 +296,7 @@ def stream_zlib(src, dst, compressed_size, chunk_size=1 << 24):
         dst.write(flushed)
 
 
+# stream xz compressed data from src to dst
 def stream_xz(src, dst, compressed_size, chunk_size=1 << 24):
     remaining = compressed_size
     decompressor = lzma.LZMADecompressor()
@@ -275,6 +309,7 @@ def stream_xz(src, dst, compressed_size, chunk_size=1 << 24):
     src.seek(-len(decompressor.unused_data), 1)
 
 
+# read a DER encoded OID
 def read_oid(buf, limit=-1):
     oid = []
     c = buf.ru8()
@@ -296,12 +331,15 @@ def read_oid(buf, limit=-1):
     return lookup_oid(oid)
 
 
+# read DER encoded data
 def read_der(buf):
     data = {}
 
+    # read tag and extract flags
     tag = buf.ru8()
     constructed = bool((tag >> 5) & 0x01)
 
+    # read long tag
     if tag & 0x0f == 0x0f:
         c = 0x80
         while c & 0x80:
@@ -309,8 +347,10 @@ def read_der(buf):
             tag <<= 7
             tag |= c & 0x7f
 
+    # read length
     length = buf.ru8()
     if length & 0x80:
+        # read long length
         length = int.from_bytes(buf.read(length & 0x7f), "big")
 
     buf.pushunit()
@@ -319,6 +359,7 @@ def read_der(buf):
     data["type"] = None
     data["length"] = length
 
+    # process tag type
     match tag:
         case 0x01:
             data["type"] = "BOOLEAN"
@@ -332,30 +373,38 @@ def read_der(buf):
             bit_length = length * 8 - skip
 
             if skip % 8 == 0:
+                # guess whether a BIT STRING that has a 8 bit aligned length actually contains nested DER
                 nested = True
                 with buf:
                     try:
+                        # read the tag
                         if buf.ru8() & 0x0f == 0x0f:
                             c = 0x80
                             while c & 0x80:
                                 c = buf.ru8()
 
+                        # read the length
                         length = buf.ru8()
                         if length & 0x80:
                             length = int.from_bytes(buf.read(length & 0x7f), "big")
 
+                        # check the length
                         assert buf.unit == length
                     except Exception:
+                        # no nested DER :(
                         nested = False
 
                 if nested:
+                    # read nested DER
                     with buf.subunit():
                         data["value"] = read_der(buf)
                 else:
+                    # nah, just hex
                     data["value"] = hex(int.from_bytes(buf.readunit()))[2:].zfill(
                         (bit_length + 7) // 8
                     )
             else:
+                # unaligned, save as bits
                 data["value"] = hex(int.from_bytes(buf.readunit()) >> skip)[2:].zfill(
                     (bit_length + 7) // 8
                 )
@@ -365,6 +414,7 @@ def read_der(buf):
             nested = True
             with buf:
                 try:
+                    # once again try to detect nested DER
                     if buf.ru8() & 0x0f == 0x0f:
                         c = 0x80
                         while c & 0x80:
@@ -379,6 +429,7 @@ def read_der(buf):
                     nested = False
 
             if nested:
+                # you know the drill
                 with buf.subunit():
                     data["value"] = read_der(buf)
             else:
@@ -395,6 +446,7 @@ def read_der(buf):
         case 0x10 | 0x11 | 0x30 | 0x31:
             data["type"] = ["SEQUENCE", "SET"][tag & 0x01]
         case 0x13 | 0x14 | 0x16:
+            # many funny names for ASCII for some reason
             data["type"] = {
                 0x13: "PrintableString",
                 0x14: "T61String",
@@ -407,6 +459,7 @@ def read_der(buf):
 
             dt = datetime.strptime(buf.readunit().decode("ascii")[:-1], "%y%m%d%H%M%S")
 
+            # years are sometimes broken for some fucking reason
             if dt.year < 1950:
                 dt = dt.replace(year=dt.year + 100)
 
@@ -416,6 +469,7 @@ def read_der(buf):
 
             time_string = buf.readunit().decode("ascii")[:-1]
             if "." in time_string:
+                # time can be more precise
                 main_time, fraction = time_string.split(".", 1)
                 fraction = (fraction + "000000")[:6]
                 data["value"] = (
@@ -433,17 +487,22 @@ def read_der(buf):
             data["type"] = f"UNKNOWN ({hex(tag)})"
 
     if tag >= 0x80 and tag <= 0xbe:
+        # X509 specific tags
         data["type"] = f"X509 [{tag & 0x0f}]"
 
         if not constructed:
+            # read content of the tag
             content = buf.readunit()
 
             if tag & 0x0f in (0x02, 0x06):
+                # some are text
                 data["value"] = content.decode("latin-1")
             else:
+                # some aren't
                 data["value"] = content.hex()
 
     if constructed:
+        # read nested DER entries if the tag is constructed
         data["value"] = []
         while buf.unit > 0:
             data["value"].append(read_der(buf))
@@ -456,6 +515,7 @@ def read_der(buf):
         and data["value"][1]["type"] == "OCTET STRING"
         and data["value"][0]["value"]["raw"] == "1.3.6.1.4.1.11129.2.1.30"
     ):
+        # Android Google specific attestation field, which contains information about the device
         data["value"][1]["parsed"] = read_cbor(
             Buf(bytes.fromhex(data["value"][1]["value"]))
         )
@@ -466,36 +526,45 @@ def read_der(buf):
     return data
 
 
+# lookup OID in the database
 def lookup_oid(oid):
     data = {}
     data["raw"] = ".".join([str(x) for x in oid])
 
     tree = []
+    # start at root
     root = OIDS
+    # walk OID database to collect names
     for i in oid:
         if i in root:
             tree.append(root[i]["name"])
             root = root[i]["children"]
         else:
+            # no more leaves
             tree.append("?")
             root = {}
 
     data["tree"] = tree
     if tree[-1] != "?":
+        # if the OID path ends in a known name, add it
         data["name"] = tree[-1]
 
     return data
 
 
+# do zlib decompression for PDF files since Adobe is fucking insane
 def zlib_decompress(content):
     try:
+        # please just work
         return zlib.decompress(content)
     except Exception:
         try:
+            # okay maybe now?
             return zlib.decompressobj().decompress(content)
         except Exception:
             decomp = zlib.decompressobj(zlib.MAX_WBITS | 32)
 
+            # a fuck it
             data = b""
             for c in content:
                 # WHAT THE FUCK ADOBE
@@ -507,17 +576,22 @@ def zlib_decompress(content):
             return data
 
 
+# stuff that actually belongs to Buf but is here to prevent circular import stuff
 def decode(*args, **kwargs):
     return _decode(*args, **kwargs)
 
 
+# lookup name in a dict or present a fallback string
 def unraw(i, width, choices, short=False):
     if short:
+        # short form, just a string
         return choices.get(i, f"Unknown (0x{hex(i)[2:].zfill(width * 2)})")
     else:
+        # long form that includes raw value
         return {"raw": i, "name": choices.get(i, "Unknown")}
 
 
+# read big integer for PGP
 def read_pgp_mpi(buf):
     bit_length = buf.ru16()
     return int.from_bytes(buf.read((bit_length + 7) // 8), "big") & (
@@ -525,6 +599,7 @@ def read_pgp_mpi(buf):
     )
 
 
+# read PGP hashed/unhashed subpacket
 def read_pgp_subpacket(buf):
     packet = {}
 

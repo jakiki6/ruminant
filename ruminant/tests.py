@@ -4,6 +4,7 @@ from .buf import Buf
 tests = {}
 
 
+# annotation to register a function as a test
 def test(group, name):
     def inner(func):
         if group not in tests:
@@ -15,6 +16,7 @@ def test(group, name):
     return inner
 
 
+# invert a function failure to allow "should fail" tests
 def inv(func):
     def f():
         try:
@@ -27,8 +29,10 @@ def inv(func):
     return f
 
 
+# is a == b?
 def assert_eq(a, b):
     if isinstance(a, int) and isinstance(b, int):
+        # special case to print hex
         assert a == b, f"Expected {b}, got {a} (i.e. {hex(a)})"
     else:
         assert a == b, f"Expected {b}, got {a}"

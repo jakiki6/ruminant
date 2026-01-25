@@ -2,15 +2,20 @@ import os
 
 OIDS = {}
 
+# read ruminant/oids.txt
 with open(os.path.join(os.path.dirname(__file__), "oids.txt"), "r") as file:
     rows = []
     for line in file.readlines():
+        # we ignore comments, they're nuked by oids-tool.py
         if line.startswith("#"):
             continue
 
+        # remove tailing newline and split OID and name
         line = line[:-1].split(": ")
+        # add it to the rows
         rows.append((line[0], ": ".join(line[1:])))
 
+    # build the hierachy
     for row in rows:
         key = [int(x) for x in row[0].split(".")]
 
