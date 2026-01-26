@@ -7793,3 +7793,7 @@ UF2_FAMILY_IDS = {
     0x7d7a66ef: "Quansheng UV-K5 V3 amateur radio based on Puya Semiconductor PY32F071",
     0xa21e1295: "STM32H7 ChibiOS Bootloader",
 }
+
+PE_MSDOS_STUBS = {
+    "0e1fba0e00b409cd21b8014ccd21546869732070726f6772616d2063616e6e6f742062652072756e20696e20444f53206d6f64652e0d0d0a2400000000000000": "Standard 'This program cannot be run in DOS mode.' stub."
+}

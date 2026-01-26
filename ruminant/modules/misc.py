@@ -1862,8 +1862,29 @@ class PeModule(module.RuminantModule):
 
         self.buf.skip(2)
         meta["msdos-header"] = {}
-        meta["msdos-header"]["stub"] = self.buf.rh(0x3a)
+        meta["msdos-header"]["bytes-on-last-page"] = self.buf.ru16l()
+        meta["msdos-header"]["pages"] = self.buf.ru16l()
+        meta["msdos-header"]["relocations"] = self.buf.ru16l()
+        meta["msdos-header"]["header-size-in-paragraphs"] = self.buf.ru16l()
+        meta["msdos-header"]["min-paragraph-alloc"] = self.buf.ru16l()
+        meta["msdos-header"]["max-paragraph-alloc"] = self.buf.ru16l()
+        meta["msdos-header"]["initial-relative-ss"] = self.buf.ru16l()
+        meta["msdos-header"]["initial-sp"] = self.buf.ru16l()
+        meta["msdos-header"]["checksum"] = self.buf.ru16l()
+        meta["msdos-header"]["initial-ip"] = self.buf.ru16l()
+        meta["msdos-header"]["initial-cs"] = self.buf.ru16l()
+        meta["msdos-header"]["reloc-table-address"] = self.buf.ru16l()
+        meta["msdos-header"]["overlay-number"] = self.buf.ru16l()
+        meta["msdos-header"]["reserved2"] = [self.buf.ru16l() for i in range(0, 4)]
+        meta["msdos-header"]["oem-id"] = self.buf.ru16l()
+        meta["msdos-header"]["oem-info"] = self.buf.ru16l()
+        meta["msdos-header"]["reserved1"] = [self.buf.ru16l() for i in range(0, 10)]
         meta["msdos-header"]["pe-header-offset"] = self.buf.ru32l()
+        meta["msdos-header"]["stub"] = utils.unraw(
+            self.buf.rh(meta["msdos-header"]["pe-header-offset"] - self.buf.tell()),
+            0,
+            constants.PE_MSDOS_STUBS,
+        )
 
         self.buf.seek(meta["msdos-header"]["pe-header-offset"])
         if self.buf.read(4) != b"PE\x00\x00":
