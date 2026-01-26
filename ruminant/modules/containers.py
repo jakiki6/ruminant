@@ -1213,3 +1213,63 @@ class DvdMpegSequenceModule(module.RuminantModule):
             meta["packs"].append(pack)
 
         return meta
+
+
+@module.register
+class GrubModuleModule(module.RuminantModule):
+    desc = "GRUB 2 module files."
+
+    def identify(buf, ctx):
+        return buf.peek(4) == b"mimg"
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "grub-module"
+
+        self.buf.skip(4)
+        meta["data"] = {}
+        meta["data"]["padding"] = self.buf.ru32l()
+        meta["data"]["offset"] = self.buf.ru64l()
+        meta["data"]["size"] = self.buf.ru64l()
+        meta["data"]["modules"] = []
+
+        self.buf.pasunit(meta["data"]["size"] - 24)
+        self.buf.skip(meta["data"]["offset"] - 24)
+
+        while self.buf.unit > 0:
+            module = {}
+            module["type"] = utils.unraw(
+                self.buf.ru32l(),
+                4,
+                {
+                    0x00000000: "ELF",
+                    0x00000001: "MEMDISK",
+                    0x00000002: "CONFIG",
+                    0x00000003: "PREFIX",
+                    0x00000004: "PUBKEY",
+                    0x00000005: "DTB",
+                    0x00000006: "DISABLE_SHIM_LOCK",
+                },
+            )
+            module["length"] = self.buf.ru32l()
+
+            self.buf.pasunit(module["length"] - 8)
+
+            match module["type"]["raw"]:
+                case 0 | 1:
+                    with self.buf.subunit():
+                        module["data"] = chew(self.buf)
+                case 3:
+                    module["data"] = self.buf.rs(self.buf.unit)
+                case _:
+                    module["unknown"] = True
+                    with self.buf.subunit():
+                        module["data"] = chew(self.buf, blob_mode=True)
+
+            self.buf.sapunit()
+
+            meta["data"]["modules"].append(module)
+
+        self.buf.sapunit()
+
+        return meta

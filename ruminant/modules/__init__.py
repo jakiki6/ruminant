@@ -147,4 +147,6 @@ from . import (  # noqa: F401,E402
     text,
     misc,
     android,
+    executables,
+    filesystems,
 )
