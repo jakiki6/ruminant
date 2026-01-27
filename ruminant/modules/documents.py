@@ -729,3 +729,92 @@ class Ole2Module(module.RuminantModule):
         )
 
         return meta
+
+
+@module.register
+class RegistryHiveFile(module.RuminantModule):
+    dev = True
+    desc = "Windows Registry hive files."
+
+    def identify(buf, ctx):
+        return buf.peek(4) == b"regf"
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "registry-hive"
+
+        self.buf.pasunit(4096)
+        meta["header"] = {}
+        self.buf.skip(4)
+        meta["header"]["primary-sequence-number"] = self.buf.ru32l()
+        meta["header"]["secondary-sequence-number"] = self.buf.ru32l()
+        meta["header"]["last-written-timestamp"] = utils.filetime_to_date(
+            self.buf.ru64l()
+        )
+        meta["header"]["major-version"] = self.buf.ru32l()
+        meta["header"]["minor-version"] = self.buf.ru32l()
+        meta["header"]["file-type"] = utils.unraw(
+            self.buf.ru32l(), 4, {0x00000000: "Primary", 0x00000001: "Log"}, True
+        )
+        meta["header"]["format-flags"] = utils.unpack_flags(self.buf.ru32l(), ())
+        meta["header"]["root-cell-offset"] = self.buf.ru32l()
+        meta["header"]["hive-length"] = self.buf.ru32l()
+        meta["header"]["clustering-factor"] = self.buf.ru32l()
+        meta["header"]["path"] = self.buf.rs(64, "utf-16le")
+        meta["header"]["checksum"] = self.buf.rh(4)
+
+        self.buf.sapunit()
+
+        meta["bins"] = []
+        should_break = False
+        while self.buf.peek(4) == b"hbin" and not should_break:
+            hbin = {}
+            self.buf.skip(4)
+            hbin["offset"] = self.buf.ru32l()
+            hbin["size"] = self.buf.ru32l()
+            hbin["reserved"] = self.buf.ru64l()
+            hbin["timestamp"] = utils.filetime_to_date(self.buf.ru64l())
+            hbin["spare"] = self.buf.ru32l()
+
+            self.buf.pasunit(hbin["size"] - 32)
+
+            hbin["cells"] = []
+            while self.buf.unit > 0:
+                cell = {}
+                size = self.buf.ri32l()
+                cell["size"] = abs(size)
+                cell["allocated"] = size < 0
+                cell["type"] = None
+                cell["data"] = {}
+
+                self.buf.pasunit(abs(cell["size"]) - 4)
+                if not cell["allocated"]:
+                    with self.buf.subunit():
+                        cell["type"] = "blob"
+                        cell["data"]["blob"] = chew(self.buf, blob_mode=True)
+                else:
+                    typ = self.buf.rs(2)
+
+                    match typ:
+                        case _:
+                            cell["type"] = f"Unknown ({typ})"
+                            with self.buf.subunit():
+                                cell["data"]["blob"] = chew(self.buf, blob_mode=True)
+
+                self.buf.sapunit()
+
+                hbin["cells"].append(cell)
+
+            self.buf.sapunit()
+
+            if self.buf.tell() % 4096:
+                to_skip = 4096 - (self.buf.tell() % 4096)
+
+                if self.buf.available() < to_skip:
+                    should_break = True
+                else:
+                    self.buf.skip(to_skip)
+
+            meta["bins"].append(hbin)
+
+        return meta

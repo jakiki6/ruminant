@@ -1,11 +1,10 @@
-from .. import module, utils, constants
+from .. import module, utils
 from . import chew
 import tempfile
 import sqlite3
 import datetime
 import gzip
 import zlib
-import time
 import binascii
 import base64
 
@@ -254,45 +253,6 @@ class McaModule(module.RuminantModule):
 
 
 @module.register
-class PycModule(module.RuminantModule):
-    dev = True
-    desc = "Python compiled bytecode files."
-
-    def identify(buf, ctx):
-        if buf.available() < 10:
-            return False
-
-        with buf:
-            if buf.read(4)[2:] != b"\x0d\x0a":
-                return False
-
-            if buf.ru16():
-                return True
-
-            return buf.ru32() < int(time.time()) + (60 * 60 * 24 * 365 * 10)
-
-    def chew(self):
-        meta = {}
-        meta["type"] = "pyc"
-
-        meta["header"] = {}
-        meta["header"]["magic"] = utils.unraw(
-            self.buf.ru16l(), 2, constants.CPYTHON_MAGICS
-        )
-        self.buf.skip(2)
-        meta["header"]["flags"] = self.buf.ru32l()
-        if meta["header"]["flags"] & 0x0001:
-            meta["header"]["source-hash"] = self.buf.rh(8)
-        else:
-            meta["header"]["timestamp"] = utils.unix_to_date(self.buf.ru32l())
-            meta["header"]["source-length"] = self.buf.ru32l()
-
-        meta["data"] = utils.read_marshal(self.buf, meta["header"]["magic"]["raw"])
-
-        return meta
-
-
-@module.register
 class BlendModule(module.RuminantModule):
     desc = "Blender project files, currently kinda broken."
 
@@ -480,124 +440,6 @@ class GitModule(module.RuminantModule):
                             header["parsed"]["timezone"] = line[-1]
 
         self.buf.sapunit()
-
-        return meta
-
-
-@module.register
-class IntelFlashModule(module.RuminantModule):
-    dev = True
-    desc = "Intel-based motherboard flash dumps.\nYou can extract yours if you're on an Intel system by installing flashrom and running 'flashrom -p internal -r flash.bin'."
-
-    def identify(buf, ctx):
-        if buf.available() < 32:
-            return False
-
-        return buf.peek(20)[16:20] == b"\x5a\xa5\xf0\x0f"
-
-    def chew(self):
-        meta = {}
-        meta["type"] = "intel-flash"
-
-        meta["flash-descriptor"] = {}
-
-        self.buf.pasunit(4096)
-        meta["flash-descriptor"]["reserved-vector"] = chew(
-            self.buf.read(16), blob_mode=True
-        )
-        meta["flash-descriptor"]["signature"] = hex(self.buf.ru32l())[2:].zfill(8)
-        temp = self.buf.ru32l()
-        meta["flash-descriptor"]["flmap0"] = {
-            "raw": temp,
-            "component-base": (temp >> 0) & ((1 << 8) - 1),
-            "number-of-flash-chips": (temp >> 8) & ((1 << 2) - 1),
-            "padding0": (temp >> 10) & ((1 << 6) - 1),
-            "region-base": (temp >> 16) & ((1 << 8) - 1),
-            "number-of-regions": (temp >> 24) & ((1 << 3) - 1),
-            "padding1": (temp >> 27) & ((1 << 5) - 1),
-        }
-        meta["flash-descriptor"]["flmap1"] = {
-            "raw": temp,
-            "master-base": (temp >> 0) & ((1 << 8) - 1),
-            "number-of-regions": (temp >> 8) & ((1 << 2) - 1),
-            "padding0": (temp >> 10) & ((1 << 6) - 1),
-            "pch-straps-base": (temp >> 16) & ((1 << 8) - 1),
-            "number-of-pch-straps": (temp >> 24) & ((1 << 8) - 1),
-        }
-        meta["flash-descriptor"]["flmap2"] = {
-            "raw": temp,
-            "proc-straps-base": (temp >> 0) & ((1 << 8) - 1),
-            "number-of-proc-straps": (temp >> 8) & ((1 << 8) - 1),
-            "padding0": (temp >> 16) & ((1 << 16) - 1),
-        }
-        meta["flash-descriptor"]["flmap3"] = {
-            "raw": temp,
-        }
-
-        self.buf.skip(3836 - self.buf.tell())
-        meta["flash-descriptor"]["vscc-table-base"] = self.buf.ru8()
-        meta["flash-descriptor"]["vscc-table-size"] = self.buf.ru8()
-        meta["flash-descriptor"]["reserved9"] = self.buf.ru16()
-
-        self.buf.sapunit()
-
-        return meta
-
-
-@module.register
-class BtrfsModule(module.RuminantModule):
-    dev = True
-    desc = "BTRFS filesystems."
-
-    def identify(buf, ctx):
-        if buf.available() < 0x10000:
-            return False
-
-        with buf:
-            buf.seek(0x10040)
-            return buf.peek(8) == b"_BHRfS_M"
-
-    def chew(self):
-        meta = {}
-        meta["type"] = "btrfs"
-
-        self.buf.seek(0x10000)
-        meta["header"] = {}
-        meta["header"]["checksum"] = self.buf.rh(32)
-        meta["header"]["uuid"] = self.buf.ruuid()
-        meta["header"]["header-paddr"] = self.buf.ru64l()
-        meta["header"]["flags"] = self.buf.ru64l()
-        self.buf.skip(8)
-        meta["header"]["generation"] = self.buf.ru64l()
-        meta["header"]["root-tree-laddr"] = self.buf.ru64l()
-        meta["header"]["chunk-tree-laddr"] = self.buf.ru64l()
-        meta["header"]["log-tree-laddr"] = self.buf.ru64l()
-        meta["header"]["log-root-transid"] = self.buf.ru64l()
-        meta["header"]["total-bytes"] = self.buf.ru64l()
-        meta["header"]["bytes-used"] = self.buf.ru64l()
-        meta["header"]["root-dir-object-id"] = self.buf.ru64l()
-        meta["header"]["device-count"] = self.buf.ru64l()
-        meta["header"]["sector-size"] = self.buf.ru32l()
-        meta["header"]["node-size"] = self.buf.ru32l()
-        meta["header"]["leaf-size"] = self.buf.ru32l()
-        meta["header"]["stripe-size"] = self.buf.ru32l()
-        meta["header"]["sys-chunk-array-size"] = self.buf.ru32l()
-        meta["header"]["chunk-root-generation"] = self.buf.ru64l()
-        meta["header"]["compat-flags"] = utils.unpack_flags(
-            self.buf.ru64l(), constants.BTRFS_FLAGS
-        )
-        meta["header"]["compat-flags-ro"] = utils.unpack_flags(
-            self.buf.ru64l(), constants.BTRFS_FLAGS
-        )
-        meta["header"]["incompat-flags"] = utils.unpack_flags(
-            self.buf.ru64l(), constants.BTRFS_FLAGS
-        )
-
-        self.buf.seek(0)
-        if meta["header"]["device-count"] == 1:
-            self.buf.skip(meta["header"]["total-bytes"])
-        else:
-            self.buf.skip(self.buf.available())
 
         return meta
 
