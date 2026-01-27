@@ -10,10 +10,12 @@ class VbmetaModule(module.RuminantModule):
     def identify(buf, ctx):
         return buf.peek(4) == b"AVB0"
 
+    # read a public key given the algorithm
     def read_pubkey(self, algo):
         key = {}
 
         match algo:
+            # RSA is the only supported family right now
             case (
                 "SHA256_RSA2048"
                 | "SHA256_RSA4096"
@@ -33,6 +35,7 @@ class VbmetaModule(module.RuminantModule):
                 )
 
                 n = key["modulus"]
+                # check whether values are correct
                 key["n0inv-correct"] = key["n0inv"] == 2**32 - pow(n, -1, 2**32)
                 key["rrmodn-correct"] = key["rrmodn"] == 2 ** (key["bits"] * 2) % n
 
@@ -47,6 +50,7 @@ class VbmetaModule(module.RuminantModule):
         meta["header"]["libavb-version"] = f"{self.buf.ru32()}.{self.buf.ru32()}"
         meta["header"]["authentication-data-block-size"] = self.buf.ru64()
         meta["header"]["auxiliary-data-block-size"] = self.buf.ru64()
+        # signature algorithm
         meta["header"]["algorithm-type"] = utils.unraw(
             self.buf.ru32(),
             4,
@@ -71,13 +75,18 @@ class VbmetaModule(module.RuminantModule):
         meta["header"]["descriptors-offset"] = self.buf.ru64()
         meta["header"]["descriptors-size"] = self.buf.ru64()
         temp = self.buf.ru64()
+        # rollback index to prevent downgrades
+        # it's supposed to be an incrementing integer
+        # Google uses the unix timestamp as it increments with time and also specifies the signing date
         meta["header"]["rollback-index"] = {
             "raw": temp,
             "date": utils.unix_to_date(temp),
         }
+        # flags are unused right now
         meta["header"]["flags"] = utils.unpack_flags(self.buf.ru32(), [])
         meta["header"]["rollback-index-location"] = self.buf.ru32()
         meta["header"]["release-string"] = self.buf.rs(48)
+        # unused right now, room for extension
         meta["header"]["padding"] = chew(self.buf.read(128), blob_mode=True)
 
         meta["authentication-data-block"] = {}
@@ -99,6 +108,7 @@ class VbmetaModule(module.RuminantModule):
         )
         self.buf.pasunit(meta["header"]["descriptors-size"])
 
+        # these are now kind of key-value pairs
         meta["auxiliary-data-block"]["descriptors"] = []
         while self.buf.unit > 0:
             tag = {}
@@ -109,6 +119,7 @@ class VbmetaModule(module.RuminantModule):
 
             self.buf.pasunit(tag["length"])
             match typ:
+                # key-value pair
                 case 0x00:
                     tag["type"] = "PROPERTY"
                     klen = self.buf.ru64()
@@ -117,6 +128,7 @@ class VbmetaModule(module.RuminantModule):
                     self.buf.skip(1)
                     tag["payload"]["value"] = self.buf.rs(vlen)
                     self.buf.skip(1)
+                # dm-verity hash tree for partition with optional forward error correction
                 case 0x01:
                     tag["type"] = "HASHTREE"
                     tag["payload"]["dm-verity-version"] = self.buf.ru32()
@@ -141,6 +153,7 @@ class VbmetaModule(module.RuminantModule):
                     tag["payload"]["root-digest"] = self.buf.rh(
                         tag["payload"]["root-digest-length"]
                     )
+                # root hash for partition
                 case 0x02:
                     tag["type"] = "HASH"
                     tag["payload"]["image-size"] = self.buf.ru64()
@@ -156,10 +169,12 @@ class VbmetaModule(module.RuminantModule):
                     tag["payload"]["root-digest"] = self.buf.rh(
                         tag["payload"]["root-digest-length"]
                     )
+                # command line for Linux kernel, seems to be baked into the kernel nowadays so unused
                 case 0x03:
                     tag["type"] = "KERNEL_CMDLINE"
                     tag["payload"]["flags"] = utils.unpack_flags(self.buf.ru32(), [])
                     tag["payload"]["cmdline"] = self.buf.rs(self.buf.ru32())
+                # chain partition signed by other key
                 case 0x04:
                     tag["type"] = "CHAIN_PARTITION"
                     tag["payload"]["rollback-index-location"] = self.buf.ru32()
@@ -179,6 +194,7 @@ class VbmetaModule(module.RuminantModule):
 
             self.buf.sapunit()
 
+            # align to 8 bytes
             if tag["length"] % 8:
                 self.buf.skip(8 - (tag["length"] % 8))
 
@@ -186,6 +202,7 @@ class VbmetaModule(module.RuminantModule):
 
         self.buf.sapunit()
 
+        # images don't have to be signed so check
         if meta["header"]["public-key-size"]:
             self.buf.seek(
                 256
@@ -197,6 +214,7 @@ class VbmetaModule(module.RuminantModule):
             meta["auxiliary-data-block"]["public-key"] = self.read_pubkey(
                 meta["header"]["algorithm-type"]["name"]
             )
+            # again, no other algorithm is supported right now
             if "RSA" in meta["header"]["algorithm-type"]["name"]:
                 sig = pow(
                     int(meta["authentication-data-block"]["signature"], 16),
@@ -212,6 +230,7 @@ class VbmetaModule(module.RuminantModule):
 
             self.buf.sapunit()
 
+        # optional public key metadata
         if meta["header"]["public-key-metadata-size"]:
             self.buf.seek(
                 256
@@ -225,8 +244,9 @@ class VbmetaModule(module.RuminantModule):
 
             self.buf.sapunit()
 
-        while self.buf.tell() % 4096:
-            self.buf.skip(1)
+        # align to next page
+        if self.buf.tell() % 4096:
+            self.buf.skip(4096 - (self.buf.tell % 4096))
 
         return meta
 
@@ -239,6 +259,7 @@ class AndroidBootImgModule(module.RuminantModule):
     def identify(buf, ctx):
         return buf.peek(8) == b"ANDROID!"
 
+    # for addresses
     def hex(self, v):
         return {"raw": v, "hex": hex(v)}
 
@@ -283,8 +304,8 @@ class AndroidBootImgModule(module.RuminantModule):
 
                 self.buf.sapunit()
 
-                while self.buf.tell() % 4096:
-                    self.buf.skip(1)
+                if self.buf.tell() % 4096:
+                    self.buf.skip(4096 - (self.buf.tell() % 4096))
             case _:
                 meta["unknown"] = True
 

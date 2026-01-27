@@ -21,6 +21,7 @@ class GzipModule(module.RuminantModule):
 
         self.buf.skip(2)
 
+        # while all gzip files use compression mode 8 (Deflate), the format allows others
         compression_method = self.buf.ru8()
         assert compression_method == 8, (
             f"Unknown gzip compression method {compression_method}"
@@ -30,6 +31,7 @@ class GzipModule(module.RuminantModule):
         flags = self.buf.ru8()
         meta["flags"] = {
             "raw": flags,
+            # unused most of the time
             "is-probably-text": bool(flags & 0x01),
             "has-crc": bool(flags & 0x02),
             "has-extra": bool(flags & 0x04),
@@ -62,6 +64,7 @@ class GzipModule(module.RuminantModule):
                 7: "Macintosh",
                 8: "Z-System",
                 9: "CP/M",
+                # some programs set this for some reason
                 10: "TOPS-20",
                 11: "NTFS",
                 12: "QDOS",
@@ -70,6 +73,7 @@ class GzipModule(module.RuminantModule):
             },
         )
 
+        # has extra?
         if flags & 0x04:
             self.buf.pushunit()
             self.buf.setunit(self.buf.ru16l())
@@ -84,18 +88,23 @@ class GzipModule(module.RuminantModule):
             self.buf.skipunit()
             self.buf.popunit()
 
+        # has name?
         if flags & 0x08:
             meta["name"] = self.buf.rzs("latin-1")
 
+        # has comment?
         if flags & 0x10:
             meta["comment"] = self.buf.rzs("latin-1")
 
+        # has front crc16?
+        # not to be confused with the footer crc
         if flags & 0x02:
             meta["header-crc"] = self.buf.rh(2)
 
         meta["footer-crc"] = None
         meta["size-mod-2^32"] = None
 
+        # stream to unnamed temporary file
         self.buf.unit = None
         with tempfile.TemporaryFile() as fd:
             decompressor = zlib.decompressobj(-zlib.MAX_WBITS)
@@ -111,11 +120,14 @@ class GzipModule(module.RuminantModule):
 
             fd.write(decompressor.flush())
 
+            # reset fd and chew it
             fd.seek(0)
             meta["data"] = chew(fd)
 
+        # read footer crc if it exists
         if self.buf.available() >= 4:
             meta["footer-crc"] = self.buf.rh(4)
+        # read the lower 32 bits of the original file length if it exists
         if self.buf.available() >= 4:
             meta["size-mod-2^32"] = self.buf.ru32l()
 
@@ -136,12 +148,15 @@ class Bzip2Module(module.RuminantModule):
         with self.buf:
             offset = self.buf.tell()
 
+            # look for end sequence
             self.buf.search(b"\x17\x72\x45\x38\x50\x90")
             length = self.buf.tell() - offset
+            meta["length"] = length
 
         with tempfile.TemporaryFile() as fd:
             utils.stream_bzip2(self.buf, fd, length)
 
+            # chew decompressed data
             fd.seek(0)
             meta["data"] = chew(fd)
 
@@ -159,6 +174,7 @@ class ZstdModule(module.RuminantModule):
         meta = {}
         meta["type"] = "zstd"
 
+        # try to import zstd library as python doesn't ship it for versions < 3.14
         has_zstd = True
         try:
             import pyzstd as zstd
@@ -238,6 +254,8 @@ class ZstdModule(module.RuminantModule):
         if "CONTENT_CHECKSUM" in meta["header"]["flags"]["names"]:
             self.buf.skip(4)
 
+        # now actually try do decompress it
+        # otherwise, we just skipped the content and move on
         if has_zstd:
             offset = self.buf.tell()
 
@@ -259,11 +277,17 @@ class ZlibModule(module.RuminantModule):
     desc = "zlib streams."
 
     def identify(buf, ctx):
-        return buf.peek(2) in (b"\x78\x01", b"\x78\x9c", b"\x78\xda")
+        return buf.peek(2) in (b"\x78\x01", b"\x78\x5e", b"\x78\x9c", b"\x78\xda")
 
     def chew(self):
         meta = {}
         meta["type"] = "zlib"
+        meta["compression-type"] = utils.unraw(
+            self.buf.ru16() & 0xff,
+            1,
+            {0x01: "none", 0x53: "fast", 0x9c: "default", 0xda: "best"},
+            True,
+        )
 
         fd = utils.tempfd()
         utils.stream_zlib(self.buf, fd, self.buf.available())

@@ -95,6 +95,8 @@ class FlacModule(module.RuminantModule):
                         14: "During recording",
                         15: "During performance",
                         16: "Movie or video screen capture",
+                        # this is a joke value since Xiph.Org (owner of FLAC) uses the green swordtail as their logo
+                        # since its Latin name is Xiphophorus hellerii
                         17: "A bright colored fish",
                         18: "Illustration",
                         19: "Band or artist logotype",
@@ -128,6 +130,7 @@ class ID3v2Module(module.RuminantModule):
     def identify(buf, ctx):
         return buf.peek(3) == b"ID3"
 
+    # helper since we need this a lot
     def read_length(self, unsynchronized):
         if unsynchronized or self.force:
             length = 0
@@ -144,13 +147,16 @@ class ID3v2Module(module.RuminantModule):
         self.force = False
 
         bak = self.buf.backup()
+        # try to decode it like the standard dictates
         try:
             return self._chew()
         except AssertionError:
+            # some files are broken, try again while forcing unsynchronized mode
             self.force = True
             self.buf.restore(bak)
             return self._chew()
 
+    # actual chew()
     def _chew(self):
         meta = {}
         meta["type"] = "id3v2"
@@ -202,6 +208,7 @@ class ID3v2Module(module.RuminantModule):
 
             frame = {}
             frame["type"] = self.buf.rs(4)
+            # last type is just 4 zero bytes
             if frame["type"] == "\x00\x00\x00\x00":
                 break
 
@@ -236,9 +243,11 @@ class ID3v2Module(module.RuminantModule):
             content = self.buf.read(frame["length"])
 
             if frame["format-flags"]["is-unsynchronized"]:
+                # ununsynchronize
                 content = content.replace(b"\xff\x00", b"\xff")
 
             if frame["format-flags"]["is-encrypted"]:
+                # we can't read this
                 frame["data"] = content.hex()
                 frame["encrypted"] = True
             else:
