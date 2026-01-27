@@ -77,8 +77,9 @@ This is a list of useful resources.
 # Java
 * https://docs.oracle.com/javase/specs/jvms/se25/html
 
-# PE
+# PE/COFF
 * https://learn.microsoft.com/en-us/windows/win32/debug/pe-format
+* https://github.com/dotnet/runtime/blob/main/docs/design/specs/PE-COFF.md
 
 # NBT
 * https://minecraft.wiki/w/NBT_format

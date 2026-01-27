@@ -2102,6 +2102,74 @@ class PeModule(module.RuminantModule):
                         }
 
                         self.buf.sapunit()
+                    case "Debug":
+                        self.seek_vaddr(rva["base"])
+                        self.buf.setunit(min(self.buf.unit, rva["size"]))
+
+                        rva["parsed"] = {}
+
+                        rva["parsed"]["entries"] = []
+                        while self.buf.unit >= 28:
+                            entry = {}
+                            entry["characteristics"] = utils.unpack_flags(
+                                self.buf.ru32l(), ()
+                            )
+                            entry["timestamp"] = utils.unix_to_date(self.buf.ru32l())
+                            entry["version"] = {
+                                "major": self.buf.ru16l(),
+                                "minor": self.buf.ru16l(),
+                            }
+                            entry["type"] = utils.unraw(
+                                self.buf.ru32l(),
+                                4,
+                                {
+                                    0x00000000: "None",
+                                    0x00000002: "CodeView/PDB",
+                                    0x00000004: "FPO",
+                                    0x00000009: "Borland",
+                                    0x00000010: "Reproducible build info",
+                                    0x00000013: "Checksums",
+                                },
+                                True,
+                            )
+                            entry["data-size"] = self.buf.ru32l()
+                            entry["data-rva"] = self.buf.ru32l()
+                            entry["data-file-offset"] = self.buf.ru32l()
+
+                            entry["data"] = {}
+                            with self.buf:
+                                self.buf.seek(entry["data-file-offset"])
+                                self.buf.pasunit(entry["data-size"])
+
+                                match entry["type"]:
+                                    case "CodeView/PDB":
+                                        # small tip:
+                                        # for Microsoft files, you can download:
+                                        # f"https://msdl.microsoft.com/download/symbols/{entry['data']['path']}/" +
+                                        # "{entry['data']['guid'].replace('-', '').upper()}/{entry['data']['path']}"
+                                        # to get the pdb
+                                        entry["data"]["signature"] = self.buf.rs(4)
+                                        entry["data"]["guid"] = self.buf.rguid()
+                                        entry["data"]["age"] = self.buf.ru32l()
+                                        entry["data"]["path"] = self.buf.rzs()
+                                    case "Checksums":
+                                        entry["data"]["algorithm"] = self.buf.rzs()
+                                        entry["data"]["hash"] = self.buf.rh(
+                                            self.buf.unit
+                                        )
+                                    case _:
+                                        with self.buf.subunit():
+                                            entry["data"]["blob"] = chew(
+                                                self.buf, blob_mode=True
+                                            )
+
+                                        entry["data"]["unknown"] = True
+
+                                self.buf.sapunit()
+
+                            rva["parsed"]["entries"].append(entry)
+
+                        self.buf.sapunit()
 
         m = self.buf.tell()
         for section in meta["sections"]:
