@@ -843,8 +843,6 @@ class JavaClassModule(module.RuminantModule):
                         "class": self.resolve(self.buf.ru16()),
                         "method": self.resolve(self.buf.ru16()),
                     }
-                case "Deprecated":
-                    val = True
                 case "Module":
                     val = {}
                     val["module-name"] = self.resolve(self.buf.ru16())
@@ -904,6 +902,8 @@ class JavaClassModule(module.RuminantModule):
                     ]
                 case "AnnotationDefault":
                     val = self.read_element()
+                case "Deprecated" | "Synthetic":
+                    val = True
                 case "RuntimeVisibleAnnotations" | "RuntimeInvisibleAnnotations":
                     val = []
                     for i in range(0, self.buf.ru16()):

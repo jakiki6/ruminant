@@ -405,6 +405,8 @@ class ZipModule(module.RuminantModule):
                         entry["payload"]["gid"] = int.from_bytes(
                             self.buf.read(self.buf.ru8()), "little"
                         )
+                    case 0xcafe:
+                        entry["type"] = "JAR indicator"
                     case _:
                         entry["type"] = f"Unknown (0x{hex(typ)[2:].zfill(4)})"
                         entry["payload"] = self.buf.rh(self.buf.unit)
