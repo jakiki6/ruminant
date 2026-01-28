@@ -384,7 +384,6 @@ class ZipModule(module.RuminantModule):
                     case 0x5455:
                         entry["type"] = "Extended Timestamp"
                         flags = self.buf.ru8()
-                        print(flags, self.buf.unit)
                         if flags & 0x01 and self.buf.unit > 0:
                             entry["payload"]["mtime"] = utils.unix_to_date(
                                 self.buf.ru32l()
