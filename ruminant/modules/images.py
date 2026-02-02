@@ -1154,6 +1154,16 @@ class JPEGModule(module.RuminantModule):
             elif typ == 0xe2 and self.buf.peek(27) == b"urn:iso:std:iso:ts:21496:-1":
                 self.buf.skip(32)
                 chunk["data"]["hdr-gainmap-length"] = self.buf.unit
+            elif typ == 0xea and self.buf.peek(4) == b"AROT":
+                self.buf.skip(6)
+                chunk["data"]["entry-count"] = self.buf.ru32()
+                chunk["data"]["entries"] = [
+                    self.buf.ru32l() for i in range(0, chunk["data"]["entry-count"])
+                ]
+            elif typ == 0xeb and self.buf.peek(8) == b"JP\x13\x00\x00\x00\x00\x00":
+                with self.buf.subunit():
+                    self.buf.skip(8)
+                    chunk["data"]["jumbf"] = chew(self.buf)
             elif typ == 0xec and self.buf.peek(5) == b"Ducky":
                 self.buf.skip(5)
 
@@ -1186,12 +1196,6 @@ class JPEGModule(module.RuminantModule):
                 chunk["data"]["flags0"] = self.buf.rh(2)
                 chunk["data"]["flags1"] = self.buf.rh(2)
                 chunk["data"]["transform"] = self.buf.ru8()
-            elif typ == 0xea and self.buf.peek(4) == b"AROT":
-                self.buf.skip(6)
-                chunk["data"]["entry-count"] = self.buf.ru32()
-                chunk["data"]["entries"] = [
-                    self.buf.ru32l() for i in range(0, chunk["data"]["entry-count"])
-                ]
             elif typ & 0xf0 == 0xe0:
                 chunk["data"]["payload"] = self.buf.readunit().hex()
             elif typ in (0xc0, 0xc2):
