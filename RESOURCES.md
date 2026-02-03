@@ -104,3 +104,6 @@ This is a list of useful resources.
 
 # ZIP
 * https://libzip.org/specifications/extrafld.txt
+
+# Android stuff
+* https://android.googlesource.com/platform/ndk/+/ndk-r17b/parse_elfnote.py

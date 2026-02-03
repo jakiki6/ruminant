@@ -1660,6 +1660,12 @@ class ElfModule(module.RuminantModule):
                                     )
 
                                     sh["parsed"]["properties"].append(prop)
+                            case "Android", 1:
+                                sh["parsed"]["api"] = self.buf.ru32l()
+
+                                if self.buf.unit >= 128:
+                                    sh["parsed"]["ndk-version"] = self.buf.rs(64)
+                                    sh["parsed"]["ndk-build-number"] = self.buf.rs(64)
                             case _, _:
                                 sh["parsed"]["desc"] = self.buf.rh(self.buf.unit)
                                 sh["unknown"] = True
