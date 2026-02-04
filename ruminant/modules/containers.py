@@ -293,7 +293,9 @@ class ZipModule(module.RuminantModule):
                     (9, "local header values masked"),
                 ),
             )
-            file["meta"]["compression-method"] = self.buf.ru16l()
+            file["meta"]["compression-method"] = utils.unraw(
+                self.buf.ru16l(), 2, constants.ZIP_COMPRESSION_ALGORITHMS, True
+            )
             file["meta"]["modification-time"] = self.buf.ru16l()
             file["meta"]["modification-date"] = self.buf.ru16l()
             file["meta"]["modification-timestamp"] = self.to_timestamp(
@@ -381,6 +383,37 @@ class ZipModule(module.RuminantModule):
 
                 self.buf.pasunit(entry["length"])
                 match typ:
+                    case 0x000a:
+                        entry["type"] = "NTFS"
+                        entry["payload"]["reserved"] = self.buf.ru32l()
+
+                        entry["payload"]["entries"] = []
+                        while self.buf.unit > 0:
+                            tag = {}
+                            tag["type"] = utils.unraw(
+                                self.buf.ru16l(), 2, {0x0001: "File Times"}, True
+                            )
+                            tag["length"] = self.buf.ru16l()
+                            tag["payload"] = {}
+
+                            self.buf.pasunit(tag["length"])
+
+                            match tag["type"]:
+                                case "File Times":
+                                    tag["payload"]["modification-time"] = (
+                                        utils.filetime_to_date(self.buf.ru64l())
+                                    )
+                                    tag["payload"]["access-time"] = (
+                                        utils.filetime_to_date(self.buf.ru64l())
+                                    )
+                                    tag["payload"]["creation-time"] = (
+                                        utils.filetime_to_date(self.buf.ru64l())
+                                    )
+                                case _:
+                                    tag["unknown"] = True
+
+                            self.buf.sapunit()
+                            entry["payload"]["entries"].append(tag)
                     case 0x5455:
                         entry["type"] = "Extended Timestamp"
                         flags = self.buf.ru8()
@@ -404,6 +437,26 @@ class ZipModule(module.RuminantModule):
                         )
                         entry["payload"]["gid"] = int.from_bytes(
                             self.buf.read(self.buf.ru8()), "little"
+                        )
+                    case 0x9901:
+                        entry["type"] = "AES Extra Data Field"
+                        entry["payload"]["version"] = self.buf.ru16l()
+                        entry["payload"]["vendor"] = self.buf.rs(2)
+                        entry["payload"]["cipher"] = utils.unraw(
+                            self.buf.ru8(),
+                            2,
+                            {
+                                0x01: "AES-128",
+                                0x02: "AES-192",
+                                0x03: "AES-256",
+                            },
+                            True,
+                        )
+                        entry["payload"]["compression-mode"] = utils.unraw(
+                            self.buf.ru16l(),
+                            2,
+                            constants.ZIP_COMPRESSION_ALGORITHMS,
+                            True,
                         )
                     case 0xcafe:
                         entry["type"] = "JAR indicator"
@@ -431,11 +484,11 @@ class ZipModule(module.RuminantModule):
                             file["encrypted-data"] = chew(self.buf, blob_mode=True)
                     else:
                         match file["meta"]["compression-method"]:
-                            case 0:
+                            case "Uncompressed":
                                 with self.buf.sub(file["uncompressed-size"]):
                                     file["data"] = chew(self.buf)
 
-                            case 8:
+                            case "Deflate":
                                 with self.buf.sub(file["meta"]["compressed-size"]):
                                     fd = tempfile.TemporaryFile()
                                     utils.stream_deflate(

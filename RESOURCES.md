@@ -104,6 +104,7 @@ This is a list of useful resources.
 
 # ZIP
 * https://libzip.org/specifications/extrafld.txt
+* https://www.winzip.com/en/support/aes-encryption/
 
 # Android stuff
 * https://android.googlesource.com/platform/ndk/+/ndk-r17b/parse_elfnote.py

@@ -13,6 +13,7 @@ Ruminant is still in early alpha but it can already process the following file t
 * ZIP files
   * APK signatures
   * Java jmod modules
+  * encrypted files
 * PDF files
 * JPEG files
   * EXIF metadata
