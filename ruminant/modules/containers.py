@@ -426,18 +426,24 @@ class ZipModule(module.RuminantModule):
                     self.buf.skip(22)
                     self.buf.skip(self.buf.ru16l() + self.buf.ru16l())
 
-                    match file["meta"]["compression-method"]:
-                        case 0:
-                            with self.buf.sub(file["uncompressed-size"]):
-                                file["data"] = chew(self.buf)
+                    if file["meta"]["general-flags"]["raw"] & 0x0041:
+                        with self.buf.sub(file["meta"]["compressed-size"]):
+                            file["encrypted-data"] = chew(self.buf, blob_mode=True)
+                    else:
+                        match file["meta"]["compression-method"]:
+                            case 0:
+                                with self.buf.sub(file["uncompressed-size"]):
+                                    file["data"] = chew(self.buf)
 
-                        case 8:
-                            with self.buf.sub(file["meta"]["compressed-size"]):
-                                fd = tempfile.TemporaryFile()
-                                utils.stream_deflate(self.buf, fd, self.buf.available())
-                                fd.seek(0)
+                            case 8:
+                                with self.buf.sub(file["meta"]["compressed-size"]):
+                                    fd = tempfile.TemporaryFile()
+                                    utils.stream_deflate(
+                                        self.buf, fd, self.buf.available()
+                                    )
+                                    fd.seek(0)
 
-                                file["data"] = chew(fd)
+                                    file["data"] = chew(fd)
 
             meta["files"].append(file)
 
