@@ -108,3 +108,4 @@ This is a list of useful resources.
 
 # Android stuff
 * https://android.googlesource.com/platform/ndk/+/ndk-r17b/parse_elfnote.py
+* https://source.android.com/docs/core/runtime/dex-format#file-layout

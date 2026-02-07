@@ -3,6 +3,8 @@ from ..buf import Buf
 from . import chew
 import datetime
 import time
+import zlib
+import hashlib
 
 
 @module.register
@@ -2848,5 +2850,101 @@ class AOutExecutableModule(module.RuminantModule):
             meta["symbols"].append(symbol)
 
         self.buf.sapunit()
+
+        return meta
+
+
+@module.register
+class DexModule(module.RuminantModule):
+    dev = True
+    desc = "Dalvik Executable files."
+
+    def identify(buf, ctx):
+        if buf.peek(4) != b"dex\n":
+            return False
+
+        with buf:
+            buf.skip(4)
+            try:
+                int(buf.rs(4))
+                return True
+            except Exception:
+                return False
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "dex"
+
+        self.buf.skip(4)
+        meta["header"] = {}
+        meta["header"]["version"] = int(self.buf.rs(4))
+        meta["header"]["checksum"] = {"raw": hex(self.buf.ru32l())[2:].zfill(8)}
+        meta["header"]["signature"] = {"raw": self.buf.rh(20)}
+        meta["header"]["file-size"] = self.buf.ru32l()
+
+        meta["header"]["header-size"] = self.buf.ru32l()
+        self.buf.pasunit(meta["header"]["header-size"] - 40)
+
+        assert self.buf.ru32l() == 0x12345678, "file is big-endian"
+        meta["header"]["link"] = {"size": self.buf.ru32l(), "offset": self.buf.ru32l()}
+        meta["header"]["map-offset"] = self.buf.ru32l()
+
+        for prefix in [
+            "string-ids",
+            "type-ids",
+            "proto-ids",
+            "field-ids",
+            "method-ids",
+            "class-defs",
+            "data",
+        ]:
+            meta["header"][prefix] = {
+                "size": self.buf.ru32l(),
+                "offset": self.buf.ru32l(),
+            }
+
+        if self.buf.unit > 0:
+            meta["header"]["container-size"] = self.buf.ru32l()
+            meta["header"]["header-offset"] = self.buf.ru32l()
+
+        self.buf.sapunit()
+
+        # strings
+        self.buf.seek(meta["header"]["string-ids"]["offset"])
+        self.buf.pasunit(meta["header"]["string-ids"]["size"])
+
+        meta["strings"] = []
+        while self.buf.unit > 0:
+            offset = self.buf.ru32l()
+            with self.buf:
+                self.buf.resetunit()
+                self.buf.seek(offset)
+                meta["strings"].append(self.buf.rs(self.buf.ruleb()))
+
+        self.buf.sapunit()
+
+        # calculate checksums
+        self.buf.seek(12)
+        checksum = hex(zlib.adler32(self.buf.read(meta["header"]["file-size"] - 12)))[
+            2:
+        ].zfill(8)
+        meta["header"]["checksum"]["correct"] = (
+            meta["header"]["checksum"]["raw"] == checksum
+        )
+        if not meta["header"]["checksum"]["correct"]:
+            meta["header"]["checksum"]["actual"] = checksum
+
+        self.buf.seek(32)
+        signature = hashlib.sha1(
+            self.buf.read(meta["header"]["file-size"] - 32)
+        ).hexdigest()
+        meta["header"]["signature"]["correct"] = (
+            meta["header"]["signature"]["raw"] == signature
+        )
+        if not meta["header"]["signature"]["correct"]:
+            meta["header"]["signature"]["actual"] = signature
+
+        # seek to end
+        self.buf.seek(meta["header"]["file-size"])
 
         return meta
