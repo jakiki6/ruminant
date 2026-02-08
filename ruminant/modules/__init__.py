@@ -6,6 +6,7 @@ import os
 
 to_extract = []
 extract_all = False
+shallow = False
 blob_id = 0
 
 
@@ -132,7 +133,9 @@ class EntryModule(module.RuminantModule):
 
 
 def chew(blob, walk_mode=False, blob_mode=False, flat=False, extra_ctx={}):
-    return EntryModule(walk_mode, blob_mode, flat, extra_ctx, Buf.of(blob)).chew()
+    return EntryModule(
+        walk_mode, blob_mode or (shallow and blob_id), flat, extra_ctx, Buf.of(blob)
+    ).chew()
 
 
 from . import (  # noqa: F401,E402

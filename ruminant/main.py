@@ -197,6 +197,10 @@ def main(dev=False):
         help="Strip metadata-removing parameters fromknown URLs like '?filetype=webp'",
     )
 
+    parser.add_argument(
+        "--shallow", action="store_true", help="Do not chew recovered blobs recursively"
+    )
+
     # look for tqdm
     has_tqdm = True
     try:
@@ -243,6 +247,9 @@ def main(dev=False):
     if has_tqdm:
         has_tqdm = args.progress
         print_filenames = args.progress_names
+
+    if args.shallow:
+        modules.shallow = True
 
     if args.extract_all:
         modules.extract_all = True
