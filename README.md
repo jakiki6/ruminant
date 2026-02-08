@@ -105,6 +105,7 @@ Ruminant is still in early alpha but it can already process the following file t
 * OpenTimestamps proof files
 * xz files
 * UF2 files
+* Android adb backup files
 
 # How do I install it?
 Run `pip3 install ruminant`.

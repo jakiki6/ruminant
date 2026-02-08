@@ -83,7 +83,7 @@ class Buf(object):
     def resetunit(self):
         self.unit = None
 
-    def read(self, count=None):
+    def read(self, count=None, free=False):
         if self._bits != 0:
             raise ValueError("unaligned")
 
@@ -91,13 +91,14 @@ class Buf(object):
             self.unit = None
             return self._file.read(self.available())
         else:
-            if self.unit is not None:
-                self.unit -= count
-                self._checkunit()
+            if not free:
+                if self.unit is not None:
+                    self.unit -= count
+                    self._checkunit()
 
-            if self.available() < count:
-                self.unit = self.available() - count
-                self._checkunit()
+                if self.available() < count:
+                    self.unit = self.available() - count
+                    self._checkunit()
 
             return self._file.read(count)
 

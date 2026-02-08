@@ -4,6 +4,8 @@ from ..buf import Buf
 
 import tempfile
 import datetime
+import base64
+import zlib
 
 
 @module.register
@@ -1331,5 +1333,60 @@ class GrubModuleModule(module.RuminantModule):
             meta["data"]["modules"].append(module)
 
         self.buf.sapunit()
+
+        return meta
+
+
+@module.register
+class AndroidBackupModule(module.RuminantModule):
+    desc = "Android Backup files produced by adb backup."
+
+    def identify(buf, ctx):
+        return buf.peek(15) == b"ANDROID BACKUP\n"
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "android-backup"
+        self.buf.skip(15)
+        meta["version"] = int(self.buf.rl().decode("utf-8"))
+        meta["compressed"] = int(self.buf.rl().decode("utf-8")) == 1
+        meta["encryption"] = self.buf.rl().decode("utf-8")
+
+        if meta["encryption"] == "AES-256":
+            meta["encryption-parameters"] = {}
+            meta["encryption-parameters"]["salt"] = bytes.fromhex(
+                self.buf.rl().decode("utf-8")
+            ).hex()
+            meta["encryption-parameters"]["checksum-salt"] = bytes.fromhex(
+                self.buf.rl().decode("utf-8")
+            ).hex()
+            meta["encryption-parameters"]["pbkdf2-rounds"] = int(
+                self.buf.rl().decode("utf-8")
+            )
+            meta["encryption-parameters"]["iv"] = bytes.fromhex(
+                self.buf.rl().decode("utf-8")
+            ).hex()
+            meta["encryption-parameters"]["master-key"] = base64.b64decode(
+                self.buf.rl()
+            ).hex()
+        else:
+            fd = utils.tempfd()
+            d = zlib.decompressobj(wbits=15)
+
+            offset = 0
+            while True:
+                try:
+                    block = self.buf.read(1 << 24, free=True)
+                    offset += len(block)
+                    assert len(block) > 0
+                except Exception:
+                    break
+
+                fd.write(d.decompress(block))
+
+            self.buf.seek(offset - len(d.unused_data))
+
+            fd.seek(0)
+            meta["data"] = chew(fd)
 
         return meta
