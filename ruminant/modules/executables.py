@@ -1723,6 +1723,26 @@ class ElfModule(module.RuminantModule):
                         sh["parsed"]["entries"] = []
                         while self.buf.available() > 0:
                             sh["parsed"]["entries"].append(self.buf.rzs())
+                    elif sh["name"]["string"] == ".fini_array":
+                        sh["parsed"]["init-addresses"] = []
+
+                        while self.buf.available() > 0:
+                            if self.wide:
+                                sh["parsed"]["init-addresses"].append(
+                                    self.hex(
+                                        self.buf.ru64l()
+                                        if self.little
+                                        else self.buf.ru64()
+                                    )
+                                )
+                            else:
+                                sh["parsed"]["init-addresses"].append(
+                                    self.hex(
+                                        self.buf.ru32l()
+                                        if self.little
+                                        else self.buf.ru32()
+                                    )
+                                )
                     else:
                         del sh["parsed"]
 
