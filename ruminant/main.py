@@ -194,7 +194,7 @@ def main(dev=False):
     parser.add_argument(
         "--strip-url",
         action="store_true",
-        help="Strip metadata-removing parameters fromknown URLs like '?filetype=webp'",
+        help="Strip metadata-removing parameters from known URLs like '?filetype=webp'",
     )
 
     parser.add_argument(
