@@ -550,3 +550,179 @@ class OpenTimestampsProofModule(module.RuminantModule):
                 meta["unknown"] = True
 
         return meta
+
+
+# https://docs.oracle.com/en/java/javase/11/docs/specs/serialization/protocol.html#stream-elements
+@module.register
+class JavaSerializationData(module.RuminantModule):
+    dev = True
+    desc = "Java serialization data as produced by java.io.ObjectOutputStream and similar classes."
+
+    def identify(buf, ctx):
+        return buf.peek(3) == b"\xac\xed\x00"
+
+    def handle(self, obj):
+        obj["data"]["handle"] = self.index
+        self.handles[self.index] = obj
+        self.index += 1
+
+    def read_classdesc_data(self, obj, classdata):
+        fields = []
+        head = obj
+        while head["type"] != "null":
+            if head["type"] == "reference":
+                head = self.handles[head["data"]["handle"]]
+
+            fields.append(head["data"]["fields"])
+            head = head["data"]["super"]
+
+        _fields = []
+        for group in fields:
+            _fields += group
+        fields = _fields
+
+        val = None
+        for field in fields:
+            match field["type"]:
+                case "I":
+                    val = self.buf.ri32()
+                case "Z":
+                    val = bool(self.buf.ru8())
+                case "L" | "[":
+                    val = self.read_element()
+                case _:
+                    raise ValueError(f"Unknown classdata type {field['type']}")
+
+        classdata[field["name"]] = val
+
+    def read_element(self):
+        tc = self.buf.ru8()
+        obj = {}
+        obj["type"] = None
+        obj["data"] = {}
+
+        match tc:
+            case 0x70:
+                obj["type"] = "null"
+            case 0x71:
+                obj["type"] = "reference"
+                obj["data"]["handle"] = self.buf.ru32() - 0x7e0000
+            case 0x72:
+                obj["type"] = "classdesc"
+                obj["data"]["name"] = self.buf.rs(self.buf.ru16())
+                obj["data"]["serial-version-uid"] = self.buf.rh(8)
+                self.handle(obj)
+                obj["data"]["flags"] = utils.unpack_flags(
+                    self.buf.ru8(),
+                    (
+                        (0, "WRITE_METHOD"),
+                        (1, "SERIALIZABLE"),
+                        (2, "EXTERNALIZABLE"),
+                        (3, "BLOCK_DATA"),
+                        (4, "ENUM"),
+                    ),
+                )
+                obj["data"]["fields"] = []
+                for i in range(0, self.buf.ru16()):
+                    field = {}
+                    field["type"] = self.buf.rs(1)
+                    field["name"] = self.buf.rs(self.buf.ru16())
+                    if field["type"] in "L[":
+                        field["class-name"] = self.read_element()
+
+                    obj["data"]["fields"].append(field)
+                obj["data"]["annotation"] = []
+                while True:
+                    obj2 = self.read_element()
+                    if obj2["type"] == "endblockdata":
+                        break
+
+                    obj["data"]["annotation"].append(obj2)
+                obj["data"]["super"] = self.read_element()
+
+            case 0x73:
+                obj["type"] = "object"
+                obj["data"]["classdesc"] = self.read_element()
+                self.handle(obj)
+
+                obj["data"]["classdata"] = {}
+                if "SERIALIZABLE" in obj["data"]["classdesc"]["data"]["flags"]["names"]:
+                    self.read_classdesc_data(
+                        obj["data"]["classdesc"], obj["data"]["classdata"]
+                    )
+
+                    if (
+                        "WRITE_METHOD"
+                        in obj["data"]["classdesc"]["data"]["flags"]["names"]
+                    ):
+                        obj["data"]["object-annotation"] = []
+                        while True:
+                            obj2 = self.read_element()
+                            if obj2["type"] == "endblockdata":
+                                break
+
+                            obj["data"]["object-annotation"].append(obj2)
+                elif (
+                    "EXTERNALIZABLE"
+                    in obj["data"]["classdesc"]["data"]["flags"]["names"]
+                    and "BLOCK_DATA"
+                    not in obj["data"]["classdesc"]["data"]["flags"]["names"]
+                ):
+                    raise ValueError(
+                        f"Invalid state for flags: {obj['data']['flags']['names']}"
+                    )
+                elif (
+                    "EXTERNALIZABLE"
+                    in obj["data"]["classdesc"]["data"]["flags"]["names"]
+                    and "BLOCK_DATA"
+                    in obj["data"]["classdesc"]["data"]["flags"]["names"]
+                ):
+                    raise ValueError(
+                        f"Invalid state for flags: {obj['data']['flags']['names']}"
+                    )
+                else:
+                    raise ValueError(
+                        "Invalid state for flags: {obj['data']['classdesc']['data']['flags']['names']}"
+                    )
+
+            case 0x74:
+                obj["type"] = "string"
+                self.handle(obj)
+                obj["data"]["payload"] = self.buf.rs(self.buf.ru16())
+            case 0x75:
+                obj["type"] = "array"
+                obj["data"]["classdesc"] = self.read_element()
+                self.handle(obj)
+                obj["data"]["values"] = []
+                for i in range(0, self.buf.ru32()):
+                    obj["data"]["values"].append(self.read_element())
+            case 0x77:
+                obj["type"] = "blockdata"
+                obj["data"]["payload"] = self.buf.rh(self.buf.ru8())
+            case 0x78:
+                obj["type"] = "endblockdata"
+            case _:
+                raise ValueError(f"Unknown type 0x{hex(tc)[2:].zfill(2)}")
+
+        return obj
+
+    def chew(self):
+        meta = {}
+        meta["type"] = "java-serialization"
+
+        self.buf.skip(2)
+        meta["version"] = self.buf.ru16()
+
+        self.index = 0
+        self.handles = {}
+        meta["elements"] = []
+        while True:
+            try:
+                meta["elements"].append(self.read_element())
+            finally:
+                pass
+        #            except Exception as e:
+        #                print(e)
+        #                break
+
+        return meta
